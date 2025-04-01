@@ -292,17 +292,24 @@ install_editor () {
 # Install yay (AUR helper)
 install_yay () {
     info_print "Installing yay, an AUR helper."
-    
+
     # Install base development tools and git
     pacstrap /mnt base-devel git >/dev/null
 
-    # Clone yay repository and install
-    arch-chroot /mnt bash -c 'git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm' >/dev/null
+    # Create a temporary user for yay installation
+    arch-chroot /mnt useradd -m -s /bin/bash aurbuild
+
+    # Set up sudo for the temporary user
+    echo "aurbuild ALL=(ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/aurbuild
+
+    # Install yay as the non-root user
+    arch-chroot /mnt su - aurbuild -c 'git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm' >/dev/null
     
     # Clean up
-    rm -rf /tmp/yay
+    arch-chroot /mnt userdel -r aurbuild
+    rm -rf /mnt/tmp/yay
+    rm -rf /mnt/etc/sudoers.d/aurbuild
 }
-
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
 ===============================================================================================
