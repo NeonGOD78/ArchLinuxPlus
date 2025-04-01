@@ -1,8 +1,5 @@
 #!/usr/bin/env -S bash -e
 
-# Fixing annoying issue that breaks GitHub Actions
-# shellcheck disable=SC2001
-
 # Cleaning the TTY.
 clear
 
