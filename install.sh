@@ -313,13 +313,12 @@ install_yay () {
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
 ========================================================================
-   _____                   .__     .____     .__                        
-  /  _  \  _______   ____  |  |__  |    |    |__|  ____   __ __ ___  ___
- /  /_\  \ \_  __ \_/ ___\ |  |  \ |    |    |  | /    \ |  |  \\  \/  /
-/    |    \ |  | \/\  \___ |   Y  \|    |___ |  ||   |  \|  |  / >    < 
-\____|__  / |__|    \___  >|___|  /|_______ \|__||___|  /|____/ /__/\_ \
-        \/              \/      \/         \/         \/              \/
-                                                                        
+    _             _     _     _            __  __     
+   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _   
+  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_ 
+ / ___ \| | | (__| | | | |___| | | | | |_| |/  \_   _|
+/_/   \_\_|  \___|_| |_|_____|_|_| |_|\__,_/_/\_\|_|
+
 ========================================================================
 ${RESET}"
 info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify the process of installing Arch Linux."
@@ -424,7 +423,7 @@ microcode_detector
 
 # Pacstrap (setting up a base sytem onto the new root).
 info_print "Installing the base system (it may take a while)."
-pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo &>/dev/null
+pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools &>/dev/null
 
 # Setting up the hostname.
 echo "$hostname" > /mnt/etc/hostname
@@ -549,7 +548,7 @@ sed -Ei 's/^#(Color)$/\1\nILoveCandy/;s/^#(ParallelDownloads).*/\1 = 10/' /mnt/e
 
 # Enabling various services.
 info_print "Enabling Reflector, automatic snapshots, BTRFS scrubbing, Grub Snapper menu and systemd-oomd."
-services=(reflector.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer grub-btrfsd.service grub-btrfs.path systemd-oomd)
+services=(reflector.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer grub-btrfsd.service systemd-oomd)
 for service in "${services[@]}"; do
     systemctl enable "$service" --root=/mnt &>/dev/null
 done
