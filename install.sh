@@ -258,26 +258,31 @@ install_editor () {
             info_print "Installing Vim."
             pacstrap /mnt vim &>/dev/null
             echo "EDITOR=vim" >> /mnt/etc/environment
+            echo "VISUAL=vim" >> /mnt/etc/enviroment
             ;;
         2 )
             info_print "Installing Neovim."
             pacstrap /mnt neovim &>/dev/null
             echo "EDITOR=nvim" >> /mnt/etc/environment
+            echo "VISUAL=nvim" >> /mnt/etc/enviroment
             ;;
         3 )
             info_print "Installing Nano."
             pacstrap /mnt nano &>/dev/null
             echo "EDITOR=nano" >> /mnt/etc/environment
+            echo "VISUAL=nano" >> /mnt/etc/enviroment
             ;;
         4 )
             info_print "Installing Micro."
             pacstrap /mnt micro &>/dev/null
             echo "EDITOR=micro" >> /mnt/etc/environment
+            echo "VISUAL=micro" >> /mnt/etc/enviroment
             ;;
         * )
-            error_print "Invalid selection, using Nano as default editor."
-            pacstrap /mnt nano &>/dev/null
-            echo "EDITOR=nano" >> /mnt/etc/environment
+            error_print "Invalid selection, using Vim as default editor."
+            pacstrap /mnt vim &>/dev/null
+            echo "EDITOR=vim" >> /mnt/etc/environment
+            echo "VISUAL=vim" >> /mnt/etc/enviroment
             ;;
     esac
 
