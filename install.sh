@@ -289,6 +289,19 @@ install_editor () {
     info_print "The selected editor has been installed and set as the default editor in /etc/environment."
 }
 
+# Install yay (AUR helper)
+install_yay () {
+    info_print "Installing yay, an AUR helper."
+    
+    # Install base development tools and git
+    pacstrap /mnt base-devel git >/dev/null
+
+    # Clone yay repository and install
+    arch-chroot /mnt bash -c 'git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm' >/dev/null
+    
+    # Clean up
+    rm -rf /tmp/yay
+}
 
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
@@ -429,11 +442,14 @@ EOF
 # Virtualization check.
 virt_check
 
+# Setting up the network.
+network_installer
+
 # Install Default Editor
 install_editor
 
-# Setting up the network.
-network_installer
+# Installing Yay (AUR helper).
+install_yay
 
 # Configuring /etc/mkinitcpio.conf.
 info_print "Configuring /etc/mkinitcpio.conf."
