@@ -309,7 +309,7 @@ echo -ne "${BOLD}${BYELLOW}
  ArchLinux Installer +                                                                                               
 ===============================================================================================
 ${RESET}"
-info_print "Welcome to ArchLinux Installer +, a script made in order to simplify the process of installing Arch Linux."
+info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify the process of installing Arch Linux."
 
 # Setting up keyboard layout.
 until keyboard_selector; do : ; done
