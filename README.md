@@ -3,4 +3,4 @@ Arch Linux install script
 
 !! WORK IN PROGRESS !!
 
-bash <(curl -sL bit.ly/ArchLinuxPlus)
+bash <(curl -sL t.ly/ArchLinuxPlus)
