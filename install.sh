@@ -423,7 +423,7 @@ microcode_detector
 
 # Pacstrap (setting up a base sytem onto the new root).
 info_print "Installing the base system (it may take a while)."
-pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc &>/dev/null
+pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git &>/dev/null
 
 #Setting Default Shell to zsh
 info_print "Setting default shell to zsh and setting up OH-MY-POSH and Zinit"
@@ -434,6 +434,10 @@ mkdir -p /mnt/etc/skel/.local/bin 2>/dev/null && curl -sSLo /mnt/etc/skel/.local
 mkdir -p /mnt/etc/skel/.cache/oh-my-posh/themes 2>/dev/null && curl -sSLo /mnt/etc/skel/.cache/oh-my-posh/themes/zen.toml https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.cache/oh-my-posh/themes/zen.toml
 curl -sSLo /mnt/etc/skel/.bashrc https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.bashrc
 curl -sSLo /mnt/etc/skel/.aliases https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.aliases
+mkdir -p /mnt/root/.local/share/zinit 2>/dev/null && git clone https://github.com/zdharma-continuum/zinit.git /mnt/root/.local/share/zinit/zinit.git &>/dev/null
+if [[ -n "$username" ]]; then
+    mkdir -p /mnt/home/$username/.local/share/zinit 2>/dev/null && git clone https://github.com/zdharma-continuum/zinit.git /mnt/home/$username/.local/share/zinit/zinit.git &>/dev/null
+fi
 
 # Setting up the hostname.
 echo "$hostname" > /mnt/etc/hostname
