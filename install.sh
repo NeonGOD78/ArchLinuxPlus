@@ -432,7 +432,7 @@ curl -sSLo /mnt/etc/skel/.zshrc https://raw.githubusercontent.com/XenoBIT78/Arch
 curl -sSLo /mnt/etc/zsh/zshrc https://raw.githubusercontent.com/XenoBIT78/Archlinux-Installer/refs/heads/main/configs/etc/zsh/zshrc
 curl -sSLo /mnt/etc/skel/.local/bin/setup-default-zsh https://raw.githubusercontent.com/XenoBIT78/Archlinux-Installer/refs/heads/main/configs/etc/skel/.local/bin/setup-default-zsh
 chmod +x /mnt/etc/skel/.local/bin/setup-default-zsh
-
+curl -sSLo /mnt/etc/skel/.cache/oh-my-posh/themes/zen.toml https://raw.githubusercontent.com/XenoBIT78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.cache/oh-my-posh/themes/zen.toml
 # Setting up the hostname.
 echo "$hostname" > /mnt/etc/hostname
 
