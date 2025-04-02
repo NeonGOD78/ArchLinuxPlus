@@ -1,9 +1,7 @@
 # ArchLinux+
 # /etc/zsh/zshrc
 
-
 # ZINIT
-
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 [ ! -d $ZINIT_HOME ] && mkdir -p "$(dirname $ZINIT_HOME)"
 [ ! -d $ZINIT_HOME/.git ] && git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
@@ -29,19 +27,15 @@ setopt hist_ignore_dups
 setopt hist_find_no_dups
 
 # OH_MY_POSH
-
 OH_MY_POSH_PATH="$HOME/.local/bin/oh-my-posh"
-
 if [[ ! -f "$OH_MY_POSH_PATH" ]]; then
     curl -s https://ohmyposh.dev/install.sh | bash > /dev/null 2>&1
 fi
-
 export PATH=$PATH:$HOME/.local/bin
 
 
 # Custom Theme
 THEME_FILE="$HOME/.cache/oh-my-posh/themes/zen.toml"
-
 if [[ ! -f "$THEME_FILE" ]]; then
     cat > "$THEME_FILE" <<EOF
 #:schema https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json
