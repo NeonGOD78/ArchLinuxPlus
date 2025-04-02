@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ArchLinux+
-# ~/.local/bin/setup-default-zsh
+# /etc/skel/.local/bin/setup-default-zsh
 
 
 # Setup Standard Config in ~/.zshrc
