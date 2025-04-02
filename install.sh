@@ -517,12 +517,13 @@ EOF
 # Setting root password.
 info_print "Setting root password."
 echo "root:$rootpass" | arch-chroot /mnt chpasswd
+arch-chroot /mnt usermod -s /usr/bin/zsh "root"
 
 # Setting user password.
 if [[ -n "$username" ]]; then
     echo "%wheel ALL=(ALL:ALL) ALL" > /mnt/etc/sudoers.d/wheel
     info_print "Adding the user $username to the system with root privilege."
-    arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
+    arch-chroot /mnt useradd -m -G wheel -s /usr/bin/zsh "$username"
     info_print "Setting user password for $username."
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
 fi
