@@ -430,6 +430,8 @@ info_print "Setting default shell to zsh and setting up OH-MY-POSH and Zinit"
 sed -i 's|^SHELL=/usr/bin/bash|SHELL=/usr/bin/zsh|' /mnt/etc/default/useradd
 curl -sSLo /mnt/etc/skel/.zshrc https://raw.githubusercontent.com/XenoBIT78/Archlinux-Installer/refs/heads/main/configs/etc/skel/.zshrc
 curl -sSLo /mnt/etc/zsh/zshrc https://raw.githubusercontent.com/XenoBIT78/Archlinux-Installer/refs/heads/main/configs/etc/zsh/zshrc
+curl -sSLo /mnt/etc/skel/.local/bin/setup-default-zsh https://raw.githubusercontent.com/XenoBIT78/Archlinux-Installer/refs/heads/main/configs/etc/skel/.local/bin/setup-default-zsh
+chmod +x /mnt/etc/skel/.local/bin/setup-default-zsh
 
 # Setting up the hostname.
 echo "$hostname" > /mnt/etc/hostname
