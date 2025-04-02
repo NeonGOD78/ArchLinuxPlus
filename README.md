@@ -1,4 +1,4 @@
 # arch
 arch install script
 
-bash <(curl -sL bit.ly/archlinux-installer)
+bash <(curl -sL bit.ly/ArchLinuxPlus)
