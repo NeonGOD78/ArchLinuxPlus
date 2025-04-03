@@ -114,7 +114,6 @@ network_installer () {
     esac
 }
 
-# User enters a password for the LUKS Container (function).
 lukspass_selector () {
     input_print "Please enter a password for the LUKS container (you're not going to see the password): "
     read -r -s password
@@ -144,6 +143,8 @@ reuse_password() {
     choice=$(head -n1 </dev/tty)
     stty "$old_stty_cfg"
 
+    echo  # Manually add a newline to separate input from next prompt
+
     choice=${choice:-yes}  # Default to "yes" if empty
 
     case "$choice" in
@@ -161,23 +162,26 @@ reuse_password() {
 userpass_selector () {
     input_print "Please enter name for a user account (enter empty to not create one): "
     read -r username
+    echo  # Ensure proper formatting
+
     if [[ -z "$username" ]]; then
         return 0
     fi
 
     if [[ -n "$userpass" ]]; then
         input_print "Using previously set password for $username."
+        echo
         return 0
     fi
 
     input_print "Please enter a password for $username (you're not going to see the password): "
     read -r -s userpass
+    echo  
     if [[ -z "$userpass" ]]; then
-        echo
         error_print "You need to enter a password for $username, please try again."
         return 1
     fi
-    echo
+
     input_print "Please enter the password again (you're not going to see it): " 
     read -r -s userpass2
     echo
@@ -192,17 +196,18 @@ userpass_selector () {
 rootpass_selector () {
     if [[ -n "$rootpass" ]]; then
         input_print "Using previously set root password."
+        echo
         return 0
     fi
 
     input_print "Please enter a password for the root user (you're not going to see it): "
     read -r -s rootpass
+    echo  
     if [[ -z "$rootpass" ]]; then
-        echo
         error_print "You need to enter a password for the root user, please try again."
         return 1
     fi
-    echo
+
     input_print "Please enter the password again (you're not going to see it): " 
     read -r -s rootpass2
     echo
