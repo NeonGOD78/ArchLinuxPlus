@@ -330,7 +330,7 @@ install_yay () {
     info_print "Installing yay, an AUR helper."
 
     # Install base development tools and git with no output
-    pacstrap /mnt base-devel git &>/dev/null
+    pacstrap /mnt base-devel &>/dev/null
 
     # Create a temporary user for yay installation with no output
     arch-chroot /mnt useradd -m -s /bin/bash aurbuild &>/dev/null
