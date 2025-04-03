@@ -13,7 +13,10 @@ zsh as default shell with zinit, OH-MY-POSH
 zsh-syntax-highlighting + zsh-completions + zsh-autosuggestions
 fzf + fzf-tab + zoxide + git.zsh + git + sudo + archlinux + command-not-found
 
-setup as seen here: https://www.youtube.com/watch?v=ud7YxC33Z3w + https://www.youtube.com/watch?v=9U8LCjuQzdc
+setup as seen here:
+https://www.youtube.com/watch?v=ud7YxC33Z3w
+https://www.youtube.com/watch?v=9U8LCjuQzdc
+
 A Big Thank you to Dreams of Autonomy
 
 
