@@ -40,7 +40,9 @@ alias top='btop'
 
 n='nano'
 sn='sudo nano'
-
+sm='sudo mount'
+reload='sudo systemctl reload'
+sc='sudo systemctl'
 yeet='yay -Rns'
 
 if [ $UID -ne 0 ]; then
