@@ -134,6 +134,20 @@ lukspass_selector () {
     return 0
 }
 
+reuse_password() {
+    read -p "Do you want to use the stored password for root and user? (yes/no): " choice
+    case "$choice" in
+        y|Y|yes|YES)
+            userpass="$password"
+            rootpass="$password"
+            ;;
+        *)
+            echo "No password set."
+            ;;
+    esac
+}
+
+
 # Setting up a password for the user account (function).
 userpass_selector () {
     input_print "Please enter name for a user account (enter empty to not create one): "
@@ -338,6 +352,9 @@ done
 
 # Setting up LUKS password.
 until lukspass_selector; do : ; done
+
+# Reuse password
+until reuse_password; do : ; done
 
 # Setting up the kernel.
 until kernel_selector; do : ; done
