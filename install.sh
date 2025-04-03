@@ -135,14 +135,16 @@ lukspass_selector () {
 }
 
 reuse_password() {
-    read -p "Do you want to use the stored password for root and user? (yes/no): " choice
+    input_print "Do you want to use the LUKS password for root and user? (YES/no): "
+    read -p  choice
+    choice=${choice:-yes}
     case "$choice" in
         y|Y|yes|YES)
             userpass="$password"
             rootpass="$password"
             ;;
         *)
-            echo "No password set."
+            info_print "No reusable passwords."
             ;;
     esac
 }
@@ -155,6 +157,12 @@ userpass_selector () {
     if [[ -z "$username" ]]; then
         return 0
     fi
+
+    if [[ -n "$userpass" ]]; then
+        input_print "Using previously set password for $username."
+        return 0
+    fi
+
     input_print "Please enter a password for $username (you're not going to see the password): "
     read -r -s userpass
     if [[ -z "$userpass" ]]; then
@@ -176,6 +184,11 @@ userpass_selector () {
 
 # Setting up a password for the root account (function).
 rootpass_selector () {
+    if [[ -n "$rootpass" ]]; then
+        input_print "Using previously set root password."
+        return 0
+    fi
+
     input_print "Please enter a password for the root user (you're not going to see it): "
     read -r -s rootpass
     if [[ -z "$rootpass" ]]; then
