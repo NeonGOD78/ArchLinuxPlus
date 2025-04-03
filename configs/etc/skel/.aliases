@@ -47,4 +47,5 @@ if [ $UID -ne 0 ]; then
     alias shutdown='sudo shutdown'
     alias reboot='sudo reboot'
     alias pacman='sudo pacman'
+    alias systemctl='sudo systemctl'
 fi
