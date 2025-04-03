@@ -531,10 +531,12 @@ fi
 # Install zinit
 info_print "Adding zinit to the system."
 
-mkdir -p /mnt/root/.local/share/zinit 2>/dev/null && git clone https://github.com/zdharma-continuum/zinit.git /mnt/root/.local/share/zinit/zinit.git
+arch-chroot /mnt mkdir -p /mnt/root/.local/share/zinit 
+arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /mnt/root/.local/share/zinit/zinit.git
 if [[ -n "$username" ]]; then
-    mkdir -p /mnt/home/$username/.local/share/zinit 2>/dev/null && git clone https://github.com/zdharma-continuum/zinit.git /mnt/home/$username/.local/share/zinit/zinit.git
-    chown -R $username:$username /mnt/home/$username
+    arch-chroot /mnt mkdir -p /mnt/home/"$username"/.local/share/zinit
+    arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /mnt/home/"$username"/.local/share/zinit/zinit.git
+    arch-chroot /mnt chown -R $username:$username /mnt/home/$username
 fi
 
 # Boot backup hook.
