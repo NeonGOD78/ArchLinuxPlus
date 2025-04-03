@@ -135,7 +135,7 @@ lukspass_selector () {
 
 # Ask if the user wants to reuse the LUKS password
 reuse_password() {
-    input_print "Do you want to use the LUKS password for root and user? (YES/no): "
+    input_print "Do you want to use the same password for root/user? (YES/no): "
 
     # Disable cursor blinking during input
     old_stty_cfg=$(stty -g)
@@ -284,47 +284,45 @@ keyboard_selector () {
 # Install the default editor (function).
 install_editor () {
     info_print "Select a default text editor to install:"
-    info_print "1) Vim (classic editor)"
+    info_print "1) Nano (simple editor)"
     info_print "2) Neovim (modern alternative to Vim)"
-    info_print "3) Nano (simple editor)"
+    info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal-based editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
     read -r editor_choice
 
     case $editor_choice in
         1 ) 
-            info_print "Installing Vim."
-            pacstrap /mnt vim &>/dev/null
-            echo "EDITOR=vim" >> /mnt/etc/environment
-            echo "VISUAL=vim" >> /mnt/etc/enviroment
+            info_print "Installing Nano and setting it as default editor in /etc/enviroment."
+            pacstrap /mnt nano &>/dev/null
+            echo "EDITOR=nano" >> /mnt/etc/environment
+            echo "VISUAL=nano" >> /mnt/etc/enviroment
             ;;
         2 )
-            info_print "Installing Neovim."
+            info_print "Installing Neovim and setting it as default editor in /etc/enviroment."
             pacstrap /mnt neovim &>/dev/null
             echo "EDITOR=nvim" >> /mnt/etc/environment
             echo "VISUAL=nvim" >> /mnt/etc/enviroment
             ;;
         3 )
-            info_print "Installing Nano."
-            pacstrap /mnt nano &>/dev/null
-            echo "EDITOR=nano" >> /mnt/etc/environment
-            echo "VISUAL=nano" >> /mnt/etc/enviroment
+            info_print "Installing Vim and setting it as default editor in /etc/enviroment."
+            pacstrap /mnt vim &>/dev/null
+            echo "EDITOR=vim" >> /mnt/etc/environment
+            echo "VISUAL=vim" >> /mnt/etc/enviroment
             ;;
         4 )
-            info_print "Installing Micro."
+            info_print "Installing Micro and setting it as default editor in /etc/enviroment."
             pacstrap /mnt micro &>/dev/null
             echo "EDITOR=micro" >> /mnt/etc/environment
             echo "VISUAL=micro" >> /mnt/etc/enviroment
             ;;
         * )
-            error_print "Invalid selection, using Vim as default editor."
-            pacstrap /mnt vim &>/dev/null
-            echo "EDITOR=vim" >> /mnt/etc/environment
-            echo "VISUAL=vim" >> /mnt/etc/enviroment
+            error_print "Invalid selection, using Nano as default editor."
+            pacstrap /mnt nano &>/dev/null
+            echo "EDITOR=nano" >> /mnt/etc/environment
+            echo "VISUAL=nano" >> /mnt/etc/enviroment
             ;;
     esac
-
-    info_print "The selected editor has been installed and set as the default editor in /etc/environment."
 }
 
 # Install yay (AUR helper)
@@ -350,14 +348,14 @@ install_yay () {
 }
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
-========================================================================
+===========================================================
     _             _     _     _            __  __     
    / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _   
   / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_ 
  / ___ \| | | (__| | | | |___| | | | | |_| |/  \_   _|
 /_/   \_\_|  \___|_| |_|_____|_|_| |_|\__,_/_/\_\|_|
 
-========================================================================
+===========================================================
 ${RESET}"
 info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify the process of installing Arch Linux."
 
@@ -571,13 +569,12 @@ fi
 
 # Install zinit
 info_print "Adding zinit to the system."
-
-mkdir -p /mnt/root/.local/share/zinit 
-arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /root/.local/share/zinit/zinit.git
+mkdir -p /mnt/root/.local/share/zinit &>/dev/null
+arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /root/.local/share/zinit/zinit.git &>/dev/null
 if [[ -n "$username" ]]; then
-    mkdir -p /mnt/home/"$username"/.local/share/zinit
-    arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /home/"$username"/.local/share/zinit/zinit.git
-    arch-chroot /mnt chown -R $username:$username /home/$username
+    mkdir -p /mnt/home/"$username"/.local/share/zinit &>/dev/null
+    arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /home/"$username"/.local/share/zinit/zinit.git &>/dev/null
+    arch-chroot /mnt chown -R $username:$username /home/$username &>/dev/null
 fi
 
 # Boot backup hook.
