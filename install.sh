@@ -573,10 +573,10 @@ fi
 info_print "Adding zinit to the system."
 
 mkdir -p /mnt/root/.local/share/zinit 
-arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /mnt/root/.local/share/zinit/zinit.git
+arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /root/.local/share/zinit/zinit.git
 if [[ -n "$username" ]]; then
     mkdir -p /mnt/home/"$username"/.local/share/zinit
-    arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /mnt/home/"$username"/.local/share/zinit/zinit.git
+    arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /home/"$username"/.local/share/zinit/zinit.git
     arch-chroot /mnt chown -R $username:$username /mnt/home/$username
 fi
 
