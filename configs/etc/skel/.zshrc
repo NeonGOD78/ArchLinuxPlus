@@ -7,6 +7,8 @@ eval "$(oh-my-posh init zsh --config $HOME/.cache/oh-my-posh/themes/zen.toml)"
 # Aliases
 source $HOME/.aliases
 
+#ZINIT read the documentation for usage: https://zdharma-continuum.github.io/zinit/wiki/INTRODUCTION/
+
 # ZINIT - Add in zsh plugins
 zinit light zsh-users/zsh-syntax-highlighting
 zinit light zsh-users/zsh-completions
