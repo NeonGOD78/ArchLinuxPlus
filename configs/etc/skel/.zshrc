@@ -39,3 +39,9 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 # Shell integrations
 eval "$(fzf --zsh)"
 eval "$(zoxide init --cmd cd zsh)"
+
+#RELOGIN_NOTICE
+if grep -q "#RELOGIN_NOTICE" "$HOME/.zshrc"; then
+    echo "⚠️  You need to relog to activate the newly installed addons! ⚠️"
+    sed -i '/#RELOGIN_NOTICE/d' "$HOME/.zshrc"
+fi
