@@ -577,7 +577,7 @@ arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /root/
 if [[ -n "$username" ]]; then
     mkdir -p /mnt/home/"$username"/.local/share/zinit
     arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /home/"$username"/.local/share/zinit/zinit.git
-    chown -R $username:$username /mnt/home/$username
+    arch-chroot /mnt chown -R $username:$username /home/$username
 fi
 
 # Boot backup hook.
