@@ -134,10 +134,18 @@ lukspass_selector () {
     return 0
 }
 
+# Ask if the user wants to reuse the LUKS password
 reuse_password() {
     input_print "Do you want to use the LUKS password for root and user? (YES/no): "
-    read -p  choice
-    choice=${choice:-yes}
+
+    # Disable cursor blinking during input
+    old_stty_cfg=$(stty -g)
+    stty -echo -icanon
+    choice=$(head -n1 </dev/tty)
+    stty "$old_stty_cfg"
+
+    choice=${choice:-yes}  # Default to "yes" if empty
+
     case "$choice" in
         y|Y|yes|YES)
             userpass="$password"
@@ -148,7 +156,6 @@ reuse_password() {
             ;;
     esac
 }
-
 
 # Setting up a password for the user account (function).
 userpass_selector () {
@@ -175,7 +182,6 @@ userpass_selector () {
     read -r -s userpass2
     echo
     if [[ "$userpass" != "$userpass2" ]]; then
-        echo
         error_print "Passwords don't match, please try again."
         return 1
     fi
