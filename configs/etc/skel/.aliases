@@ -38,12 +38,12 @@ alias df='df -H'
 alias du='du -ch'
 alias top='btop'
 
-n='nano'
-sn='sudo nano'
-sm='sudo mount'
-reload='sudo systemctl reload'
-sc='sudo systemctl'
-yeet='yay -Rns'
+alias n='nano'
+alias sn='sudo nano'
+alias sm='sudo mount'
+alias reload='sudo systemctl reload'
+alias sc='sudo systemctl'
+alias yeet='yay -Rns'
 
 if [ $UID -ne 0 ]; then
     alias shutdown='sudo shutdown'
