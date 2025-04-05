@@ -1,4 +1,4 @@
-# Aliases
+n# Aliases
 alias c='clear'
 alias smc='sudo mc'
 
@@ -41,7 +41,7 @@ alias top='btop'
 alias n='nano'
 alias sn='sudo nano'
 alias sm='sudo mount'
-alias reload='sudo systemctl reload'
+alias reload='sudo systemctl daemon-reload'
 alias sc='sudo systemctl'
 alias yeet='yay -Rns'
 
