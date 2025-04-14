@@ -591,10 +591,11 @@ arch-chroot /mnt /bin/bash -e <<EOF
     grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
     cat >> /etc/grub.d/40_custom <<EOF
     menuentry 'Arch Linux (UKI)' {
-       search --label ESP --set=esp
-       linuxefi (\$esp)/EFI/Linux/arch.efi
-       }
+    search --label ESP --set=esp
+    linuxefi (\$esp)/EFI/Linux/arch.efi
+    }
     EOF
+    chmod +x /etc/grub.d/40_custom
 
     # Enable Automatic Grub snapper menu
     sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
