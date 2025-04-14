@@ -470,10 +470,9 @@ umount /mnt
 info_print "Mounting the newly created subvolumes."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
-mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
+mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg,pkgs,lib/{portables,machines}},boot}
 
 # Mount root subvolumes (uden @home)
-subvols=(var_pkgs var_log root srv var_lib_portables var_lib_machines)
 for subvol in "${subvols[@]}"; do
     mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot /mnt/"${subvol//_//}"
 done
@@ -486,7 +485,6 @@ mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
 chattr +C /mnt/var/log
 mount "$ESP" /mnt/efi/
-
 
 # Checking the microcode to install.
 microcode_detector
