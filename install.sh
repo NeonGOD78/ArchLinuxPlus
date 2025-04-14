@@ -674,24 +674,55 @@ if [[ -n "$username" ]]; then
     arch-chroot /mnt chown -R $username:$username /home/$username &>/dev/null
 fi
 
-# Boot backup hook.
-info_print "Configuring /boot backup when pacman transactions are made."
+# UKI Backup folder
+info_print "Creating EFI backup folder at /.efibackup"
+mkdir -p /mnt/.efibackup
+
+# UKI rebuild hook with integrated backup
+info_print "Creating UKI rebuild hook and backup script."
 mkdir -p /mnt/etc/pacman.d/hooks
-cat > /mnt/etc/pacman.d/hooks/50-bootbackup.hook <<EOF
+cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<EOF
 [Trigger]
-Operation = Upgrade
-Operation = Install
-Operation = Remove
 Type = Path
-Target = usr/lib/modules/*/vmlinuz
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = boot/vmlinuz-linux
+Target = boot/initramfs-linux.img
 
 [Action]
-Depends = rsync
-Description = Backing up /boot...
+Description = Regenerating Unified Kernel Image (UKI)...
 When = PostTransaction
-Exec = /usr/bin/rsync -a --delete /boot /.bootbackup
+Exec = /usr/local/bin/update-uki
 EOF
 
+mkdir -p /mnt/usr/local/bin
+cat > /mnt/usr/local/bin/update-uki <<'EOF'
+#!/bin/bash
+set -e
+
+UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
+KERNEL="/boot/vmlinuz-linux"
+INITRD="/boot/initramfs-linux.img"
+BACKUP_DIR="/.efibackup"
+
+UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+
+CMDLINE="rd.luks.name=${UUID_ROOT}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
+
+# Regenerate UKI
+ukify build \
+  --linux "$KERNEL" \
+  --initrd "$INITRD" \
+  --cmdline "$CMDLINE" \
+  --output "$UKI_OUTPUT"
+
+# Backup current UKI
+mkdir -p "$BACKUP_DIR"
+cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak"
+EOF
+
+chmod +x /mnt/usr/local/bin/update-uki
 # ZRAM configuration.
 info_print "Configuring ZRAM."
 cat > /mnt/etc/systemd/zram-generator.conf <<EOF
