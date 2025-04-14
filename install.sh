@@ -667,4 +667,6 @@ done
 
 # Finishing up.
 info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
+info_print "Verifying LUKS devices before reboot..."
+ls /dev/mapper | grep -E 'cryptroot|crypthome' || error_print "Warning: LUKS devices not active"
 exit
