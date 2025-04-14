@@ -492,7 +492,7 @@ mount "$ESP" /mnt/efi/
 # Checking the microcode to install.
 microcode_detector
 
-# Pacstrap (setting up a base sytem onto the new root).
+# Pacstrap (setting up a base system onto the new root).
 info_print "Installing the base system (it may take a while)."
 pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git systemd ukify sbctl &>/dev/null
 
@@ -561,7 +561,7 @@ arch-chroot /mnt /bin/bash -e <<EOF
     ln -sf /usr/share/zoneinfo/$(curl -s http://ip-api.com/line?fields=timezone) /etc/localtime &>/dev/null
 
     # Setting up clock.
-    hwclock --systohc
+    hwclock --hctosys
 
     # Generating locales.
     locale-gen &>/dev/null
@@ -577,51 +577,6 @@ arch-chroot /mnt /bin/bash -e <<EOF
      --output /efi/EFI/Linux/arch.efi
 
     ukify verify /efi/EFI/Linux/arch.efi
-    
-    # --- Add hook for UKI auto-rebuild on kernel upgrade ---
-    info_print "Creating UKI rebuild hook and script."
-
-    mkdir -p /etc/pacman.d/hooks
-    cat > /etc/pacman.d/hooks/95-ukify.hook <<EOF
-    [Trigger]
-    Type = Path
-    Operation = Install
-    Operation = Upgrade
-    Operation = Remove
-    Target = boot/vmlinuz-linux
-    Target = boot/initramfs-linux.img
-    
-    [Action]
-    Description = Regenerating Unified Kernel Image (UKI)...
-    When = PostTransaction
-    Exec = /usr/local/bin/update-uki
-    EOF
-    
-mkdir -p /usr/local/bin
-cat > /usr/local/bin/update-uki <<'EOF'
-#!/bin/bash
-
-set -e
-
-UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
-KERNEL="/boot/vmlinuz-linux"
-INITRD="/boot/initramfs-linux.img"
-
-UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
-
-CMDLINE="rd.luks.name=${UUID_ROOT}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
-
-ukify build \
-  --linux "$KERNEL" \
-  --initrd "$INITRD" \
-  --cmdline "$CMDLINE" \
-  --output "$UKI_OUTPUT"
-EOF
-
-chmod +x /usr/local/bin/update-uki
-
-# --- End of UKI hook addition ---
-    
     
     # Snapper configuration.
     umount /.snapshots
@@ -695,6 +650,19 @@ Description = Regenerating Unified Kernel Image (UKI)...
 When = PostTransaction
 Exec = /usr/local/bin/update-uki
 EOF
+
+cat > /mnt/etc/systemd/system/update-uki.timer <<EOF
+[Unit]
+Description=Run update-uki daily
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1d
+
+[Install]
+WantedBy=timers.target
+EOF
+
 
 mkdir -p /mnt/usr/local/bin
 cat > /mnt/usr/local/bin/update-uki <<'EOF'
