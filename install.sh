@@ -470,9 +470,10 @@ umount /mnt
 info_print "Mounting the newly created subvolumes."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
-mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg,pkgs,lib/{portables,machines}},boot}
+mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
 
 # Mount root subvolumes (uden @home)
+subvols=(var_pkgs var_log root srv var_lib_portables var_lib_machines)
 for subvol in "${subvols[@]}"; do
     mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot /mnt/"${subvol//_//}"
 done
@@ -486,12 +487,14 @@ mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacm
 chattr +C /mnt/var/log
 mount "$ESP" /mnt/efi/
 
+
 # Checking the microcode to install.
 microcode_detector
 
 # Pacstrap (setting up a base sytem onto the new root).
 info_print "Installing the base system (it may take a while)."
 pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git &>/dev/null
+pacstrap /mnt systemd ukify
 
 #Setting Default Shell to zsh
 info_print "Setting default shell to zsh"
@@ -565,6 +568,14 @@ arch-chroot /mnt /bin/bash -e <<EOF
 
     # Generating a new initramfs.
     mkinitcpio -P &>/dev/null
+    
+    # Generating unified kernel image
+    UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+    ukify build \
+    --linux /boot/vmlinuz-linux \
+    --initrd /boot/initramfs-linux.img \
+    --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3" \
+    --output /efi/EFI/Linux/arch.efi
 
     # Snapper configuration.
     umount /.snapshots
@@ -576,7 +587,13 @@ arch-chroot /mnt /bin/bash -e <<EOF
     chmod 750 /.snapshots
 
     # Installing GRUB.
-    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
+    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
+    cat >> /etc/grub.d/40_custom <<EOF
+    menuentry 'Arch Linux (UKI)' {
+       search --label ESP --set=esp
+       linuxefi (\$esp)/EFI/Linux/arch.efi
+       }
+    EOF
 
     # Enable Automatic Grub snapper menu
     sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
