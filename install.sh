@@ -499,7 +499,6 @@ mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 chmod 750 /mnt/root
 mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
-chattr +C /mnt/var/log
 mount "$ESP" /mnt/efi/
 
 # Checking the microcode to install.
