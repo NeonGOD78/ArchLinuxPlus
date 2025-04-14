@@ -473,6 +473,20 @@ mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
 mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
 
+# Disable Copy-on-Write (CoW) for selected Btrfs directories (must be empty before mounting)
+nocow_dirs=(
+  /mnt/var/log
+  /mnt/var/cache/pacman/pkg
+  /mnt/var/lib/libvirt
+  /mnt/var/lib/machines
+  /mnt/var/lib/portables
+)
+
+for dir in "${nocow_dirs[@]}"; do
+    mkdir -p "$dir"  # just to be safe
+    chattr +C "$dir" 2>/dev/null || true
+done
+
 # Mount root subvolumes (uden @home)
 subvols=(var_pkgs var_log root srv var_lib_portables var_lib_machines)
 for subvol in "${subvols[@]}"; do
