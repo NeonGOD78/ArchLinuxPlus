@@ -488,7 +488,6 @@ mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacm
 chattr +C /mnt/var/log
 mount "$ESP" /mnt/efi/
 
-
 # Checking the microcode to install.
 microcode_detector
 
