@@ -493,8 +493,7 @@ microcode_detector
 
 # Pacstrap (setting up a base sytem onto the new root).
 info_print "Installing the base system (it may take a while)."
-pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git &>/dev/null
-pacstrap /mnt systemd ukify
+pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git systemd ukify &>/dev/null
 
 #Setting Default Shell to zsh
 info_print "Setting default shell to zsh"
@@ -570,19 +569,17 @@ arch-chroot /mnt /bin/bash -e <<EOF
     mkinitcpio -P &>/dev/null
     
     # Generating unified kernel image
-    arch-chroot /mnt /bin/bash -e <<EOF
     ukify build \
      --linux /boot/vmlinuz-linux \
      --initrd /boot/initramfs-linux.img \
      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3" \
      --output /efi/EFI/Linux/arch.efi
-    EOF
-    
+        
     # --- Add hook for UKI auto-rebuild on kernel upgrade ---
     info_print "Creating UKI rebuild hook and script."
 
-    mkdir -p /mnt/etc/pacman.d/hooks
-    cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<EOF
+    mkdir -p /etc/pacman.d/hooks
+    cat > /etc/pacman.d/hooks/95-ukify.hook <<EOF
     [Trigger]
     Type = Path
     Operation = Install
@@ -597,8 +594,8 @@ arch-chroot /mnt /bin/bash -e <<EOF
     Exec = /usr/local/bin/update-uki
     EOF
     
-mkdir -p /mnt/usr/local/bin
-cat > /mnt/usr/local/bin/update-uki <<'EOF'
+mkdir -p /usr/local/bin
+cat > /usr/local/bin/update-uki <<'EOF'
 #!/bin/bash
 
 set -e
