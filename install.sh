@@ -578,6 +578,51 @@ arch-chroot /mnt /bin/bash -e <<EOF
      --output /efi/EFI/Linux/arch.efi
     EOF
     
+    # --- Add hook for UKI auto-rebuild on kernel upgrade ---
+    info_print "Creating UKI rebuild hook and script."
+
+    mkdir -p /mnt/etc/pacman.d/hooks
+    cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<EOF
+    [Trigger]
+    Type = Path
+    Operation = Install
+    Operation = Upgrade
+    Operation = Remove
+    Target = boot/vmlinuz-linux
+    Target = boot/initramfs-linux.img
+    
+    [Action]
+    Description = Regenerating Unified Kernel Image (UKI)...
+    When = PostTransaction
+    Exec = /usr/local/bin/update-uki
+    EOF
+    
+mkdir -p /mnt/usr/local/bin
+cat > /mnt/usr/local/bin/update-uki <<'EOF'
+#!/bin/bash
+
+set -e
+
+UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
+KERNEL="/boot/vmlinuz-linux"
+INITRD="/boot/initramfs-linux.img"
+
+UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+
+CMDLINE="rd.luks.name=${UUID_ROOT}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
+
+ukify build \
+  --linux "$KERNEL" \
+  --initrd "$INITRD" \
+  --cmdline "$CMDLINE" \
+  --output "$UKI_OUTPUT"
+EOF
+
+chmod +x /mnt/usr/local/bin/update-uki
+
+# --- End of UKI hook addition ---
+    
+    
     # Snapper configuration.
     umount /.snapshots
     rm -r /.snapshots
