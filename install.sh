@@ -293,34 +293,34 @@ install_editor () {
 
     case $editor_choice in
         1 ) 
-            info_print "Installing Nano and setting it as default editor in /etc/enviroment."
+            info_print "Installing Nano and setting it as default editor in /etc/environment."
             pacstrap /mnt nano &>/dev/null
             echo "EDITOR=nano" >> /mnt/etc/environment
-            echo "VISUAL=nano" >> /mnt/etc/enviroment
+            echo "VISUAL=nano" >> /mnt/etc/envirnoment
             ;;
         2 )
-            info_print "Installing Neovim and setting it as default editor in /etc/enviroment."
+            info_print "Installing Neovim and setting it as default editor in /etc/environment."
             pacstrap /mnt neovim &>/dev/null
             echo "EDITOR=nvim" >> /mnt/etc/environment
-            echo "VISUAL=nvim" >> /mnt/etc/enviroment
+            echo "VISUAL=nvim" >> /mnt/etc/environment
             ;;
         3 )
-            info_print "Installing Vim and setting it as default editor in /etc/enviroment."
+            info_print "Installing Vim and setting it as default editor in /etc/environment."
             pacstrap /mnt vim &>/dev/null
             echo "EDITOR=vim" >> /mnt/etc/environment
-            echo "VISUAL=vim" >> /mnt/etc/enviroment
+            echo "VISUAL=vim" >> /mnt/etc/environment
             ;;
         4 )
-            info_print "Installing Micro and setting it as default editor in /etc/enviroment."
+            info_print "Installing Micro and setting it as default editor in /etc/environment."
             pacstrap /mnt micro &>/dev/null
             echo "EDITOR=micro" >> /mnt/etc/environment
-            echo "VISUAL=micro" >> /mnt/etc/enviroment
+            echo "VISUAL=micro" >> /mnt/etc/environment
             ;;
         * )
             error_print "Invalid selection, using Nano as default editor."
             pacstrap /mnt nano &>/dev/null
             echo "EDITOR=nano" >> /mnt/etc/environment
-            echo "VISUAL=nano" >> /mnt/etc/enviroment
+            echo "VISUAL=nano" >> /mnt/etc/environment
             ;;
     esac
 }
