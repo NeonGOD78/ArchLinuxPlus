@@ -575,6 +575,9 @@ arch-chroot /mnt /bin/bash -e <<EOF
     # Setting up clock.
     hwclock --hctosys
 
+    # set umask
+    echo "umask 077" >> /etc/profile
+
     # Generating locales.
     locale-gen &>/dev/null
 
