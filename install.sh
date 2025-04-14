@@ -297,7 +297,7 @@ install_editor () {
             info_print "Installing Nano and setting it as default editor in /etc/environment."
             pacstrap /mnt nano &>/dev/null
             echo "EDITOR=nano" >> /mnt/etc/environment
-            echo "VISUAL=nano" >> /mnt/etc/envirnoment
+            echo "VISUAL=nano" >> /mnt/etc/environment
             ;;
         2 )
             info_print "Installing Neovim and setting it as default editor in /etc/environment."
