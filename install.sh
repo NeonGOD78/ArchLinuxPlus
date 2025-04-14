@@ -473,6 +473,7 @@ mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
 mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
 
 # Mount root subvolumes (uden @home)
+subvols=(var_pkgs var_log root srv var_lib_portables var_lib_machines)
 for subvol in "${subvols[@]}"; do
     mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot /mnt/"${subvol//_//}"
 done
@@ -626,7 +627,7 @@ Target = usr/lib/modules/*/vmlinuz
 Depends = rsync
 Description = Backing up /boot...
 When = PostTransaction
-Exec = /usr/bin/rsync -a --delete /boot /var/backup/boot
+Exec = /usr/bin/rsync -a --delete /boot /.bootbackup
 EOF
 
 # ZRAM configuration.
