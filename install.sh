@@ -616,7 +616,7 @@ ukify build \
   --output "$UKI_OUTPUT"
 EOF
 
-chmod +x /mnt/usr/local/bin/update-uki
+chmod +x /usr/local/bin/update-uki
 
 # --- End of UKI hook addition ---
     
