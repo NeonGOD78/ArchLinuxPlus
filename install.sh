@@ -405,16 +405,26 @@ info_print "Wiping $DISK."
 wipefs -af "$DISK" &>/dev/null
 sgdisk -Zo "$DISK" &>/dev/null
 
+####
+# Ask for root size
+input_print "How much space should root (/) use (e.g. 100G): "
+read -r root_size
+if [[ -z "$root_size" ]]; then
+    error_print "You must enter a size for root."; exit 1
+fi
+
 # Creating a new partition scheme.
 info_print "Creating the partitions on $DISK."
 parted -s "$DISK" \
     mklabel gpt \
     mkpart ESP fat32 1MiB 1025MiB \
     set 1 esp on \
-    mkpart CRYPTROOT 1025MiB 100% \
-
+    mkpart CRYPTROOT 1025MiB "$root_size" \
+    mkpart CRYPTHOME "$root_size" 100%
+    
 ESP="/dev/disk/by-partlabel/ESP"
 CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
+CRYPTHOME="/dev/disk/by-partlabel/CRYPTHOME"
 
 # Informing the Kernel of the changes.
 info_print "Informing the Kernel about the disk changes."
