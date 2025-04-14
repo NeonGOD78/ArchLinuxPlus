@@ -438,34 +438,54 @@ mkfs.fat -F 32 "$ESP" &>/dev/null
 info_print "Creating LUKS Container for the root partition."
 echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>/dev/null
 echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d - 
-BTRFS="/dev/mapper/cryptroot"
 
-# Formatting the LUKS Container as BTRFS.
-info_print "Formatting the LUKS container as BTRFS."
-mkfs.btrfs "$BTRFS" &>/dev/null
-mount "$BTRFS" /mnt
+# Creating LUKS Container for home partition.
+info_print "Creating LUKS Container for the home partition."
+echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>/dev/null
+echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d -
 
-# Creating BTRFS subvolumes.
-info_print "Creating BTRFS subvolumes."
-subvols=(snapshots var_pkgs var_log home root srv)
-for subvol in '' "${subvols[@]}"; do
-    btrfs su cr /mnt/@"$subvol" &>/dev/null
+# Formatting the cryptroot Container as BTRFS.
+info_print "Formatting the cryptroot LUKS container as BTRFS."
+mkfs.btrfs /dev/mapper/cryptroot &>/dev/null
+
+# Formatting the crypthome Container as BTRFS.
+info_print "Formatting the crypthome LUKS container as BTRFS."
+mkfs.btrfs /dev/mapper/crypthome &>/dev/null
+
+# Opret Btrfs subvolumes på luks-root (cryptroot)
+info_print "Creating BTRFS subvolumes on root partition."
+mount /dev/mapper/cryptroot /mnt
+for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines; do
+    btrfs subvolume create /mnt/$subvol
 done
+umount /mnt
+
+# Opret Btrfs subvolume på luks-home (crypthome)
+info_print "Creating BTRFS subvolume on home partition."
+mount /dev/mapper/crypthome /mnt
+btrfs subvolume create /mnt/@home
+umount /mnt
 
 # Mounting the newly created subvolumes.
-umount /mnt
 info_print "Mounting the newly created subvolumes."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
-mount -o "$mountopts",subvol=@ "$BTRFS" /mnt
-mkdir -p /mnt/{home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
-for subvol in "${subvols[@]:2}"; do
-    mount -o "$mountopts",subvol=@"$subvol" "$BTRFS" /mnt/"${subvol//_//}"
+mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
+mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
+
+# Mount root subvolumes (uden @home)
+for subvol in "${subvols[@]}"; do
+    mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot /mnt/"${subvol//_//}"
 done
+
+# Mount home separat
+mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
+
 chmod 750 /mnt/root
-mount -o "$mountopts",subvol=@snapshots "$BTRFS" /mnt/.snapshots
-mount -o "$mountopts",subvol=@var_pkgs "$BTRFS" /mnt/var/cache/pacman/pkg
+mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
+mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
 chattr +C /mnt/var/log
-mount "$ESP" /mnt/boot/
+mount "$ESP" /mnt/efi/
+
 
 # Checking the microcode to install.
 microcode_detector
@@ -516,16 +536,20 @@ install_editor
 # Installing Yay (AUR helper).
 install_yay
 
-# Configuring /etc/mkinitcpio.conf.
+# Configuring /etc/mkinitcpio.conf with correct hooks
 info_print "Configuring /etc/mkinitcpio.conf."
-cat > /mnt/etc/mkinitcpio.conf <<EOF
-HOOKS=(systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems grub-btrfs-overlayfs)
-EOF
+sed -i 's/^HOOKS=.*/HOOKS=(systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems grub-btrfs-overlayfs)/' /mnt/etc/mkinitcpio.conf
 
-# Setting up LUKS2 encryption in grub.
-info_print "Setting up grub config."
-UUID=$(blkid -s UUID -o value $CRYPTROOT)
-sed -i "\,^GRUB_CMDLINE_LINUX=\"\",s,\",&rd.luks.name=$UUID=cryptroot root=$BTRFS," /mnt/etc/default/grub
+# Setting up LUKS2 encryption in GRUB
+info_print "Setting up GRUB config."
+
+UUID_ROOT=$(blkid -s UUID -o value "$CRYPTROOT")
+UUID_HOME=$(blkid -s UUID -o value "$CRYPTHOME")
+
+ROOT_MAPPER="/dev/mapper/cryptroot"
+
+# Erstat hele linjen med luks parametre og root-mountpoint
+sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet rd.luks.name=$UUID_ROOT=cryptroot rd.luks.name=$UUID_HOME=crypthome root=$ROOT_MAPPER rootflags=subvol=@\"|" /mnt/etc/default/grub
 
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
@@ -553,7 +577,7 @@ arch-chroot /mnt /bin/bash -e <<EOF
     chmod 750 /.snapshots
 
     # Installing GRUB.
-    grub-install --target=x86_64-efi --efi-directory=/boot/ --bootloader-id=GRUB &>/dev/null
+    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
 
     # Enable Automatic Grub snapper menu
     sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
@@ -589,7 +613,7 @@ fi
 
 # Boot backup hook.
 info_print "Configuring /boot backup when pacman transactions are made."
-mkdir /mnt/etc/pacman.d/hooks
+mkdir -p /mnt/etc/pacman.d/hooks
 cat > /mnt/etc/pacman.d/hooks/50-bootbackup.hook <<EOF
 [Trigger]
 Operation = Upgrade
@@ -602,7 +626,7 @@ Target = usr/lib/modules/*/vmlinuz
 Depends = rsync
 Description = Backing up /boot...
 When = PostTransaction
-Exec = /usr/bin/rsync -a --delete /boot /.bootbackup
+Exec = /usr/bin/rsync -a --delete /boot /var/backup/boot
 EOF
 
 # ZRAM configuration.
