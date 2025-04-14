@@ -570,13 +570,14 @@ arch-chroot /mnt /bin/bash -e <<EOF
     mkinitcpio -P &>/dev/null
     
     # Generating unified kernel image
-    UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+    arch-chroot /mnt /bin/bash -e <<EOF
     ukify build \
-    --linux /boot/vmlinuz-linux \
-    --initrd /boot/initramfs-linux.img \
-    --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3" \
-    --output /efi/EFI/Linux/arch.efi
-
+     --linux /boot/vmlinuz-linux \
+     --initrd /boot/initramfs-linux.img \
+     --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3" \
+     --output /efi/EFI/Linux/arch.efi
+    EOF
+    
     # Snapper configuration.
     umount /.snapshots
     rm -r /.snapshots
