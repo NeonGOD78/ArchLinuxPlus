@@ -575,7 +575,9 @@ arch-chroot /mnt /bin/bash -e <<EOF
      --initrd /boot/initramfs-linux.img \
      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3" \
      --output /efi/EFI/Linux/arch.efi
-        
+
+    ukify verify /efi/EFI/Linux/arch.efi
+    
     # --- Add hook for UKI auto-rebuild on kernel upgrade ---
     info_print "Creating UKI rebuild hook and script."
 
