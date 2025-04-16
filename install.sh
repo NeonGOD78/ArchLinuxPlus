@@ -579,7 +579,6 @@ sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
 
-#########
 arch-chroot /mnt /bin/bash -e <<'CHROOT_EOF'
 
 # Timezone og klokkeslæt
@@ -682,6 +681,103 @@ grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
 info_print "Base system configuration via chroot completed successfully."
 CHROOT_EOF
+
+# UKI: create EFI backup folder
+info_print "Creating EFI backup folder at /.efibackup"
+mkdir -p /mnt/.efibackup
+
+# UKI: create update-uki script
+info_print "Creating /usr/local/bin/update-uki"
+mkdir -p /mnt/usr/local/bin
+
+cat > /mnt/usr/local/bin/update-uki <<'UKIFY_SCRIPT_EOF'
+#!/bin/bash
+set -e
+
+UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
+UKI_OUTPUT_FB="/efi/EFI/Linux/arch-fallback.efi"
+KERNEL="/boot/vmlinuz-linux"
+INITRD="/boot/initramfs-linux.img"
+INITRD_FB="/boot/initramfs-linux-fallback.img"
+BACKUP_DIR="/.efibackup"
+
+UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+
+CMDLINE="rd.luks.name=${UUID_ROOT}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
+
+# Standard UKI
+ukify build --linux "$KERNEL" --initrd "$INITRD" --cmdline "$CMDLINE" --output "$UKI_OUTPUT" >> /var/log/ukify.log 2>&1 || echo "UKI build failed"
+[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT" "$UKI_OUTPUT" >> /var/log/ukify.log 2>&1 || echo "UKI signing failed"
+cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak" &>/dev/null || echo "Backup failed"
+
+# Fallback UKI
+ukify build --linux "$KERNEL" --initrd "$INITRD_FB" --cmdline "$CMDLINE" --output "$UKI_OUTPUT_FB" >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed"
+[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT_FB" "$UKI_OUTPUT_FB" >> /var/log/ukify.log 2>&1 || echo "Fallback UKI signing failed"
+cp "$UKI_OUTPUT_FB" "$BACKUP_DIR/arch-fallback.efi.bak" &>/dev/null || echo "Fallback backup failed"
+UKIFY_SCRIPT_EOF
+
+chmod +x /mnt/usr/local/bin/update-uki
+
+# UKI: systemd timer
+info_print "Creating update-uki systemd timer"
+mkdir -p /mnt/etc/systemd/system
+
+cat > /mnt/etc/systemd/system/update-uki.timer <<'UKIFY_TIMER_EOF'
+[Unit]
+Description=Run update-uki daily
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1d
+
+[Install]
+WantedBy=timers.target
+UKIFY_TIMER_EOF
+
+# UKI: 95-ukify pacman hook (standard)
+info_print "Creating 95-ukify pacman hook"
+mkdir -p /mnt/etc/pacman.d/hooks
+
+cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<'UKIFY_HOOK_EOF'
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = boot/vmlinuz-linux
+Target = boot/initramfs-linux.img
+
+[Action]
+Description = Regenerating Unified Kernel Image (UKI)...
+When = PostTransaction
+Exec = /usr/local/bin/update-uki
+UKIFY_HOOK_EOF
+
+# UKI: 96-ukify-fallback pacman hook
+info_print "Creating 96-ukify-fallback pacman hook"
+cat > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook <<'UKIFY_FB_HOOK_EOF'
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = boot/initramfs-linux-fallback.img
+
+[Action]
+Description = Regenerating fallback Unified Kernel Image (UKI)...
+When = PostTransaction
+Exec = /bin/bash -c '/usr/bin/ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux-fallback.img \
+  --cmdline "rd.luks.name=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed." && \
+  sbsign --key /etc/secureboot/db.key \
+         --cert /etc/secureboot/db.crt \
+         --output /efi/EFI/Linux/arch-fallback.efi \
+         /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI signing failed."'
+UKIFY_FB_HOOK_EOF
+
+# Enable the systemd timer in chroot
+arch-chroot /mnt systemctl enable update-uki.timer >> /mnt/var/log/ukify.log 2>&1 || info_print "Failed to enable update-uki.timer"
 
 # Setting root password.
 info_print "Setting root password."
