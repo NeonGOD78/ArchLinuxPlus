@@ -492,20 +492,31 @@ done
 
 mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
 
-# Definer subvolumes til mounting (undtagen @home som er på separat luks)
-subvols=(snapshots var_pkgs var_log srv root var_lib_portables var_lib_machines)
-for subvol in @ @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_portables @srv @snapshots; do
-    mountpoint="/mnt/${subvol//_//}"
-    [[ "$subvol" == "@snapshots" ]] && mountpoint="/mnt/.snapshots"
-    [[ "$subvol" == "@" ]] && mountpoint="/mnt"
+print_info "Mounting the newly created subvolumes..."
 
-    info_print "Mounting $subvol on $mountpoint"
-    mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
+declare -A mountpoints=(
+  [@]="/mnt"
+  [@snapshots]="/mnt/.snapshots"
+  [@home]="/mnt/home"
+  [@var_log]="/mnt/var/log"
+  [@var_cache]="/mnt/var/cache/pacman/pkg"
+  [@var_lib_libvirt]="/mnt/var/lib/libvirt"
+  [@var_lib_machines]="/mnt/var/lib/machines"
+  [@var_lib_portables]="/mnt/var/lib/portables"
+  [@srv]="/mnt/srv"
+)
+
+# Mount root subvolumes (fra cryptroot)
+for subvol in @ @snapshots @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_portables @srv; do
+  mountpoint="${mountpoints[$subvol]}"
+  print_info "Mounting $subvol on $mountpoint"
+  mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
-# Separat /home på crypthome
-info_print "Mounting @home on /mnt/home from crypthome..."
-mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
+# Mount separat /home (fra crypthome)
+mountpoint="${mountpoints[@home]}"
+print_info "Mounting @home on $mountpoint"
+mount -o "$mountopts",subvol=@home /dev/mapper/crypthome "$mountpoint"
 
 # Ekstra mounts og rettigheder
 chmod 750 /mnt/root
