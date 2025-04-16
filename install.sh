@@ -445,7 +445,7 @@ mkfs.btrfs /dev/mapper/crypthome &>/dev/null
 info_print "Creating BTRFS subvolumes on root partition."
 mount /dev/mapper/cryptroot /mnt
 for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
-    btrfs subvolume create /mnt/$subvol
+    btrfs subvolume create /mnt/$subvol &>/dev/null
 done
 umount /mnt
 
@@ -460,7 +460,7 @@ info_print "Mounting Btrfs subvolumes manually with CoW disabled where needed...
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 
 # Mount root subvolume (@)
-info_print "Mounting @ on /mnt"
+info_print "Mounting @ on /"
 mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
 
 # Create all required mount points
@@ -468,35 +468,36 @@ mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt,var/lib/m
 chmod 750 /mnt/root
 
 # Mount and disable CoW immediately after each
-info_print "Mounting @snapshots on /mnt/.snapshots"
+info_print "Mounting @snapshots on /.snapshots"
 mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 
-info_print "Mounting @var_log on /mnt/var/log"
+info_print "Mounting @var_log on /var/log"
 mount -o "$mountopts",subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
 chattr +C /mnt/var/log 2>/dev/null || info_print "Could not disable CoW on /mnt/var/log"
 
-info_print "Mounting @var_pkgs on /mnt/var/cache/pacman/pkg"
+info_print "Mounting @var_pkgs on /var/cache/pacman/pkg"
 mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
 chattr +C /mnt/var/cache/pacman/pkg 2>/dev/null || info_print "Could not disable CoW on /mnt/var/cache/pacman/pkg"
 
-info_print "Mounting @var_lib_libvirt on /mnt/var/lib/libvirt"
+info_print "Mounting @var_lib_libvirt on /var/lib/libvirt"
 mount -o "$mountopts",subvol=@var_lib_libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
 chattr +C /mnt/var/lib/libvirt 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/libvirt"
 
-info_print "Mounting @var_lib_machines on /mnt/var/lib/machines"
+info_print "Mounting @var_lib_machines on /var/lib/machines"
 mount -o "$mountopts",subvol=@var_lib_machines /dev/mapper/cryptroot /mnt/var/lib/machines
 chattr +C /mnt/var/lib/machines 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/machines"
 
-info_print "Mounting @var_lib_portables on /mnt/var/lib/portables"
+info_print "Mounting @var_lib_portables on /var/lib/portables"
 mount -o "$mountopts",subvol=@var_lib_portables /dev/mapper/cryptroot /mnt/var/lib/portables
 chattr +C /mnt/var/lib/portables 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/portables"
 
-info_print "Mounting @srv on /mnt/srv"
+info_print "Mounting @srv on /srv"
 mount -o "$mountopts",subvol=@srv /dev/mapper/cryptroot /mnt/srv
 
-info_print "Mounting @home on /mnt/home from crypthome"
+info_print "Mounting @home on /home on crypthome"
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
+info_print "Mounting ESP on /efi"
 mount "$ESP" /mnt/efi/
 
 # Checking the microcode to install.
@@ -514,7 +515,7 @@ if [[ ! -f /mnt/etc/secureboot/db.key || ! -f /mnt/etc/secureboot/db.crt ]]; the
     openssl req -new -x509 -newkey rsa:2048 -sha256 -days 3650 \
         -nodes -subj "/CN=Secure Boot Signing" \
         -keyout /mnt/etc/secureboot/db.key \
-        -out /mnt/etc/secureboot/db.crt
+        -out /mnt/etc/secureboot/db.crt &>/dev/null
     chmod 600 /mnt/etc/secureboot/db.key
 else
     info_print "Secure Boot keys already exist."
