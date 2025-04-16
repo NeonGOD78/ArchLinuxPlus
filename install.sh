@@ -375,14 +375,13 @@ info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify
 # Setting up keyboard layout.
 until keyboard_selector; do : ; done
 
-
 info_print "Available internal disks and their partitions:"
-PS3="${BOLD}${BBLUE}Select target disk number ${BYELLOW}(e.g. 1)${RESET}: "
+PS3="Select target disk number (e.g. 1): "
 
 # Find internal (non-removable) disks
 mapfile -t DISKS < <(lsblk -dpno NAME,RM,TYPE,SIZE | awk '$2 == 0 && $3 == "disk" {print $1 "|" $4}')
 
-# Show partition layout with lsblk
+# Vis partitioner for hver disk
 for entry in "${DISKS[@]}"; do
     disk="${entry%%|*}"
     echo ""
@@ -390,22 +389,22 @@ for entry in "${DISKS[@]}"; do
 done
 echo ""
 
-# Build pretty menu with colors
+# Byg ren tekst-menu (uden farver – select forstår dem ikke)
 MENU_ITEMS=()
 DISK_PATHS=()
 
 for entry in "${DISKS[@]}"; do
     disk="${entry%%|*}"
     size="${entry##*|}"
-    MENU_ITEMS+=("${BYELLOW}${disk}${RESET} ${BGREEN}(${size})${RESET}")
+    MENU_ITEMS+=("${disk} (${size})")
     DISK_PATHS+=("$disk")
 done
 
-# Interactive menu
+# Interaktivt valg
 select CHOICE in "${MENU_ITEMS[@]}"; do
     if [[ -n "$CHOICE" ]]; then
         DISK="${DISK_PATHS[$REPLY-1]}"
-        info_print "Arch Linux will be installed on: ${BYELLOW}$DISK${RESET}"
+        info_print "Arch Linux will be installed on: ${BYELLOW}${DISK}${RESET}"
         break
     fi
 done
