@@ -712,8 +712,8 @@ EOF
 
 chmod +x /mnt/usr/local/bin/update-uki
 
-# UKI regeneration hook
-info_print "Creating pacman hook for UKI regeneration."
+# UKI regeneration hook with logging
+info_print "Creating pacman hook for UKI regeneration with logging."
 mkdir -p /mnt/etc/pacman.d/hooks
 
 cat > /mnt/etc/pacman.d/hooks/90-ukify.hook <<EOF
@@ -728,13 +728,12 @@ Target = boot/initramfs-linux.img
 [Action]
 Description = Regenerating Unified Kernel Image (UKI)...
 When = PostTransaction
-Exec = /usr/bin/ukify build \
-    --linux /boot/vmlinuz-linux \
-    --initrd /boot/initramfs-linux.img \
-    --cmdline "rd.luks.name=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
-    --output /efi/EFI/Linux/arch.efi
+Exec = /bin/bash -c '/usr/bin/ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux.img \
+  --cmdline "rd.luks.name=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "UKI build failed. Check /var/log/ukify.log"'
 EOF
-
 
 # ZRAM configuration.
 info_print "Configuring ZRAM."
