@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -e
+ssl #!/usr/bin/env -S bash -e
 
 set -euo pipefail
 trap 'echo "[ERROR] on line $LINENO" >&2' ERR
@@ -469,13 +469,247 @@ install_base_system() {
   if pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers \
     btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac \
     zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl \
-    btop mc git systemd ukify sbctl &>/dev/null; then
+    btop mc git systemd ukify openssl sbsigntools sbctl &>/dev/null; then
     success_print "Base system installed successfully."
     return 0
   else
     warning_print "Base system installation failed. Please check your internet connection or pacman mirrors."
     return 1
   fi
+}
+
+# Setup Secureboot
+setup_secureboot() {
+    info_print "Setting up Secure Boot integration..."
+
+    mkdir -p /mnt/etc/secureboot
+    if [[ ! -f /mnt/etc/secureboot/db.key || ! -f /mnt/etc/secureboot/db.crt ]]; then
+        info_print "Secure Boot keys not found. Generating new ones."
+        openssl req -new -x509 -newkey rsa:2048 -sha256 -days 3650 \
+            -nodes -subj "/CN=Secure Boot Signing" \
+            -keyout /mnt/etc/secureboot/db.key \
+            -out /mnt/etc/secureboot/db.crt &>/dev/null
+        chmod 600 /mnt/etc/secureboot/db.key
+    else
+        info_print "Secure Boot keys already exist."
+    fi
+
+    info_print "Creating /usr/local/bin/update-uki"
+    mkdir -p /mnt/usr/local/bin
+
+    cat > /mnt/usr/local/bin/update-uki <<'UKIFY_SCRIPT_EOF'
+#!/bin/bash
+set -e
+UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
+UKI_OUTPUT_FB="/efi/EFI/Linux/arch-fallback.efi"
+KERNEL="/boot/vmlinuz-linux"
+INITRD="/boot/initramfs-linux.img"
+INITRD_FB="/boot/initramfs-linux-fallback.img"
+BACKUP_DIR="/.efibackup"
+CMDLINE="rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
+ukify build --linux "$KERNEL" --initrd "$INITRD" --cmdline "$CMDLINE" --output "$UKI_OUTPUT" >> /var/log/ukify.log 2>&1 || echo "UKI build failed"
+[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT" "$UKI_OUTPUT"
+cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak" &>/dev/null || echo "Backup failed"
+ukify build --linux "$KERNEL" --initrd "$INITRD_FB" --cmdline "$CMDLINE" --output "$UKI_OUTPUT_FB" >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed"
+[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT_FB" "$UKI_OUTPUT_FB"
+cp "$UKI_OUTPUT_FB" "$BACKUP_DIR/arch-fallback.efi.bak" &>/dev/null || echo "Fallback backup failed"
+UKIFY_SCRIPT_EOF
+
+    chmod +x /mnt/usr/local/bin/update-uki
+
+    info_print "Creating /usr/local/bin/sign-grub helper script"
+    cat > /mnt/usr/local/bin/sign-grub <<'SIGN_GRUB_EOF'
+#!/bin/bash
+set -e
+GRUB_EFI="/boot/EFI/GRUB/grubx64.efi"
+KEY="/etc/secureboot/db.key"
+CERT="/etc/secureboot/db.crt"
+[[ -f $GRUB_EFI && -f $KEY && -f $CERT ]] || { echo "Missing files."; exit 1; }
+sbsign --key "$KEY" --cert "$CERT" --output "$GRUB_EFI" "$GRUB_EFI"
+echo "[✓] GRUB successfully signed."
+SIGN_GRUB_EOF
+
+    chmod +x /mnt/usr/local/bin/sign-grub
+
+    info_print "Creating EFI backup folder at /.efibackup"
+    mkdir -p /mnt/.efibackup
+
+    info_print "Adding post-install hint to /etc/motd"
+    cat > /mnt/etc/motd <<'MOTD_EOF'
+Welcome to your freshly installed Arch system 🎉
+Useful commands:
+  update-uki     → Rebuild + sign your Unified Kernel Images
+  sign-grub      → Re-sign GRUB after reinstall/update
+MOTD_EOF
+
+    info_print "Creating update-uki systemd timer"
+    mkdir -p /mnt/etc/systemd/system
+    cat > /mnt/etc/systemd/system/update-uki.timer <<'EOF'
+[Unit]
+Description=Run update-uki daily
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1d
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    info_print "Creating pacman hooks for UKI"
+    mkdir -p /mnt/etc/pacman.d/hooks
+
+    cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<'EOF'
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = boot/vmlinuz-linux
+Target = boot/initramfs-linux.img
+
+[Action]
+Description = Regenerating Unified Kernel Image (UKI)...
+When = PostTransaction
+Exec = /usr/local/bin/update-uki
+EOF
+
+    cat > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook <<'EOF'
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = boot/initramfs-linux-fallback.img
+
+[Action]
+Description = Regenerating fallback Unified Kernel Image (UKI)...
+When = PostTransaction
+Exec = /bin/bash -c '/usr/bin/ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux-fallback.img \
+  --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch-fallback.efi && \
+  sbsign --key /etc/secureboot/db.key \
+         --cert /etc/secureboot/db.crt \
+         --output /efi/EFI/Linux/arch-fallback.efi \
+         /efi/EFI/Linux/arch-fallback.efi'
+EOF
+
+    arch-chroot /mnt systemctl enable update-uki.timer >> /mnt/var/log/ukify.log 2>&1 || info_print "Failed to enable update-uki.timer"
+
+    info_print "Reminder: Add the Secure Boot keys manually via your UEFI firmware interface."
+
+# Setp Secureboot in arch-chroot
+setup_secureboot_chroot() {
+    info_print "Entering chroot to configure Secure Boot (GRUB, UKI, Snapper, etc.)"
+
+    arch-chroot /mnt /bin/bash -e <<'CHROOT_EOF'
+set -euo pipefail
+
+info() { echo -e "\033[92m[+] \033[0m$1"; }
+warn() { echo -e "\033[93m[!] \033[0m$1"; }
+
+# Set timezone
+info "Setting timezone"
+ln -sf /usr/share/zoneinfo/$(curl -s http://ip-api.com/line?fields=timezone) /etc/localtime || warn "Failed to set timezone"
+hwclock --systohc || warn "Failed to sync hardware clock"
+
+# Locale and initramfs
+info "Generating locale and initramfs"
+locale-gen || warn "Locale generation failed"
+mkinitcpio -P || warn "mkinitcpio failed"
+
+# Snapper configuration
+if command -v snapper &>/dev/null; then
+    info "Setting up Snapper"
+    umount /.snapshots &>/dev/null || true
+    rm -rf /.snapshots
+    snapper --no-dbus -c root create-config /
+    btrfs subvolume delete /.snapshots &>/dev/null || true
+    mkdir /.snapshots
+    mount -a
+    chmod 750 /.snapshots
+fi
+
+# GRUB installation
+info "Installing GRUB EFI"
+grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB || warn "GRUB install failed"
+
+# Sign GRUB
+if [[ -f /boot/EFI/GRUB/grubx64.efi && -f /etc/secureboot/db.key ]]; then
+    info "Signing GRUB EFI binary"
+    sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt \
+           --output /boot/EFI/GRUB/grubx64.efi /boot/EFI/GRUB/grubx64.efi || warn "GRUB signing failed"
+fi
+
+# grub-btrfs configuration
+info "Configuring grub-btrfs"
+sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
+sed -i 's|^#USE_CUSTOM_CONFIG=.*|USE_CUSTOM_CONFIG="true"|' /etc/default/grub-btrfs/config
+
+# Custom menu entry generator for snapshots
+cat > /etc/grub.d/42_grub-btrfs-custom <<'EOF'
+#!/bin/bash
+. /usr/share/grub/grub-mkconfig_lib
+snapshot="$1"
+title="Arch Linux (UKI) Snapshot: ${snapshot##*/}"
+
+cat <<GRUB_ENTRY
+menuentry '$title' {
+    search --no-floppy --file --set=root /EFI/Linux/arch.efi
+    linuxefi /EFI/Linux/arch.efi
+    options rootflags=subvol=${snapshot#/mnt} rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
+}
+menuentry 'Arch Linux (UKI Fallback)' {
+    search --no-floppy --file --set=root /EFI/Linux/arch-fallback.efi
+    linuxefi /EFI/Linux/arch-fallback.efi
+}
+GRUB_ENTRY
+EOF
+chmod +x /etc/grub.d/42_grub-btrfs-custom
+
+# Fallback menu
+cat > /etc/grub.d/41_fallback <<'EOF'
+#!/bin/bash
+cat <<GRUBENTRY
+menuentry "Arch Linux (Fallback Kernel)" {
+    search --no-floppy --file --set=root /boot/vmlinuz-linux
+    linux /boot/vmlinuz-linux root=/dev/mapper/cryptroot rd.luks.name=/dev/mapper/cryptroot=cryptroot rootflags=subvol=@ quiet loglevel=3
+    initrd /boot/initramfs-linux.img
+}
+GRUBENTRY
+EOF
+chmod +x /etc/grub.d/41_fallback
+
+# Build UKIs
+info "Building UKI"
+ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux.img \
+  --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch.efi || warn "UKI build failed"
+
+ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux-fallback.img \
+  --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch-fallback.efi || warn "Fallback UKI build failed"
+
+# Sign UKIs
+if [[ -f /etc/secureboot/db.key ]]; then
+    info "Signing UKIs"
+    sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt \
+           --output /efi/EFI/Linux/arch.efi /efi/EFI/Linux/arch.efi || warn "Signing arch.efi failed"
+    sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt \
+           --output /efi/EFI/Linux/arch-fallback.efi /efi/EFI/Linux/arch-fallback.efi || warn "Signing arch-fallback.efi failed"
+fi
+
+# Generate grub.cfg
+info "Generating GRUB config"
+grub-mkconfig -o /boot/grub/grub.cfg || warn "GRUB config generation failed"
+
+info "Secure Boot + UKI chroot configuration complete."
+CHROOT_EOF
 }
 
 # Welcome screen.
@@ -534,20 +768,10 @@ until install_base_system; do
   sleep 5
 done
 
-# Generate Secure Boot keys if they do not exist
-info_print "Checking for Secure Boot keys in /etc/secureboot."
-mkdir -p /mnt/etc/secureboot
-if [[ ! -f /mnt/etc/secureboot/db.key || ! -f /mnt/etc/secureboot/db.crt ]]; then
-    info_print "Secure Boot keys not found. Generating new ones."
-    openssl req -new -x509 -newkey rsa:2048 -sha256 -days 3650 \
-        -nodes -subj "/CN=Secure Boot Signing" \
-        -keyout /mnt/etc/secureboot/db.key \
-        -out /mnt/etc/secureboot/db.crt &>/dev/null
-    chmod 600 /mnt/etc/secureboot/db.key
-else
-    info_print "Secure Boot keys already exist."
-fi
-info_print "Reminder: Add the Secure Boot keys manually via your UEFI firmware interface."
+setup_secureboot
+
+# Configure Secure Boot, GRUB and UKIs
+setup_secureboot_chroot
 
 #Setting Default Shell to zsh
 info_print "Setting default shell to zsh"
@@ -614,14 +838,6 @@ fi
 
 # GRUB-installation
 grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
-
-# Sign GRUB EFI (hvis muligt)
-[[ -f /boot/EFI/GRUB/grubx64.efi && -f /etc/secureboot/db.key ]] && \
-    sbsign --key /etc/secureboot/db.key \
-           --cert /etc/secureboot/db.crt \
-           --output /boot/EFI/GRUB/grubx64.efi \
-           /boot/EFI/GRUB/grubx64.efi >> /var/log/ukify.log 2>&1 || \
-           echo "GRUB signing failed"
 
 # grub-btrfs custom template
 sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
@@ -691,138 +907,7 @@ grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 info_print "Base system configuration via chroot completed successfully."
 CHROOT_EOF
 
-# UKI: create EFI backup folder
-info_print "Creating EFI backup folder at /.efibackup"
-mkdir -p /mnt/.efibackup
 
-# UKI: create update-uki script
-info_print "Creating /usr/local/bin/update-uki"
-mkdir -p /mnt/usr/local/bin
-
-cat > /mnt/usr/local/bin/update-uki <<UKIFY_SCRIPT_EOF
-#!/bin/bash
-set -e
-
-UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
-UKI_OUTPUT_FB="/efi/EFI/Linux/arch-fallback.efi"
-KERNEL="/boot/vmlinuz-linux"
-INITRD="/boot/initramfs-linux.img"
-INITRD_FB="/boot/initramfs-linux-fallback.img"
-BACKUP_DIR="/.efibackup"
-
-UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
-
-CMDLINE="rd.luks.name=${UUID_ROOT}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
-
-# Standard UKI
-ukify build --linux "$KERNEL" --initrd "$INITRD" --cmdline "$CMDLINE" --output "$UKI_OUTPUT" >> /var/log/ukify.log 2>&1 || echo "UKI build failed"
-[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT" "$UKI_OUTPUT" >> /var/log/ukify.log 2>&1 || echo "UKI signing failed"
-cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak" &>/dev/null || echo "Backup failed"
-
-# Fallback UKI
-ukify build --linux "$KERNEL" --initrd "$INITRD_FB" --cmdline "$CMDLINE" --output "$UKI_OUTPUT_FB" >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed"
-[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT_FB" "$UKI_OUTPUT_FB" >> /var/log/ukify.log 2>&1 || echo "Fallback UKI signing failed"
-cp "$UKI_OUTPUT_FB" "$BACKUP_DIR/arch-fallback.efi.bak" &>/dev/null || echo "Fallback backup failed"
-UKIFY_SCRIPT_EOF
-
-chmod +x /mnt/usr/local/bin/update-uki
-
-info_print "Creating /usr/local/bin/sign-grub helper script"
-cat > /mnt/usr/local/bin/sign-grub <<SIGN_GRUB_EOF
-#!/bin/bash
-set -e
-
-GRUB_EFI="/boot/EFI/GRUB/grubx64.efi"
-KEY="/etc/secureboot/db.key"
-CERT="/etc/secureboot/db.crt"
-
-if [[ ! -f $GRUB_EFI ]]; then
-    echo "[!] GRUB EFI file not found at $GRUB_EFI"
-    exit 1
-fi
-
-if [[ ! -f $KEY || ! -f $CERT ]]; then
-    echo "[!] Missing Secure Boot keys in /etc/secureboot"
-    exit 1
-fi
-
-echo "[+] Signing GRUB EFI..."
-sbsign --key "$KEY" --cert "$CERT" --output "$GRUB_EFI" "$GRUB_EFI"
-echo "[✓] GRUB successfully signed."
-SIGN_GRUB_EOF
-
-chmod +x /mnt/usr/local/bin/sign-grub
-
-# Add post-install hint to /etc/motd
-info_print "Adding post-install hint to /etc/motd"
-cat > /mnt/etc/motd <<MOTD_EOF
-Welcome to your freshly installed Arch system 🎉
-
-Useful commands:
-  update-uki     → Rebuild + sign your Unified Kernel Images
-  sign-grub      → Re-sign GRUB after reinstall/update
-MOTD_EOF
-
-# UKI: systemd timer
-info_print "Creating update-uki systemd timer"
-mkdir -p /mnt/etc/systemd/system
-
-cat > /mnt/etc/systemd/system/update-uki.timer <<UKIFY_TIMER_EOF
-[Unit]
-Description=Run update-uki daily
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=1d
-
-[Install]
-WantedBy=timers.target
-UKIFY_TIMER_EOF
-
-# UKI: 95-ukify pacman hook
-info_print "Creating 95-ukify pacman hook"
-cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<UKIFY_HOOK_EOF
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = boot/vmlinuz-linux
-Target = boot/initramfs-linux.img
-
-[Action]
-Description = Regenerating Unified Kernel Image (UKI)...
-When = PostTransaction
-Exec = /usr/local/bin/update-uki
-UKIFY_HOOK_EOF
-
-# UKI: 96-ukify-fallback pacman hook
-info_print "Creating 96-ukify-fallback pacman hook"
-cat > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook <<UKIFY_FB_HOOK_EOF
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Target = boot/initramfs-linux-fallback.img
-
-[Action]
-Description = Regenerating fallback Unified Kernel Image (UKI)...
-When = PostTransaction
-Exec = /bin/bash -c '/usr/bin/ukify build \
-  --linux /boot/vmlinuz-linux \
-  --initrd /boot/initramfs-linux-fallback.img \
-  --cmdline "rd.luks.name=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
-  --output /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed." && \
-  sbsign --key /etc/secureboot/db.key \
-         --cert /etc/secureboot/db.crt \
-         --output /efi/EFI/Linux/arch-fallback.efi \
-         /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI signing failed."'
-UKIFY_FB_HOOK_EOF
-
-
-
-# Enable the systemd timer in chroot
-arch-chroot /mnt systemctl enable update-uki.timer >> /mnt/var/log/ukify.log 2>&1 || info_print "Failed to enable update-uki.timer"
 
 # Setting root password.
 info_print "Setting root password."
