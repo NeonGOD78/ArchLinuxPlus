@@ -373,7 +373,7 @@ until keyboard_selector; do : ; done
 
 
 info_print "Available internal disks and their partitions:"
-PS3="Please select the number of the target disk (e.g. 1): "
+PS3="${BOLD}${BBLUE}Select target disk number ${BYELLOW}(e.g. 1)${RESET}: "
 
 # Find internal (non-removable) disks
 mapfile -t DISKS < <(lsblk -dpno NAME,RM,TYPE,SIZE | awk '$2 == 0 && $3 == "disk" {print $1 "|" $4}')
