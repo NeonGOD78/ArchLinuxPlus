@@ -719,6 +719,22 @@ OnUnitActiveSec=1d
 WantedBy=timers.target
 UKIFY_TIMER_EOF
 
+# UKI: 95-ukify pacman hook
+info_print "Creating 95-ukify pacman hook"
+cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<'UKIFY_HOOK_EOF'
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = boot/vmlinuz-linux
+Target = boot/initramfs-linux.img
+
+[Action]
+Description = Regenerating Unified Kernel Image (UKI)...
+When = PostTransaction
+Exec = /usr/local/bin/update-uki
+UKIFY_HOOK_EOF
 
 # UKI: 96-ukify-fallback pacman hook
 info_print "Creating 96-ukify-fallback pacman hook"
@@ -742,6 +758,8 @@ Exec = /bin/bash -c '/usr/bin/ukify build \
          --output /efi/EFI/Linux/arch-fallback.efi \
          /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI signing failed."'
 UKIFY_FB_HOOK_EOF
+
+
 
 # Enable the systemd timer in chroot
 arch-chroot /mnt systemctl enable update-uki.timer >> /mnt/var/log/ukify.log 2>&1 || info_print "Failed to enable update-uki.timer"
