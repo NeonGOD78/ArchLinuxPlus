@@ -492,8 +492,6 @@ done
 
 mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
 
-info_print "Mounting the newly created subvolumes..."
-
 declare -A mountpoints=(
   [@]="/mnt"
   [@snapshots]="/mnt/.snapshots"
