@@ -512,7 +512,7 @@ for subvol in "${!mountpoints[@]}"; do
 done
 
 # Mount separat /home (fra crypthome)
-info_print "Mounting @home on $mountpoint from crypthome..."
+info_print "Mounting @home on /mnt/home on crypthome..."
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
 # Ekstra mounts og rettigheder
