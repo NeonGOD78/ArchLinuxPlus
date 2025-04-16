@@ -609,6 +609,15 @@ arch-chroot /mnt /bin/bash -e <<EOF
     # Installing GRUB.
     grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
 
+    # Sign GRUB EFI binary for Secure Boot
+    if [[ -f /boot/EFI/GRUB/grubx64.efi ]]; then
+        sbsign --key /etc/secureboot/db.key \
+               --cert /etc/secureboot/db.crt \
+               --output /boot/EFI/GRUB/grubx64.efi \
+               /boot/EFI/GRUB/grubx64.efi >> /var/log/ukify.log 2>&1 || \
+        echo "GRUB signing failed. See /var/log/ukify.log"
+    fi
+    
     # Enable Automatic Grub snapper menu
     sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
 
