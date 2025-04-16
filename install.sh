@@ -506,7 +506,7 @@ declare -A mountpoints=(
 # Mount root subvolumes (fra cryptroot)
 for subvol in "${!mountpoints[@]}"; do
   mountpoint="${mountpoints[$subvol]}"
-  print_info "Mounting $subvol on $mountpoint"
+  info_print "Mounting $subvol on $mountpoint"
   mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
