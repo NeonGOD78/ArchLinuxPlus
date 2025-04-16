@@ -7,12 +7,12 @@ trap 'echo "[ERROR] on line $LINENO" >&2' ERR
 clear
 
 # Cosmetics (colours for text)
-BOLD='\e[1m'
-BRED='\e[91m'
-BBLUE='\e[34m'
-BGREEN='\e[92m'
-BYELLOW='\e[93m'
-RESET='\e[0m'
+BOLD='\033[1m'
+BRED='\033[91m'
+BBLUE='\033[34m'
+BGREEN='\033[92m'
+BYELLOW='\033[93m'
+RESET='\033[0m'
 
 # Message functions
 info_print () {
