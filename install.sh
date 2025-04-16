@@ -365,14 +365,39 @@ info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify
 # Setting up keyboard layout.
 until keyboard_selector; do : ; done
 
-# Choosing the target for the installation.
-info_print "Available disks for the installation:"
-PS3="Please select the number of the corresponding disk (e.g. 1): "
-select ENTRY in $(lsblk -dpnoNAME|grep -P "/dev/sd|nvme|vd");
-do
-    DISK="$ENTRY"
-    info_print "Arch Linux will be installed on the following disk: $DISK"
-    break
+#####
+info_print "Available internal disks and their partitions:"
+PS3="Please select the number of the target disk (e.g. 1): "
+
+# Find internal (non-removable) disks
+mapfile -t DISKS < <(lsblk -dpno NAME,RM,TYPE,SIZE | awk '$2 == 0 && $3 == "disk" {print $1 "|" $4}')
+
+# Show partition layout with lsblk
+for entry in "${DISKS[@]}"; do
+    disk="${entry%%|*}"
+    echo ""
+    lsblk "$disk"
+done
+echo ""
+
+# Build pretty menu with colors
+MENU_ITEMS=()
+DISK_PATHS=()
+
+for entry in "${DISKS[@]}"; do
+    disk="${entry%%|*}"
+    size="${entry##*|}"
+    MENU_ITEMS+=("${BYELLOW}${disk}${NC} ${GREEN}(${size})${NC}")
+    DISK_PATHS+=("$disk")
+done
+
+# Interactive menu
+select CHOICE in "${MENU_ITEMS[@]}"; do
+    if [[ -n "$CHOICE" ]]; then
+        DISK="${DISK_PATHS[$REPLY-1]}"
+        info_print "Arch Linux will be installed on: ${BYELLOW}$DISK${NC}"
+        break
+    fi
 done
 
 # Setting up LUKS password.
