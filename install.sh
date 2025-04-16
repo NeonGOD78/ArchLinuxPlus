@@ -599,8 +599,12 @@ cat > /mnt/etc/hosts <<HOSTFILE_EOF
 127.0.1.1   $hostname.localdomain   $hostname
 HOSTFILE_EOF
 
+info_print "Checkpoint reached after hosts file!"
+
 # Virtualization check.
+info_print ">>> Klar til at køre virt_check"
 virt_check
+info_print ">>> virt_check function blev kaldt!"
 
 # Setting up the network.
 network_installer
