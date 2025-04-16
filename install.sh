@@ -494,11 +494,16 @@ mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
 
 # Definer subvolumes til mounting (undtagen @home som er på separat luks)
 subvols=(snapshots var_pkgs var_log srv root var_lib_portables var_lib_machines)
-for subvol in "${subvols[@]}"; do
-    mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot "/mnt/${subvol//_//}"
+for subvol in @ @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_portables @srv @snapshots; do
+    mountpoint="/mnt/${subvol//_//}"
+    [[ "$subvol" == "@snapshots" ]] && mountpoint="/mnt/.snapshots"
+
+    print_info "Mounting $subvol on $mountpoint"
+    mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
-# Mount /home separat
+# Separat /home på crypthome
+print_info "Mounting @home on /mnt/home from crypthome..."
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
 # Ekstra mounts og rettigheder
