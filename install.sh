@@ -351,7 +351,7 @@ select_disk() {
     done
 }
 
-# Partiotion disk and encrypt
+# Partition disk and encrypt
 partition_and_encrypt_disks() {
     input_print "This will delete the current partition table on $DISK once installation starts. Do you agree [y/N]?: "
     read -r disk_response
@@ -404,6 +404,64 @@ partition_and_encrypt_disks() {
     mkfs.btrfs /dev/mapper/crypthome &>/dev/null
 }
 
+# Setup BTRFS Subvolumes
+setup_btrfs_subvolumes() {
+    info_print "Creating BTRFS subvolumes on root partition."
+    mount /dev/mapper/cryptroot /mnt
+    for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
+        btrfs subvolume create /mnt/$subvol &>/dev/null
+    done
+    umount /mnt
+
+    info_print "Creating BTRFS subvolume on home partition."
+    mount /dev/mapper/crypthome /mnt
+    btrfs subvolume create /mnt/@home
+    umount /mnt
+
+    info_print "Mounting Btrfs subvolumes manually with CoW disabled where needed..."
+    mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
+
+    # Mount root subvolume (@)
+    info_print "Mounting @ on /"
+    mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
+
+    # Create all required mount points
+    mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt,var/lib/machines,var/lib/portables,srv,efi,boot,home,root}
+    chmod 750 /mnt/root
+
+    # Mount and disable CoW where needed
+    info_print "Mounting @snapshots on /.snapshots"
+    mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
+
+    info_print "Mounting @var_log on /var/log"
+    mount -o "$mountopts",subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
+    chattr +C /mnt/var/log 2>/dev/null || info_print "Could not disable CoW on /mnt/var/log"
+
+    info_print "Mounting @var_pkgs on /var/cache/pacman/pkg"
+    mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
+    chattr +C /mnt/var/cache/pacman/pkg 2>/dev/null || info_print "Could not disable CoW on /mnt/var/cache/pacman/pkg"
+
+    info_print "Mounting @var_lib_libvirt on /var/lib/libvirt"
+    mount -o "$mountopts",subvol=@var_lib_libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
+    chattr +C /mnt/var/lib/libvirt 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/libvirt"
+
+    info_print "Mounting @var_lib_machines on /var/lib/machines"
+    mount -o "$mountopts",subvol=@var_lib_machines /dev/mapper/cryptroot /mnt/var/lib/machines
+    chattr +C /mnt/var/lib/machines 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/machines"
+
+    info_print "Mounting @var_lib_portables on /var/lib/portables"
+    mount -o "$mountopts",subvol=@var_lib_portables /dev/mapper/cryptroot /mnt/var/lib/portables
+    chattr +C /mnt/var/lib/portables 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/portables"
+
+    info_print "Mounting @srv on /srv"
+    mount -o "$mountopts",subvol=@srv /dev/mapper/cryptroot /mnt/srv
+
+    info_print "Mounting @home on /home on crypthome"
+    mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
+
+    info_print "Mounting ESP on /efi"
+    mount "$ESP" /mnt/efi/
+}
 
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
@@ -446,67 +504,11 @@ until hostname_selector; do : ; done
 until userpass_selector; do : ; done
 until rootpass_selector; do : ; done
 
-# Partiotion disk and encrypt
+# Partition disk and encrypt
 until partition_and_encrypt_disks; do : ; done
 
-# Opret Btrfs subvolumes på luks-root (cryptroot)
-info_print "Creating BTRFS subvolumes on root partition."
-mount /dev/mapper/cryptroot /mnt
-for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
-    btrfs subvolume create /mnt/$subvol &>/dev/null
-done
-umount /mnt
-
-# Opret Btrfs subvolume på luks-home (crypthome)
-info_print "Creating BTRFS subvolume on home partition."
-mount /dev/mapper/crypthome /mnt
-btrfs subvolume create /mnt/@home
-umount /mnt
-
-#####
-info_print "Mounting Btrfs subvolumes manually with CoW disabled where needed..."
-mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
-
-# Mount root subvolume (@)
-info_print "Mounting @ on /"
-mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
-
-# Create all required mount points
-mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt,var/lib/machines,var/lib/portables,srv,efi,boot,home,root}
-chmod 750 /mnt/root
-
-# Mount and disable CoW immediately after each
-info_print "Mounting @snapshots on /.snapshots"
-mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
-
-info_print "Mounting @var_log on /var/log"
-mount -o "$mountopts",subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
-chattr +C /mnt/var/log 2>/dev/null || info_print "Could not disable CoW on /mnt/var/log"
-
-info_print "Mounting @var_pkgs on /var/cache/pacman/pkg"
-mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
-chattr +C /mnt/var/cache/pacman/pkg 2>/dev/null || info_print "Could not disable CoW on /mnt/var/cache/pacman/pkg"
-
-info_print "Mounting @var_lib_libvirt on /var/lib/libvirt"
-mount -o "$mountopts",subvol=@var_lib_libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
-chattr +C /mnt/var/lib/libvirt 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/libvirt"
-
-info_print "Mounting @var_lib_machines on /var/lib/machines"
-mount -o "$mountopts",subvol=@var_lib_machines /dev/mapper/cryptroot /mnt/var/lib/machines
-chattr +C /mnt/var/lib/machines 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/machines"
-
-info_print "Mounting @var_lib_portables on /var/lib/portables"
-mount -o "$mountopts",subvol=@var_lib_portables /dev/mapper/cryptroot /mnt/var/lib/portables
-chattr +C /mnt/var/lib/portables 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/portables"
-
-info_print "Mounting @srv on /srv"
-mount -o "$mountopts",subvol=@srv /dev/mapper/cryptroot /mnt/srv
-
-info_print "Mounting @home on /home on crypthome"
-mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
-
-info_print "Mounting ESP on /efi"
-mount "$ESP" /mnt/efi/
+# Setup BTRFS subvolumes
+setup_btrfs_subvolumes
 
 # Checking the microcode to install.
 microcode_detector
