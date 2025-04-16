@@ -468,31 +468,11 @@ mount /dev/mapper/crypthome /mnt
 btrfs subvolume create /mnt/@home
 umount /mnt
 
-# Mounting the newly created subvolumes.
-info_print "Mounting the newly created subvolumes."
+# Mounting the newly created subvolumes
+info_print "Mounting the newly created subvolumes..."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 
-# Mount root-subvolume
-mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
-mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
-
-# Opret alle nødvendige mount points og disable CoW
-nocow_dirs=(
-  /mnt/var/log
-  /mnt/var/cache/pacman/pkg
-  /mnt/var/lib/libvirt
-  /mnt/var/lib/machines
-  /mnt/var/lib/portables
-)
-
-for dir in "${nocow_dirs[@]}"; do
-    mkdir -p "$dir"
-    chattr +C "$dir" 2>/dev/null || true
-done
-
-
-mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
-
+# Define subvolume-to-mountpoint mapping
 declare -A mountpoints=(
   [@]="/mnt"
   [@snapshots]="/mnt/.snapshots"
@@ -504,18 +484,40 @@ declare -A mountpoints=(
   [@srv]="/mnt/srv"
 )
 
-# Mount root subvolumes (fra cryptroot)
+# Create all required mount points
+info_print "Creating necessary mount points..."
+for path in "${mountpoints[@]}"; do
+  mkdir -p "$path"
+done
+mkdir -p /mnt/{efi,boot,home,root}
+
+# Mount root subvolumes (from cryptroot)
 for subvol in "${!mountpoints[@]}"; do
   mountpoint="${mountpoints[$subvol]}"
   info_print "Mounting $subvol on $mountpoint"
   mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
-# Mount separat /home (fra crypthome)
-info_print "Mounting @home on /mnt/home on crypthome..."
+# Mount separate /home from crypthome
+info_print "Mounting @home on /mnt/home from crypthome..."
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
-# Ekstra mounts og rettigheder
+# Disable CoW on specific directories (after mounting)
+info_print "Disabling Copy-on-Write on selected directories..."
+nocow_dirs=(
+  /mnt/var/log
+  /mnt/var/cache/pacman/pkg
+  /mnt/var/lib/libvirt
+  /mnt/var/lib/machines
+  /mnt/var/lib/portables
+)
+
+for dir in "${nocow_dirs[@]}"; do
+  mkdir -p "$dir"
+  chattr +C "$dir" 2>/dev/null || true
+done
+
+# Final mounts and permissions
 chmod 750 /mnt/root
 mount "$ESP" /mnt/efi/
 
