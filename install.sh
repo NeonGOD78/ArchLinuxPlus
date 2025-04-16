@@ -492,11 +492,12 @@ done
 
 mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
 
-print_info "Mounting the newly created subvolumes..."
+info_print "Mounting the newly created subvolumes..."
 
 declare -A mountpoints=(
   [@]="/mnt"
   [@snapshots]="/mnt/.snapshots"
+  [@home]="/mnt/home"
   [@var_log]="/mnt/var/log"
   [@var_cache]="/mnt/var/cache/pacman/pkg"
   [@var_lib_libvirt]="/mnt/var/lib/libvirt"
@@ -509,12 +510,12 @@ declare -A mountpoints=(
 # Mount root subvolumes (fra cryptroot)
 for subvol in @ @snapshots @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_portables @srv; do
   mountpoint="${mountpoints[$subvol]}"
-  print_info "Mounting $subvol on $mountpoint"
+  info_print "Mounting $subvol on $mountpoint"
   mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
 # Mount separat /home (fra crypthome)
-print_info "Mounting @home on $mountpoint from crypthome..."
+info_print "Mounting @home on $mountpoint from crypthome..."
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
 # Ekstra mounts og rettigheder
