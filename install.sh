@@ -620,6 +620,21 @@ GRUBCUSTOM
 
     chmod +x /etc/grub.d/42_grub-btrfs-custom
 
+# Fallback GRUB entry
+info_print "Adding fallback GRUB menuentry."
+cat > /mnt/etc/grub.d/41_fallback <<EOF
+#!/bin/bash
+cat <<GRUBENTRY
+menuentry "Arch Linux (Fallback Kernel)" {
+    search --no-floppy --file --set=root /boot/vmlinuz-linux
+    linux /boot/vmlinuz-linux root=/dev/mapper/cryptroot rd.luks.name=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot rootflags=subvol=@ quiet loglevel=3
+    initrd /boot/initramfs-linux.img
+}
+GRUBENTRY
+EOF
+
+chmod +x /mnt/etc/grub.d/41_fallback
+
     # Creating grub config file.
     grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
