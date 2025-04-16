@@ -18,15 +18,15 @@ RESET='\033[0m'
 : "${BOLD:='\033[1m'}"
 : "${RESET:='\033[0m'}"
 
-print_info() {
+info_print() {
   printf "${BGREEN}[+] %s${RESET}\n" "$1"
 }
 
-print_warning() {
+warning_print() {
   printf "${BYELLOW}[!] %s${RESET}\n" "$1"
 }
 
-print_error() {
+error_print() {
   printf "${BRED}[ERROR] %s${RESET}\n" "$1" >&2
 }
 
