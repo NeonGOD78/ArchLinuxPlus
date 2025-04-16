@@ -600,8 +600,6 @@ grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/de
 sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
 sed -i 's|^#USE_CUSTOM_CONFIG=.*|USE_CUSTOM_CONFIG="true"|' /etc/default/grub-btrfs/config
 
-UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
-
 cat > /etc/grub.d/42_grub-btrfs-custom <<GRUBCUSTOM
 #!/bin/bash
 . /usr/share/grub/grub-mkconfig_lib
@@ -613,7 +611,7 @@ cat <<GRUB_ENTRY
 menuentry '\${title}' {
     search --no-floppy --file --set=root /EFI/Linux/arch.efi
     linuxefi /EFI/Linux/arch.efi
-    options rootflags=subvol=\${snapshot#/mnt} rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
+    options rootflags=subvol=\${snapshot#/mnt} rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
 }
 menuentry 'Arch Linux (UKI Fallback)' {
     search --no-floppy --file --set=root /EFI/Linux/arch-fallback.efi
@@ -630,7 +628,7 @@ cat > /etc/grub.d/41_fallback <<GRUBFALLBACK
 cat <<GRUBENTRY
 menuentry "Arch Linux (Fallback Kernel)" {
     search --no-floppy --file --set=root /boot/vmlinuz-linux
-    linux /boot/vmlinuz-linux root=/dev/mapper/cryptroot rd.luks.name=$UUID_ROOT=cryptroot rootflags=subvol=@ quiet loglevel=3
+    linux /boot/vmlinuz-linux root=/dev/mapper/cryptroot rd.luks.name=/dev/mapper/cryptroot=cryptroot rootflags=subvol=@ quiet loglevel=3
     initrd /boot/initramfs-linux.img
 }
 GRUBENTRY
@@ -641,7 +639,7 @@ chmod +x /etc/grub.d/41_fallback
 [[ -x /usr/bin/ukify ]] && ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux.img \
-  --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
   --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "UKI build failed."
 
 [[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key \
@@ -652,7 +650,7 @@ chmod +x /etc/grub.d/41_fallback
 ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
-  --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
   --output /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "UKI fallback build failed."
 
 [[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key \
