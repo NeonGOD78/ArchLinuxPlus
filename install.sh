@@ -488,7 +488,7 @@ mkfs.btrfs /dev/mapper/crypthome &>/dev/null
 # Opret Btrfs subvolumes på luks-root (cryptroot)
 info_print "Creating BTRFS subvolumes on root partition."
 mount /dev/mapper/cryptroot /mnt
-for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines; do
+for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
     btrfs subvolume create /mnt/$subvol
 done
 umount /mnt
