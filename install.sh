@@ -564,7 +564,7 @@ install_editor
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
 
-arch-chroot /mnt /bin/bash -e <<'CHROOT_EOF'
+arch-chroot /mnt /bin/bash -e <<CHROOT_EOF
 
 # Timezone og klokkeslæt
 TZ=$(curl -s http://ip-api.com/line?fields=timezone)
@@ -675,7 +675,7 @@ mkdir -p /mnt/.efibackup
 info_print "Creating /usr/local/bin/update-uki"
 mkdir -p /mnt/usr/local/bin
 
-cat > /mnt/usr/local/bin/update-uki <<'UKIFY_SCRIPT_EOF'
+cat > /mnt/usr/local/bin/update-uki <<UKIFY_SCRIPT_EOF
 #!/bin/bash
 set -e
 
@@ -704,7 +704,7 @@ UKIFY_SCRIPT_EOF
 chmod +x /mnt/usr/local/bin/update-uki
 
 info_print "Creating /usr/local/bin/sign-grub helper script"
-cat > /mnt/usr/local/bin/sign-grub <<'SIGN_GRUB_EOF'
+cat > /mnt/usr/local/bin/sign-grub <<SIGN_GRUB_EOF
 #!/bin/bash
 set -e
 
@@ -731,7 +731,7 @@ chmod +x /mnt/usr/local/bin/sign-grub
 
 # Add post-install hint to /etc/motd
 info_print "Adding post-install hint to /etc/motd"
-cat > /mnt/etc/motd <<'MOTD_EOF'
+cat > /mnt/etc/motd <<MOTD_EOF
 Welcome to your freshly installed Arch system 🎉
 
 Useful commands:
@@ -743,7 +743,7 @@ MOTD_EOF
 info_print "Creating update-uki systemd timer"
 mkdir -p /mnt/etc/systemd/system
 
-cat > /mnt/etc/systemd/system/update-uki.timer <<'UKIFY_TIMER_EOF'
+cat > /mnt/etc/systemd/system/update-uki.timer <<UKIFY_TIMER_EOF
 [Unit]
 Description=Run update-uki daily
 
@@ -757,7 +757,7 @@ UKIFY_TIMER_EOF
 
 # UKI: 95-ukify pacman hook
 info_print "Creating 95-ukify pacman hook"
-cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<'UKIFY_HOOK_EOF'
+cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<UKIFY_HOOK_EOF
 [Trigger]
 Type = Path
 Operation = Install
@@ -774,7 +774,7 @@ UKIFY_HOOK_EOF
 
 # UKI: 96-ukify-fallback pacman hook
 info_print "Creating 96-ukify-fallback pacman hook"
-cat > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook <<'UKIFY_FB_HOOK_EOF'
+cat > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook <<UKIFY_FB_HOOK_EOF
 [Trigger]
 Type = Path
 Operation = Install
