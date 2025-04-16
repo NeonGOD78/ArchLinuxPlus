@@ -711,6 +711,31 @@ cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak"
 EOF
 
 chmod +x /mnt/usr/local/bin/update-uki
+
+# UKI regeneration hook
+info_print "Creating pacman hook for UKI regeneration."
+mkdir -p /mnt/etc/pacman.d/hooks
+
+cat > /mnt/etc/pacman.d/hooks/90-ukify.hook <<EOF
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = boot/vmlinuz-linux
+Target = boot/initramfs-linux.img
+
+[Action]
+Description = Regenerating Unified Kernel Image (UKI)...
+When = PostTransaction
+Exec = /usr/bin/ukify build \
+    --linux /boot/vmlinuz-linux \
+    --initrd /boot/initramfs-linux.img \
+    --cmdline "rd.luks.name=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+    --output /efi/EFI/Linux/arch.efi
+EOF
+
+
 # ZRAM configuration.
 info_print "Configuring ZRAM."
 cat > /mnt/etc/systemd/zram-generator.conf <<EOF
