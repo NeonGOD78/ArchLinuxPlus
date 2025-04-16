@@ -497,6 +497,7 @@ subvols=(snapshots var_pkgs var_log srv root var_lib_portables var_lib_machines)
 for subvol in @ @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_portables @srv @snapshots; do
     mountpoint="/mnt/${subvol//_//}"
     [[ "$subvol" == "@snapshots" ]] && mountpoint="/mnt/.snapshots"
+    [[ "$subvol" == "@" ]] && mountpoint="/mnt"
 
     info_print "Mounting $subvol on $mountpoint"
     mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
