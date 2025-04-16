@@ -503,6 +503,7 @@ declare -A mountpoints=(
   [@var_lib_libvirt]="/mnt/var/lib/libvirt"
   [@var_lib_machines]="/mnt/var/lib/machines"
   [@var_lib_portables]="/mnt/var/lib/portables"
+  [@var_pkgs]="/mnt/var/cache/pacman/pkg"
   [@srv]="/mnt/srv"
 )
 
@@ -514,9 +515,8 @@ for subvol in @ @snapshots @var_log @var_cache @var_lib_libvirt @var_lib_machine
 done
 
 # Mount separat /home (fra crypthome)
-mountpoint="${mountpoints[@home]}"
-print_info "Mounting @home on $mountpoint"
-mount -o "$mountopts",subvol=@home /dev/mapper/crypthome "$mountpoint"
+print_info "Mounting @home on $mountpoint from crypthome..."
+mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
 # Ekstra mounts og rettigheder
 chmod 750 /mnt/root
