@@ -474,6 +474,7 @@ mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 
 # Mount root-subvolume
 mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
+mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 
 # Opret alle nødvendige mount points og disable CoW
 nocow_dirs=(
