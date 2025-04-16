@@ -371,7 +371,7 @@ info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify
 # Setting up keyboard layout.
 until keyboard_selector; do : ; done
 
-#####
+
 info_print "Available internal disks and their partitions:"
 PS3="Please select the number of the target disk (e.g. 1): "
 
@@ -393,7 +393,7 @@ DISK_PATHS=()
 for entry in "${DISKS[@]}"; do
     disk="${entry%%|*}"
     size="${entry##*|}"
-    MENU_ITEMS+=("${BYELLOW}${disk}${NC} ${GREEN}(${size})${NC}")
+    MENU_ITEMS+=("${BYELLOW}${disk}${RESET} ${BGREEN}(${size})${RESET}")
     DISK_PATHS+=("$disk")
 done
 
@@ -401,7 +401,7 @@ done
 select CHOICE in "${MENU_ITEMS[@]}"; do
     if [[ -n "$CHOICE" ]]; then
         DISK="${DISK_PATHS[$REPLY-1]}"
-        info_print "Arch Linux will be installed on: ${BYELLOW}$DISK${NC}"
+        info_print "Arch Linux will be installed on: ${BYELLOW}$DISK${RESET}"
         break
     fi
 done
