@@ -495,7 +495,6 @@ mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
 declare -A mountpoints=(
   [@]="/mnt"
   [@snapshots]="/mnt/.snapshots"
-  [@home]="/mnt/home"
   [@var_log]="/mnt/var/log"
   [@var_pkgs]="/mnt/var/cache/pacman/pkg"
   [@var_lib_libvirt]="/mnt/var/lib/libvirt"
