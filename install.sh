@@ -312,6 +312,99 @@ install_editor () {
     esac
 }
 
+# Select which disk to install to
+select_disk() {
+    info_print "Available internal disks and their partitions:"
+    PS3="Select target disk number (e.g. 1): "
+
+    # Find internal (non-removable) disks
+    mapfile -t DISKS < <(lsblk -dpno NAME,RM,TYPE,SIZE | awk '$2 == 0 && $3 == "disk" {print $1 "|" $4}')
+
+    # Display partitions for each disk
+    for entry in "${DISKS[@]}"; do
+        disk="${entry%%|*}"
+        echo ""
+        lsblk "$disk"
+    done
+    echo ""
+
+    # Build simple text-menu (without colors – select doesn't understand them)
+    MENU_ITEMS=()
+    DISK_PATHS=()
+
+    for entry in "${DISKS[@]}"; do
+        disk="${entry%%|*}"
+        size="${entry##*|}"
+        MENU_ITEMS+=("${disk} (${size})")
+        DISK_PATHS+=("$disk")
+    done
+
+    # Interactive choice
+    select CHOICE in "${MENU_ITEMS[@]}"; do
+        if [[ -n "$CHOICE" ]]; then
+            DISK="${DISK_PATHS[$REPLY-1]}"
+            info_print "Arch Linux will be installed on: ${BYELLOW}${DISK}${RESET}"
+            break
+        else
+            error_print "Invalid selection. Please try again."
+        fi
+    done
+}
+
+# Partiotion disk and encrypt
+partition_and_encrypt_disks() {
+    input_print "This will delete the current partition table on $DISK once installation starts. Do you agree [y/N]?: "
+    read -r disk_response
+    if ! [[ "${disk_response,,}" =~ ^(yes|y)$ ]]; then
+        error_print "Quitting."
+        exit
+    fi
+
+    info_print "Wiping $DISK."
+    wipefs -af "$DISK" &>/dev/null
+    sgdisk -Zo "$DISK" &>/dev/null
+
+    input_print "How much space should root (/) use (e.g. 100G): "
+    read -r root_size
+    if [[ -z "$root_size" ]]; then
+        error_print "You must enter a size for root."
+        exit 1
+    fi
+
+    info_print "Creating the partitions on $DISK."
+    parted -s "$DISK" \
+        mklabel gpt \
+        mkpart ESP fat32 1MiB 1025MiB \
+        set 1 esp on \
+        mkpart CRYPTROOT 1025MiB "$root_size" \
+        mkpart CRYPTHOME "$root_size" 100%
+
+    ESP="/dev/disk/by-partlabel/ESP"
+    CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
+    CRYPTHOME="/dev/disk/by-partlabel/CRYPTHOME"
+
+    info_print "Informing the Kernel about the disk changes."
+    partprobe "$DISK"
+
+    info_print "Formatting the EFI Partition as FAT32."
+    mkfs.fat -F 32 "$ESP" &>/dev/null
+
+    info_print "Creating LUKS Container for the root partition."
+    echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>/dev/null
+    echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d -
+
+    info_print "Creating LUKS Container for the home partition."
+    echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>/dev/null
+    echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d -
+
+    info_print "Formatting the cryptroot LUKS container as BTRFS."
+    mkfs.btrfs /dev/mapper/cryptroot &>/dev/null
+
+    info_print "Formatting the crypthome LUKS container as BTRFS."
+    mkfs.btrfs /dev/mapper/crypthome &>/dev/null
+}
+
+
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
 ===========================================================
@@ -323,44 +416,13 @@ echo -ne "${BOLD}${BYELLOW}
 
 ===========================================================
 ${RESET}"
-info_print "Welcome to ArchLinux Installer+ , a script made in order to simplify the process of installing Arch Linux."
+info_print "Welcome to ArchLinux+, a script made in order to simplify the process of installing Arch Linux."
 
 # Setting up keyboard layout.
 until keyboard_selector; do : ; done
 
-info_print "Available internal disks and their partitions:"
-PS3="Select target disk number (e.g. 1): "
-
-# Find internal (non-removable) disks
-mapfile -t DISKS < <(lsblk -dpno NAME,RM,TYPE,SIZE | awk '$2 == 0 && $3 == "disk" {print $1 "|" $4}')
-
-# Vis partitioner for hver disk
-for entry in "${DISKS[@]}"; do
-    disk="${entry%%|*}"
-    echo ""
-    lsblk "$disk"
-done
-echo ""
-
-# Byg ren tekst-menu (uden farver – select forstår dem ikke)
-MENU_ITEMS=()
-DISK_PATHS=()
-
-for entry in "${DISKS[@]}"; do
-    disk="${entry%%|*}"
-    size="${entry##*|}"
-    MENU_ITEMS+=("${disk} (${size})")
-    DISK_PATHS+=("$disk")
-done
-
-# Interaktivt valg
-select CHOICE in "${MENU_ITEMS[@]}"; do
-    if [[ -n "$CHOICE" ]]; then
-        DISK="${DISK_PATHS[$REPLY-1]}"
-        info_print "Arch Linux will be installed on: ${BYELLOW}${DISK}${RESET}"
-        break
-    fi
-done
+# Select disk to install to. 
+until select_disk; do : ; done
 
 # Setting up LUKS password.
 until lukspass_selector; do : ; done
@@ -384,62 +446,8 @@ until hostname_selector; do : ; done
 until userpass_selector; do : ; done
 until rootpass_selector; do : ; done
 
-# Warn user about deletion of old partition scheme.
-input_print "This will delete the current partition table on $DISK once installation starts. Do you agree [y/N]?: "
-read -r disk_response
-if ! [[ "${disk_response,,}" =~ ^(yes|y)$ ]]; then
-    error_print "Quitting."
-    exit
-fi
-info_print "Wiping $DISK."
-wipefs -af "$DISK" &>/dev/null
-sgdisk -Zo "$DISK" &>/dev/null
-
-# Ask for root size
-input_print "How much space should root (/) use (e.g. 100G): "
-read -r root_size
-if [[ -z "$root_size" ]]; then
-    error_print "You must enter a size for root."; exit 1
-fi
-
-# Creating a new partition scheme.
-info_print "Creating the partitions on $DISK."
-parted -s "$DISK" \
-    mklabel gpt \
-    mkpart ESP fat32 1MiB 1025MiB \
-    set 1 esp on \
-    mkpart CRYPTROOT 1025MiB "$root_size" \
-    mkpart CRYPTHOME "$root_size" 100%
-    
-ESP="/dev/disk/by-partlabel/ESP"
-CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
-CRYPTHOME="/dev/disk/by-partlabel/CRYPTHOME"
-
-# Informing the Kernel of the changes.
-info_print "Informing the Kernel about the disk changes."
-partprobe "$DISK"
-
-# Formatting the ESP as FAT32.
-info_print "Formatting the EFI Partition as FAT32."
-mkfs.fat -F 32 "$ESP" &>/dev/null
-
-# Creating a LUKS Container for the root partition.
-info_print "Creating LUKS Container for the root partition."
-echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>/dev/null
-echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d - 
-
-# Creating LUKS Container for home partition.
-info_print "Creating LUKS Container for the home partition."
-echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>/dev/null
-echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d -
-
-# Formatting the cryptroot Container as BTRFS.
-info_print "Formatting the cryptroot LUKS container as BTRFS."
-mkfs.btrfs /dev/mapper/cryptroot &>/dev/null
-
-# Formatting the crypthome Container as BTRFS.
-info_print "Formatting the crypthome LUKS container as BTRFS."
-mkfs.btrfs /dev/mapper/crypthome &>/dev/null
+# Partiotion disk and encrypt
+until partition_and_encrypt_disks; do : ; done
 
 # Opret Btrfs subvolumes på luks-root (cryptroot)
 info_print "Creating BTRFS subvolumes on root partition."
