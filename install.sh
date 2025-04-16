@@ -719,24 +719,6 @@ OnUnitActiveSec=1d
 WantedBy=timers.target
 UKIFY_TIMER_EOF
 
-# UKI: 95-ukify pacman hook (standard)
-info_print "Creating 95-ukify pacman hook"
-mkdir -p /mnt/etc/pacman.d/hooks
-
-cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<'UKIFY_HOOK_EOF'
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = boot/vmlinuz-linux
-Target = boot/initramfs-linux.img
-
-[Action]
-Description = Regenerating Unified Kernel Image (UKI)...
-When = PostTransaction
-Exec = /usr/local/bin/update-uki
-UKIFY_HOOK_EOF
 
 # UKI: 96-ukify-fallback pacman hook
 info_print "Creating 96-ukify-fallback pacman hook"
