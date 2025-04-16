@@ -3,30 +3,36 @@
 set -euo pipefail
 trap 'echo "[ERROR] on line $LINENO" >&2' ERR
 
-# Cleaning the TTY.
+# Clear the terminal to make output clean
 clear
 
-# Cosmetics (colours for text).
+# Cosmetics (colours for text)
 BOLD='\e[1m'
 BRED='\e[91m'
-BBLUE='\e[34m'  
+BBLUE='\e[34m'
 BGREEN='\e[92m'
 BYELLOW='\e[93m'
 RESET='\e[0m'
 
-# Pretty print (function).
+# Message functions
 info_print () {
     echo -e "${BOLD}${BGREEN}[ ${BYELLOW}•${BGREEN} ] $1${RESET}"
 }
 
-# Pretty print for input (function).
 input_print () {
     echo -ne "${BOLD}${BYELLOW}[ ${BGREEN}•${BYELLOW} ] $1${RESET}"
 }
 
-# Alert user of bad input (function).
 error_print () {
     echo -e "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
+}
+
+success_print () {
+    echo -e "${BOLD}${BGREEN}[ ${BBLUE}✓${BGREEN} ] $1${RESET}"
+}
+
+warning_print () {
+    echo -e "${BOLD}${BYELLOW}[ ${BBLUE}!${BYELLOW} ] $1${RESET}"
 }
 
 # Virtualization check (function).
