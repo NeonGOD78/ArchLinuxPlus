@@ -485,7 +485,8 @@ nocow_dirs=(
 for dir in "${nocow_dirs[@]}"; do
     mkdir -p "$dir"
     chattr +C "$dir" 2>/dev/null || true
-}
+done
+
 
 mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
 
