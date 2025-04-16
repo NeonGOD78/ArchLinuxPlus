@@ -586,17 +586,18 @@ info_print "Generating a new fstab."
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Configure selected locale and console keymap
+info_print "Setting locale."
 sed -i "/^#$locale/s/^#//" /mnt/etc/locale.gen
 echo "LANG=$locale" > /mnt/etc/locale.conf
 echo "KEYMAP=$kblayout" > /mnt/etc/vconsole.conf
 
 # Setting hosts file.
 info_print "Setting hosts file."
-cat > /mnt/etc/hosts <<EOF
+cat > /mnt/etc/hosts <<HOSTFILE_EOF
 127.0.0.1   localhost
 ::1         localhost
 127.0.1.1   $hostname.localdomain   $hostname
-EOF
+HOSTFILE_EOF
 
 # Virtualization check.
 virt_check
