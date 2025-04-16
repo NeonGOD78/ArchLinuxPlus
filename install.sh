@@ -6,7 +6,7 @@ trap 'echo "[ERROR] on line $LINENO" >&2' ERR
 # Clear the terminal to make output clean
 clear
 
-# Cosmetics (colours for text)
+# Colors (safe for printf)
 BOLD='\033[1m'
 BRED='\033[91m'
 BBLUE='\033[34m'
@@ -14,25 +14,20 @@ BGREEN='\033[92m'
 BYELLOW='\033[93m'
 RESET='\033[0m'
 
-# Message functions
-info_print () {
-    echo -e "${BOLD}${BGREEN}[ ${BYELLOW}•${BGREEN} ] $1${RESET}"
+# Safe defaults (fallback if not defined)
+: "${BOLD:='\033[1m'}"
+: "${RESET:='\033[0m'}"
+
+print_info() {
+  printf "${BGREEN}[+] %s${RESET}\n" "$1"
 }
 
-input_print () {
-    echo -ne "${BOLD}${BYELLOW}[ ${BGREEN}•${BYELLOW} ] $1${RESET}"
+print_warning() {
+  printf "${BYELLOW}[!] %s${RESET}\n" "$1"
 }
 
-error_print () {
-    echo -e "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
-}
-
-success_print () {
-    echo -e "${BOLD}${BGREEN}[ ${BBLUE}✓${BGREEN} ] $1${RESET}"
-}
-
-warning_print () {
-    echo -e "${BOLD}${BYELLOW}[ ${BBLUE}!${BYELLOW} ] $1${RESET}"
+print_error() {
+  printf "${BRED}[ERROR] %s${RESET}\n" "$1" >&2
 }
 
 # Virtualization check (function).
