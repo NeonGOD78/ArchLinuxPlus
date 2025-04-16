@@ -499,18 +499,17 @@ declare -A mountpoints=(
   [@snapshots]="/mnt/.snapshots"
   [@home]="/mnt/home"
   [@var_log]="/mnt/var/log"
-  [@var_cache]="/mnt/var/cache/pacman/pkg"
+  [@var_pkgs]="/mnt/var/cache/pacman/pkg"
   [@var_lib_libvirt]="/mnt/var/lib/libvirt"
   [@var_lib_machines]="/mnt/var/lib/machines"
   [@var_lib_portables]="/mnt/var/lib/portables"
-  [@var_pkgs]="/mnt/var/cache/pacman/pkg"
   [@srv]="/mnt/srv"
 )
 
 # Mount root subvolumes (fra cryptroot)
-for subvol in @ @snapshots @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_portables @srv; do
+for subvol in "${!mountpoints[@]}"; do
   mountpoint="${mountpoints[$subvol]}"
-  info_print "Mounting $subvol on $mountpoint"
+  print_info "Mounting $subvol on $mountpoint"
   mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
