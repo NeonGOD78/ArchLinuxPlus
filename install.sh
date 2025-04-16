@@ -406,7 +406,6 @@ info_print "Wiping $DISK."
 wipefs -af "$DISK" &>/dev/null
 sgdisk -Zo "$DISK" &>/dev/null
 
-####
 # Ask for root size
 input_print "How much space should root (/) use (e.g. 100G): "
 read -r root_size
@@ -467,14 +466,14 @@ mount /dev/mapper/crypthome /mnt
 btrfs subvolume create /mnt/@home
 umount /mnt
 
-
 # Mounting the newly created subvolumes.
 info_print "Mounting the newly created subvolumes."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
-mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
-mkdir -p /mnt/{efi,home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
 
-# Disable Copy-on-Write (CoW) for selected Btrfs directories (must be empty before mounting)
+# Mount root-subvolume
+mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
+
+# Opret alle nødvendige mount points og disable CoW
 nocow_dirs=(
   /mnt/var/log
   /mnt/var/cache/pacman/pkg
@@ -484,22 +483,23 @@ nocow_dirs=(
 )
 
 for dir in "${nocow_dirs[@]}"; do
-    mkdir -p "$dir"  # just to be safe
+    mkdir -p "$dir"
     chattr +C "$dir" 2>/dev/null || true
-done
+}
 
-# Mount root subvolumes (uden @home)
-subvols=(var_pkgs var_log root srv var_lib_portables var_lib_machines)
+mkdir -p /mnt/{efi,home,root,srv,.snapshots,boot}
+
+# Definer subvolumes til mounting (undtagen @home som er på separat luks)
+subvols=(snapshots var_pkgs var_log srv root var_lib_portables var_lib_machines)
 for subvol in "${subvols[@]}"; do
-    mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot /mnt/"${subvol//_//}"
+    mount -o "$mountopts",subvol=@"$subvol" /dev/mapper/cryptroot "/mnt/${subvol//_//}"
 done
 
-# Mount home separat
+# Mount /home separat
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
+# Ekstra mounts og rettigheder
 chmod 750 /mnt/root
-mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
-mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
 mount "$ESP" /mnt/efi/
 
 # Checking the microcode to install.
