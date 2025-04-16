@@ -509,6 +509,21 @@ microcode_detector
 info_print "Installing the base system (it may take a while)."
 pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git systemd ukify sbctl &>/dev/null
 
+# Generate Secure Boot keys if they do not exist
+info_print "Checking for Secure Boot keys in /etc/secureboot."
+mkdir -p /mnt/etc/secureboot
+if [[ ! -f /mnt/etc/secureboot/db.key || ! -f /mnt/etc/secureboot/db.crt ]]; then
+    info_print "Secure Boot keys not found. Generating new ones."
+    openssl req -new -x509 -newkey rsa:2048 -sha256 -days 3650 \
+        -nodes -subj "/CN=Secure Boot Signing" \
+        -keyout /mnt/etc/secureboot/db.key \
+        -out /mnt/etc/secureboot/db.crt
+    chmod 600 /mnt/etc/secureboot/db.key
+else
+    info_print "Secure Boot keys already exist."
+    info_print "Remember to add keys to secureboot in UEFI interface
+fi
+
 #Setting Default Shell to zsh
 info_print "Setting default shell to zsh"
 sed -i 's|^SHELL=/usr/bin/bash|SHELL=/usr/bin/zsh|' /mnt/etc/default/useradd
