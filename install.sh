@@ -1,4 +1,4 @@
-ssl #!/usr/bin/env -S bash -e
+#!/usr/bin/env -S bash -e
 
 set -euo pipefail
 trap 'echo "[ERROR] on line $LINENO" >&2' ERR
