@@ -645,13 +645,23 @@ chmod +x /mnt/etc/grub.d/41_fallback
       --initrd /boot/initramfs-linux.img \
       --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
       --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "Initial UKI build failed. See /var/log/ukify.log"
-
+    # Sign uki image  
+    sbsign --key /mnt/etc/secureboot/db.key \
+       --cert /mnt/etc/secureboot/db.crt \
+       --output /efi/EFI/Linux/arch.efi \
+       /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1
+####
     # Build fallback UKI image and log output
     ukify build \
       --linux /boot/vmlinuz-linux \
       --initrd /boot/initramfs-linux-fallback.img \
       --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
       --output /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed. See /var/log/ukify.log"
+    # sign uki fallback image    
+     sbsign --key /mnt/etc/secureboot/db.key \
+       --cert /mnt/etc/secureboot/db.crt \
+       --output /efi/EFI/Linux/arch-fallback.efi \
+       /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1
 
     # Creating grub config file.
     grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
