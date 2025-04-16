@@ -778,101 +778,6 @@ if [[ -n "$username" ]]; then
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
 fi
 
-# Install zinit
-info_print "Adding zinit to the system."
-mkdir -p /mnt/root/.local/share/zinit &>/dev/null
-arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /root/.local/share/zinit/zinit.git &>/dev/null
-if [[ -n "$username" ]]; then
-    mkdir -p /mnt/home/"$username"/.local/share/zinit &>/dev/null
-    arch-chroot /mnt git clone https://github.com/zdharma-continuum/zinit.git /home/"$username"/.local/share/zinit/zinit.git &>/dev/null
-    arch-chroot /mnt chown -R $username:$username /home/$username &>/dev/null
-fi
-
-# UKI Backup folder
-info_print "Creating EFI backup folder at /.efibackup"
-mkdir -p /mnt/.efibackup
-
-# UKI rebuild hook with integrated backup
-info_print "Creating UKI rebuild hook and backup script."
-mkdir -p /mnt/etc/pacman.d/hooks
-cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<UKIFY_HOOK_EOF
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = boot/vmlinuz-linux
-Target = boot/initramfs-linux.img
-
-[Action]
-Description = Regenerating Unified Kernel Image (UKI)...
-When = PostTransaction
-Exec = /usr/local/bin/update-uki
-UKIFY_HOOK_EOF
-
-cat > /mnt/etc/systemd/system/update-uki.timer <<TIMER_EOF
-[Unit]
-Description=Run update-uki daily
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=1d
-
-[Install]
-WantedBy=timers.target
-TIMER_EOF
-
-
-mkdir -p /mnt/usr/local/bin
-cat > /mnt/usr/local/bin/update-uki <<'UKIFY_SCRIPT_EOF'
-#!/bin/bash
-set -e
-
-UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
-KERNEL="/boot/vmlinuz-linux"
-INITRD="/boot/initramfs-linux.img"
-BACKUP_DIR="/.efibackup"
-
-UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
-
-CMDLINE="rd.luks.name=${UUID_ROOT}=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
-
-# Regenerate UKI
-ukify build \
-  --linux "$KERNEL" \
-  --initrd "$INITRD" \
-  --cmdline "$CMDLINE" \
-  --output "$UKI_OUTPUT"
-
-# Backup current UKI
-mkdir -p "$BACKUP_DIR"
-cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak"
-UKIFY_SCRIPT_EOF
-
-chmod +x /mnt/usr/local/bin/update-uki
-
-# UKI regeneration hook with logging
-info_print "Creating pacman hook for UKI regeneration with logging."
-mkdir -p /mnt/etc/pacman.d/hooks
-
-cat > /mnt/etc/pacman.d/hooks/90-ukify.hook <<UKIFY_LOG_HOOK_EOF
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = boot/vmlinuz-linux
-Target = boot/initramfs-linux.img
-
-[Action]
-Description = Regenerating Unified Kernel Image (UKI)...
-When = PostTransaction
-Exec = /bin/bash -c '/usr/bin/ukify build \
-  --linux /boot/vmlinuz-linux \
-  --initrd /boot/initramfs-linux.img \
-  --cmdline "rd.luks.name=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
-  --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "UKI build failed. Check /var/log/ukify.log"'
-UKIFY_LOG_HOOK_EOF
 
 # ZRAM configuration.
 info_print "Configuring ZRAM."
@@ -888,7 +793,7 @@ sed -Ei 's/^#(Color)$/\1\nILoveCandy/;s/^#(ParallelDownloads).*/\1 = 10/' /mnt/e
 
 # Enabling various services.
 info_print "Enabling Reflector, automatic snapshots, BTRFS scrubbing, Grub Snapper menu and systemd-oomd."
-services=(reflector.timer update-uki.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer grub-btrfsd.service systemd-oomd)
+services=(reflector.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer grub-btrfsd.service systemd-oomd)
 for service in "${services[@]}"; do
     systemctl enable "$service" --root=/mnt &>/dev/null
 done
