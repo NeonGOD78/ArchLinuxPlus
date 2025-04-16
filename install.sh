@@ -578,50 +578,48 @@ sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3
 
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
-arch-chroot /mnt /bin/bash -e <<CHROOT_EOF
 
-    # Setting up timezone.
-    ln -sf /usr/share/zoneinfo/$(curl -s http://ip-api.com/line?fields=timezone) /etc/localtime &>/dev/null
+#########
+arch-chroot /mnt /bin/bash -e <<'CHROOT_EOF'
 
-    # Setting up clock.
-    hwclock --systohc
+# Timezone og klokkeslæt
+TZ=$(curl -s http://ip-api.com/line?fields=timezone)
+ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime &>/dev/null
+hwclock --systohc &>/dev/null
 
-    # Generating locales.
-    locale-gen &>/dev/null
+# Lokale og initramfs
+locale-gen &>/dev/null
+mkinitcpio -P &>/dev/null
 
-    # Generating a new initramfs.
-    mkinitcpio -P &>/dev/null
-
-    # Snapper configuration.
-    umount /.snapshots
-    rm -r /.snapshots
-    snapper --no-dbus -c root create-config /
-    btrfs subvolume delete /.snapshots &>/dev/null
+# Snapper setup
+if command -v snapper &>/dev/null; then
+    umount /.snapshots &>/dev/null || true
+    rm -rf /.snapshots
+    snapper --no-dbus -c root create-config / &>/dev/null
+    btrfs subvolume delete /.snapshots &>/dev/null || true
     mkdir /.snapshots
     mount -a &>/dev/null
     chmod 750 /.snapshots
+fi
 
-    # Installing GRUB.
-    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
+# GRUB-installation
+grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
 
-    # Sign GRUB EFI binary for Secure Boot
-    if [[ -f /boot/EFI/GRUB/grubx64.efi ]]; then
-        sbsign --key /etc/secureboot/db.key \
-               --cert /etc/secureboot/db.crt \
-               --output /boot/EFI/GRUB/grubx64.efi \
-               /boot/EFI/GRUB/grubx64.efi >> /var/log/ukify.log 2>&1 || \
-        echo "GRUB signing failed. See /var/log/ukify.log"
-    fi
-    
-    # Enable Automatic Grub snapper menu
-    sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
+# Sign GRUB EFI (hvis muligt)
+[[ -f /boot/EFI/GRUB/grubx64.efi && -f /etc/secureboot/db.key ]] && \
+    sbsign --key /etc/secureboot/db.key \
+           --cert /etc/secureboot/db.crt \
+           --output /boot/EFI/GRUB/grubx64.efi \
+           /boot/EFI/GRUB/grubx64.efi >> /var/log/ukify.log 2>&1 || \
+           echo "GRUB signing failed"
 
-    # Enable custom grub-btrfs template for UKI snapshots
-    sed -i 's|^#USE_CUSTOM_CONFIG=.*|USE_CUSTOM_CONFIG="true"|' /etc/default/grub-btrfs/config
+# grub-btrfs custom template
+sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
+sed -i 's|^#USE_CUSTOM_CONFIG=.*|USE_CUSTOM_CONFIG="true"|' /etc/default/grub-btrfs/config
 
-    UUID_ROOT=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+UUID_ROOT=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
 
-    cat > /etc/grub.d/42_grub-btrfs-custom <<GRUBCUSTOM
+cat > /etc/grub.d/42_grub-btrfs-custom <<GRUBCUSTOM
 #!/bin/bash
 . /usr/share/grub/grub-mkconfig_lib
 
@@ -632,7 +630,7 @@ cat <<GRUB_ENTRY
 menuentry '\${title}' {
     search --no-floppy --file --set=root /EFI/Linux/arch.efi
     linuxefi /EFI/Linux/arch.efi
-    options rootflags=subvol=\${snapshot#/mnt} rd.luks.name=\$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
+    options rootflags=subvol=\${snapshot#/mnt} rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
 }
 menuentry 'Arch Linux (UKI Fallback)' {
     search --no-floppy --file --set=root /EFI/Linux/arch-fallback.efi
@@ -641,53 +639,49 @@ menuentry 'Arch Linux (UKI Fallback)' {
 GRUB_ENTRY
 GRUBCUSTOM
 
-    chmod +x /etc/grub.d/42_grub-btrfs-custom
+chmod +x /etc/grub.d/42_grub-btrfs-custom
 
-# Fallback GRUB entry
-info_print "Adding fallback GRUB menuentry."
-cat > /mnt/etc/grub.d/41_fallback <<GRUB_FALLBACK_EOF
+# fallback menuentry til GRUB
+cat > /etc/grub.d/41_fallback <<GRUBFALLBACK
 #!/bin/bash
 cat <<GRUBENTRY
 menuentry "Arch Linux (Fallback Kernel)" {
     search --no-floppy --file --set=root /boot/vmlinuz-linux
-    linux /boot/vmlinuz-linux root=/dev/mapper/cryptroot rd.luks.name=$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot rootflags=subvol=@ quiet loglevel=3
+    linux /boot/vmlinuz-linux root=/dev/mapper/cryptroot rd.luks.name=$UUID_ROOT=cryptroot rootflags=subvol=@ quiet loglevel=3
     initrd /boot/initramfs-linux.img
 }
 GRUBENTRY
-GRUB_FALLBACK_EOF
+GRUBFALLBACK
+chmod +x /etc/grub.d/41_fallback
 
-chmod +x /mnt/etc/grub.d/41_fallback
+# UKI builds
+[[ -x /usr/bin/ukify ]] && ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux.img \
+  --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "UKI build failed."
 
-    # Build UKI image and log output
-    ukify build \
-      --linux /boot/vmlinuz-linux \
-      --initrd /boot/initramfs-linux.img \
-      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
-      --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "Initial UKI build failed. See /var/log/ukify.log"
-    # Sign uki image  
-    sbsign --key /mnt/etc/secureboot/db.key \
-       --cert /mnt/etc/secureboot/db.crt \
-       --output /efi/EFI/Linux/arch.efi \
-       /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1
-####
-    # Build fallback UKI image and log output
-    ukify build \
-      --linux /boot/vmlinuz-linux \
-      --initrd /boot/initramfs-linux-fallback.img \
-      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
-      --output /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "Fallback UKI build failed. See /var/log/ukify.log"
-    # sign uki fallback image    
-     sbsign --key /mnt/etc/secureboot/db.key \
-       --cert /mnt/etc/secureboot/db.crt \
-       --output /efi/EFI/Linux/arch-fallback.efi \
-       /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1
+[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key \
+  --cert /etc/secureboot/db.crt \
+  --output /efi/EFI/Linux/arch.efi \
+  /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1
 
-    # Creating grub config file.
-    grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
+ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux-fallback.img \
+  --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --output /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1 || echo "UKI fallback build failed."
+
+[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key \
+  --cert /etc/secureboot/db.crt \
+  --output /efi/EFI/Linux/arch-fallback.efi \
+  /efi/EFI/Linux/arch-fallback.efi >> /var/log/ukify.log 2>&1
+
+# grub.cfg generering
+grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
 info_print "Base system configuration via chroot completed successfully."
 CHROOT_EOF
-
 
 # Setting root password.
 info_print "Setting root password."
