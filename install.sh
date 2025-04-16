@@ -703,6 +703,42 @@ UKIFY_SCRIPT_EOF
 
 chmod +x /mnt/usr/local/bin/update-uki
 
+info_print "Creating /usr/local/bin/sign-grub helper script"
+cat > /mnt/usr/local/bin/sign-grub <<'SIGN_GRUB_EOF'
+#!/bin/bash
+set -e
+
+GRUB_EFI="/boot/EFI/GRUB/grubx64.efi"
+KEY="/etc/secureboot/db.key"
+CERT="/etc/secureboot/db.crt"
+
+if [[ ! -f $GRUB_EFI ]]; then
+    echo "[!] GRUB EFI file not found at $GRUB_EFI"
+    exit 1
+fi
+
+if [[ ! -f $KEY || ! -f $CERT ]]; then
+    echo "[!] Missing Secure Boot keys in /etc/secureboot"
+    exit 1
+fi
+
+echo "[+] Signing GRUB EFI..."
+sbsign --key "$KEY" --cert "$CERT" --output "$GRUB_EFI" "$GRUB_EFI"
+echo "[✓] GRUB successfully signed."
+SIGN_GRUB_EOF
+
+chmod +x /mnt/usr/local/bin/sign-grub
+
+# Add post-install hint to /etc/motd
+info_print "Adding post-install hint to /etc/motd"
+cat > /mnt/etc/motd <<'MOTD_EOF'
+Welcome to your freshly installed Arch system 🎉
+
+Useful commands:
+  update-uki     → Rebuild + sign your Unified Kernel Images
+  sign-grub      → Re-sign GRUB after reinstall/update
+MOTD_EOF
+
 # UKI: systemd timer
 info_print "Creating update-uki systemd timer"
 mkdir -p /mnt/etc/systemd/system
@@ -802,4 +838,5 @@ done
 info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
 info_print "Verifying LUKS devices before reboot..."
 ls /dev/mapper | grep -E 'cryptroot|crypthome' || error_print "Warning: LUKS devices not active"
+info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
 exit
