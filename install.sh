@@ -574,10 +574,7 @@ arch-chroot /mnt /bin/bash -e <<EOF
     ln -sf /usr/share/zoneinfo/$(curl -s http://ip-api.com/line?fields=timezone) /etc/localtime &>/dev/null
 
     # Setting up clock.
-    hwclock --hctosys
-
-    # set umask
-    echo "umask 077" >> /etc/profile
+    hwclock --systohc
 
     # Generating locales.
     locale-gen &>/dev/null
@@ -585,18 +582,6 @@ arch-chroot /mnt /bin/bash -e <<EOF
     # Generating a new initramfs.
     mkinitcpio -P &>/dev/null
 
-    # Make dir for UKI
-    mkdir -p /efi/EFI/Linux
-
-    # Generer Unified Kernel Image med ukify
-    ukify build \
-      --linux /boot/vmlinuz-linux \
-      --initrd /boot/initramfs-linux.img \
-      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
-      --output /efi/EFI/Linux/arch.efi
-
-    ukify verify /efi/EFI/Linux/arch.efi
-    
     # Snapper configuration.
     umount /.snapshots
     rm -r /.snapshots
@@ -606,21 +591,34 @@ arch-chroot /mnt /bin/bash -e <<EOF
     mount -a &>/dev/null
     chmod 750 /.snapshots
 
-
     # Installing GRUB.
-    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
-
-    # Tilføj brugerdefineret GRUB-menuentry til UKI
-    cat >> /etc/grub.d/40_custom <<EOF
-    menuentry 'Arch Linux (UKI)' {
-    search --no-floppy --file --set=root /EFI/Linux/arch.efi
-    linuxefi /EFI/Linux/arch.efi
-    }
-    EOF
-    chmod +x /etc/grub.d/40_custom
+    grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>/dev/null
 
     # Enable Automatic Grub snapper menu
     sed -i '/#GRUB_BTRFS_GRUB_DIRNAME=/s|#GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' /etc/default/grub-btrfs/config
+
+    # Enable custom grub-btrfs template for UKI snapshots
+    sed -i 's|^#USE_CUSTOM_CONFIG=.*|USE_CUSTOM_CONFIG="true"|' /etc/default/grub-btrfs/config
+
+    UUID_ROOT=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)
+
+    cat > /etc/grub.d/42_grub-btrfs-custom <<GRUBCUSTOM
+#!/bin/bash
+. /usr/share/grub/grub-mkconfig_lib
+
+snapshot="\$1"
+title="Arch Linux (UKI) Snapshot: \${snapshot##*/}"
+
+cat <<GRUB_ENTRY
+menuentry '\${title}' {
+    search --no-floppy --file --set=root /EFI/Linux/arch.efi
+    linuxefi /EFI/Linux/arch.efi
+    options rootflags=subvol=\${snapshot#/mnt} rd.luks.name=\$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
+}
+GRUB_ENTRY
+GRUBCUSTOM
+
+    chmod +x /etc/grub.d/42_grub-btrfs-custom
 
     # Creating grub config file.
     grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
