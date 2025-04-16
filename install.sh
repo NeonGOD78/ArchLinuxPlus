@@ -497,7 +497,6 @@ print_info "Mounting the newly created subvolumes..."
 declare -A mountpoints=(
   [@]="/mnt"
   [@snapshots]="/mnt/.snapshots"
-  [@home]="/mnt/home"
   [@var_log]="/mnt/var/log"
   [@var_cache]="/mnt/var/cache/pacman/pkg"
   [@var_lib_libvirt]="/mnt/var/lib/libvirt"
