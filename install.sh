@@ -566,8 +566,8 @@ if [[ ! -f /mnt/etc/secureboot/db.key || ! -f /mnt/etc/secureboot/db.crt ]]; the
     chmod 600 /mnt/etc/secureboot/db.key
 else
     info_print "Secure Boot keys already exist."
-    info_print "Remember to add keys to secureboot in UEFI interface
 fi
+info_print "Reminder: Add the Secure Boot keys manually via your UEFI firmware interface."
 
 #Setting Default Shell to zsh
 info_print "Setting default shell to zsh"
