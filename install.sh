@@ -1,6 +1,8 @@
 #!/usr/bin/env -S bash -e
 
-set -o pipefail
+set -euo pipefail
+trap 'echo "[ERROR] on line $LINENO" >&2' ERR
+
 # Cleaning the TTY.
 clear
 
