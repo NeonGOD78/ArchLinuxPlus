@@ -615,6 +615,10 @@ menuentry '\${title}' {
     linuxefi /EFI/Linux/arch.efi
     options rootflags=subvol=\${snapshot#/mnt} rd.luks.name=\$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot quiet loglevel=3
 }
+menuentry 'Arch Linux (UKI Fallback)' {
+    search --no-floppy --file --set=root /EFI/Linux/arch-fallback.efi
+    linuxefi /EFI/Linux/arch-fallback.efi
+}
 GRUB_ENTRY
 GRUBCUSTOM
 
