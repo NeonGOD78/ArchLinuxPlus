@@ -22,13 +22,22 @@ info_print() {
   printf "${BGREEN}[+] %s${RESET}\n" "$1"
 }
 
-warning_print() {
-  printf "${BYELLOW}[!] %s${RESET}\n" "$1"
+input_print () {
+    printf "${BOLD}${BYELLOW}[ ${BGREEN}•${BYELLOW} ] $1${RESET}"
 }
 
 error_print() {
-  printf "${BRED}[ERROR] %s${RESET}\n" "$1" >&2
+  printf "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
 }
+
+success_print () {
+    printf "${BOLD}${BGREEN}[ ${BBLUE}✓${BGREEN} ] $1${RESET}"
+}
+
+warning_print () {
+    printf "${BOLD}${BYELLOW}[ ${BBLUE}!${BYELLOW} ] $1${RESET}"
+}
+
 
 # Virtualization check (function).
 virt_check () {
