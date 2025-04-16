@@ -567,8 +567,7 @@ info_print "Configuring the system (timezone, system clock, initramfs, Snapper, 
 arch-chroot /mnt /bin/bash -e <<CHROOT_EOF
 
 # Timezone og klokkeslæt
-TZ=$(curl -s http://ip-api.com/line?fields=timezone)
-ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime &>/dev/null
+ln -sf /usr/share/zoneinfo/$(curl -s http://ip-api.com/line?fields=timezone) /etc/localtime &>/dev/null
 hwclock --systohc &>/dev/null
 
 # Lokale og initramfs
