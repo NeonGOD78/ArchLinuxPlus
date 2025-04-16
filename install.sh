@@ -463,6 +463,21 @@ setup_btrfs_subvolumes() {
     mount "$ESP" /mnt/efi/
 }
 
+# Pacstrap base system
+install_base_system() {
+  info_print "Installing the base system (this may take a while)..."
+  if pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers \
+    btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac \
+    zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl \
+    btop mc git systemd ukify sbctl &>/dev/null; then
+    success_print "Base system installed successfully."
+    return 0
+  else
+    warning_print "Base system installation failed. Please check your internet connection or pacman mirrors."
+    return 1
+  fi
+}
+
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
 ===========================================================
@@ -513,9 +528,11 @@ setup_btrfs_subvolumes
 # Checking the microcode to install.
 microcode_detector
 
-# Pacstrap (setting up a base system onto the new root).
-info_print "Installing the base system (it may take a while)."
-pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl btop mc git systemd ukify sbctl &>/dev/null
+# Pacstrap basesystem
+until install_base_system; do
+  warning_print "Retrying in 5 seconds..."
+  sleep 5
+done
 
 # Generate Secure Boot keys if they do not exist
 info_print "Checking for Secure Boot keys in /etc/secureboot."
