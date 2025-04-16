@@ -499,57 +499,48 @@ mount /dev/mapper/crypthome /mnt
 btrfs subvolume create /mnt/@home
 umount /mnt
 
-# Mounting the newly created subvolumes
-info_print "Mounting the newly created subvolumes..."
+#####
+info_print "Mounting Btrfs subvolumes manually with CoW disabled where needed..."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
 
-# Define subvolume-to-mountpoint mapping
-declare -A mountpoints=(
-  [@]="/mnt"
-  [@snapshots]="/mnt/.snapshots"
-  [@var_log]="/mnt/var/log"
-  [@var_pkgs]="/mnt/var/cache/pacman/pkg"
-  [@var_lib_libvirt]="/mnt/var/lib/libvirt"
-  [@var_lib_machines]="/mnt/var/lib/machines"
-  [@var_lib_portables]="/mnt/var/lib/portables"
-  [@srv]="/mnt/srv"
-)
+# Mount root subvolume (@)
+info_print "Mounting @ on /mnt"
+mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
 
 # Create all required mount points
-info_print "Creating necessary mount points..."
-for path in "${mountpoints[@]}"; do
-  mkdir -p "$path"
-done
-mkdir -p /mnt/{efi,boot,home,root}
+mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt,var/lib/machines,var/lib/portables,srv,efi,boot,home,root}
+chmod 750 /mnt/root
 
-# Mount root subvolumes (from cryptroot)
-for subvol in "${!mountpoints[@]}"; do
-  mountpoint="${mountpoints[$subvol]}"
-  info_print "Mounting $subvol on $mountpoint"
-  mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
-done
+# Mount and disable CoW immediately after each
+info_print "Mounting @snapshots on /mnt/.snapshots"
+mount -o "$mountopts",subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 
-# Mount separate /home from crypthome
-info_print "Mounting @home on /mnt/home from crypthome..."
+info_print "Mounting @var_log on /mnt/var/log"
+mount -o "$mountopts",subvol=@var_log /dev/mapper/cryptroot /mnt/var/log
+chattr +C /mnt/var/log 2>/dev/null || info_print "Could not disable CoW on /mnt/var/log"
+
+info_print "Mounting @var_pkgs on /mnt/var/cache/pacman/pkg"
+mount -o "$mountopts",subvol=@var_pkgs /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
+chattr +C /mnt/var/cache/pacman/pkg 2>/dev/null || info_print "Could not disable CoW on /mnt/var/cache/pacman/pkg"
+
+info_print "Mounting @var_lib_libvirt on /mnt/var/lib/libvirt"
+mount -o "$mountopts",subvol=@var_lib_libvirt /dev/mapper/cryptroot /mnt/var/lib/libvirt
+chattr +C /mnt/var/lib/libvirt 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/libvirt"
+
+info_print "Mounting @var_lib_machines on /mnt/var/lib/machines"
+mount -o "$mountopts",subvol=@var_lib_machines /dev/mapper/cryptroot /mnt/var/lib/machines
+chattr +C /mnt/var/lib/machines 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/machines"
+
+info_print "Mounting @var_lib_portables on /mnt/var/lib/portables"
+mount -o "$mountopts",subvol=@var_lib_portables /dev/mapper/cryptroot /mnt/var/lib/portables
+chattr +C /mnt/var/lib/portables 2>/dev/null || info_print "Could not disable CoW on /mnt/var/lib/portables"
+
+info_print "Mounting @srv on /mnt/srv"
+mount -o "$mountopts",subvol=@srv /dev/mapper/cryptroot /mnt/srv
+
+info_print "Mounting @home on /mnt/home from crypthome"
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
-# Disable CoW on specific directories (after mounting)
-info_print "Disabling Copy-on-Write on selected directories..."
-nocow_dirs=(
-  /mnt/var/log
-  /mnt/var/cache/pacman/pkg
-  /mnt/var/lib/libvirt
-  /mnt/var/lib/machines
-  /mnt/var/lib/portables
-)
-
-for dir in "${nocow_dirs[@]}"; do
-  mkdir -p "$dir"
-  chattr +C "$dir" 2>/dev/null || true
-done
-
-# Final mounts and permissions
-chmod 750 /mnt/root
 mount "$ESP" /mnt/efi/
 
 # Checking the microcode to install.
