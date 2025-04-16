@@ -735,7 +735,9 @@ chmod +x /mnt/etc/grub.d/41_fallback
     # Creating grub config file.
     grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
+info_print "Base system configuration via chroot completed successfully."
 CHROOT_EOF
+
 
 # Setting root password.
 info_print "Setting root password."
