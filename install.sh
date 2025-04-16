@@ -312,27 +312,6 @@ install_editor () {
     esac
 }
 
-# Install yay (AUR helper)
-install_yay () {
-    info_print "Installing yay, an AUR helper."
-
-    # Install base development tools and git with no output
-    pacstrap /mnt base-devel &>/dev/null
-
-    # Create a temporary user for yay installation with no output
-    arch-chroot /mnt useradd -m -s /bin/bash aurbuild &>/dev/null
-
-    # Set up sudo for the temporary user with no output
-    echo "aurbuild ALL=(ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/aurbuild &>/dev/null
-
-    # Install yay as the non-root user with no output
-    arch-chroot /mnt su - aurbuild -c 'git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm' &>/dev/null
-
-    # Clean up with no output
-    arch-chroot /mnt userdel -r aurbuild &>/dev/null
-    rm -rf /mnt/tmp/yay &>/dev/null
-    rm -rf /mnt/etc/sudoers.d/aurbuild &>/dev/null
-}
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
 ===========================================================
@@ -580,9 +559,6 @@ network_installer
 
 # Install Default Editor
 install_editor
-
-# Installing Yay (AUR helper).
-install_yay
 
 # Configuring /etc/mkinitcpio.conf with correct hooks
 info_print "Configuring /etc/mkinitcpio.conf."
