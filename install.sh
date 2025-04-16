@@ -498,12 +498,12 @@ for subvol in @ @var_log @var_cache @var_lib_libvirt @var_lib_machines @var_lib_
     mountpoint="/mnt/${subvol//_//}"
     [[ "$subvol" == "@snapshots" ]] && mountpoint="/mnt/.snapshots"
 
-    print_info "Mounting $subvol on $mountpoint"
+    info_print "Mounting $subvol on $mountpoint"
     mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "$mountpoint"
 done
 
 # Separat /home på crypthome
-print_info "Mounting @home on /mnt/home from crypthome..."
+info_print "Mounting @home on /mnt/home from crypthome..."
 mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
 
 # Ekstra mounts og rettigheder
