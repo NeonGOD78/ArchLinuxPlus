@@ -467,6 +467,7 @@ mount /dev/mapper/crypthome /mnt
 btrfs subvolume create /mnt/@home
 umount /mnt
 
+
 # Mounting the newly created subvolumes.
 info_print "Mounting the newly created subvolumes."
 mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
