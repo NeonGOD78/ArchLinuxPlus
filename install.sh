@@ -561,21 +561,6 @@ network_installer
 # Install Default Editor
 install_editor
 
-# Configuring /etc/mkinitcpio.conf with correct hooks
-info_print "Configuring /etc/mkinitcpio.conf."
-sed -i 's/^HOOKS=.*/HOOKS=(systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems grub-btrfs-overlayfs)/' /mnt/etc/mkinitcpio.conf
-
-# Setting up LUKS2 encryption in GRUB
-info_print "Setting up GRUB config."
-
-UUID_ROOT=$(blkid -s UUID -o value "$CRYPTROOT")
-UUID_HOME=$(blkid -s UUID -o value "$CRYPTHOME")
-
-ROOT_MAPPER="/dev/mapper/cryptroot"
-
-# Erstat hele linjen med luks parametre og root-mountpoint
-sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet rd.luks.name=$UUID_ROOT=cryptroot rd.luks.name=$UUID_HOME=crypthome root=$ROOT_MAPPER rootflags=subvol=@\"|" /mnt/etc/default/grub
-
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
 
