@@ -584,13 +584,16 @@ arch-chroot /mnt /bin/bash -e <<EOF
 
     # Generating a new initramfs.
     mkinitcpio -P &>/dev/null
-    
-    # Generating unified kernel image
+
+    # Make dir for UKI
+    mkdir -p /efi/EFI/Linux
+
+    # Generer Unified Kernel Image med ukify
     ukify build \
-     --linux /boot/vmlinuz-linux \
-     --initrd /boot/initramfs-linux.img \
-     --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3" \
-     --output /efi/EFI/Linux/arch.efi
+      --linux /boot/vmlinuz-linux \
+      --initrd /boot/initramfs-linux.img \
+      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+      --output /efi/EFI/Linux/arch.efi
 
     ukify verify /efi/EFI/Linux/arch.efi
     
@@ -603,12 +606,15 @@ arch-chroot /mnt /bin/bash -e <<EOF
     mount -a &>/dev/null
     chmod 750 /.snapshots
 
+
     # Installing GRUB.
     grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
+
+    # Tilføj brugerdefineret GRUB-menuentry til UKI
     cat >> /etc/grub.d/40_custom <<EOF
     menuentry 'Arch Linux (UKI)' {
-    search --label ESP --set=esp
-    linuxefi (\$esp)/EFI/Linux/arch.efi
+    search --no-floppy --file --set=root /EFI/Linux/arch.efi
+    linuxefi /EFI/Linux/arch.efi
     }
     EOF
     chmod +x /etc/grub.d/40_custom
