@@ -635,6 +635,13 @@ EOF
 
 chmod +x /mnt/etc/grub.d/41_fallback
 
+    # Build UKI image and log output
+    ukify build \
+      --linux /boot/vmlinuz-linux \
+      --initrd /boot/initramfs-linux.img \
+      --cmdline "rd.luks.name=$UUID_ROOT=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+      --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "Initial UKI build failed. See /var/log/ukify.log"
+
     # Creating grub config file.
     grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
