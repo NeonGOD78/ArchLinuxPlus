@@ -628,7 +628,7 @@ sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3
 
 # Configuring the system.
 info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
-arch-chroot /mnt /bin/bash -e <<EOF
+arch-chroot /mnt /bin/bash -e <<CHROOT_EOF
 
     # Setting up timezone.
     ln -sf /usr/share/zoneinfo/$(curl -s http://ip-api.com/line?fields=timezone) /etc/localtime &>/dev/null
@@ -695,7 +695,7 @@ GRUBCUSTOM
 
 # Fallback GRUB entry
 info_print "Adding fallback GRUB menuentry."
-cat > /mnt/etc/grub.d/41_fallback <<EOF
+cat > /mnt/etc/grub.d/41_fallback <<GRUB_FALLBACK_EOF
 #!/bin/bash
 cat <<GRUBENTRY
 menuentry "Arch Linux (Fallback Kernel)" {
@@ -704,7 +704,7 @@ menuentry "Arch Linux (Fallback Kernel)" {
     initrd /boot/initramfs-linux.img
 }
 GRUBENTRY
-EOF
+GRUB_FALLBACK_EOF
 
 chmod +x /mnt/etc/grub.d/41_fallback
 
@@ -735,7 +735,7 @@ chmod +x /mnt/etc/grub.d/41_fallback
     # Creating grub config file.
     grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null
 
-EOF
+CHROOT_EOF
 
 # Setting root password.
 info_print "Setting root password."
@@ -768,7 +768,7 @@ mkdir -p /mnt/.efibackup
 # UKI rebuild hook with integrated backup
 info_print "Creating UKI rebuild hook and backup script."
 mkdir -p /mnt/etc/pacman.d/hooks
-cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<EOF
+cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<UKIFY_HOOK_EOF
 [Trigger]
 Type = Path
 Operation = Install
@@ -781,9 +781,9 @@ Target = boot/initramfs-linux.img
 Description = Regenerating Unified Kernel Image (UKI)...
 When = PostTransaction
 Exec = /usr/local/bin/update-uki
-EOF
+UKIFY_HOOK_EOF
 
-cat > /mnt/etc/systemd/system/update-uki.timer <<EOF
+cat > /mnt/etc/systemd/system/update-uki.timer <<TIMER_EOF
 [Unit]
 Description=Run update-uki daily
 
@@ -793,11 +793,11 @@ OnUnitActiveSec=1d
 
 [Install]
 WantedBy=timers.target
-EOF
+TIMER_EOF
 
 
 mkdir -p /mnt/usr/local/bin
-cat > /mnt/usr/local/bin/update-uki <<'EOF'
+cat > /mnt/usr/local/bin/update-uki <<'UKIFY_SCRIPT_EOF'
 #!/bin/bash
 set -e
 
@@ -820,7 +820,7 @@ ukify build \
 # Backup current UKI
 mkdir -p "$BACKUP_DIR"
 cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak"
-EOF
+UKIFY_SCRIPT_EOF
 
 chmod +x /mnt/usr/local/bin/update-uki
 
@@ -828,7 +828,7 @@ chmod +x /mnt/usr/local/bin/update-uki
 info_print "Creating pacman hook for UKI regeneration with logging."
 mkdir -p /mnt/etc/pacman.d/hooks
 
-cat > /mnt/etc/pacman.d/hooks/90-ukify.hook <<EOF
+cat > /mnt/etc/pacman.d/hooks/90-ukify.hook <<UKIFY_LOG_HOOK_EOF
 [Trigger]
 Type = Path
 Operation = Install
@@ -845,15 +845,15 @@ Exec = /bin/bash -c '/usr/bin/ukify build \
   --initrd /boot/initramfs-linux.img \
   --cmdline "rd.luks.name=\$(blkid -s UUID -o value /dev/disk/by-partlabel/CRYPTROOT)=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
   --output /efi/EFI/Linux/arch.efi >> /var/log/ukify.log 2>&1 || echo "UKI build failed. Check /var/log/ukify.log"'
-EOF
+UKIFY_LOG_HOOK_EOF
 
 # ZRAM configuration.
 info_print "Configuring ZRAM."
-cat > /mnt/etc/systemd/zram-generator.conf <<EOF
+cat > /mnt/etc/systemd/zram-generator.conf <<ZRAM_CONF_EOF
 [zram0]
 zram-size = min(ram, 8192)
 compression-algorithm = zstd
-EOF
+ZRAM_CONF_EOF
 
 # Pacman eye-candy features.
 info_print "Enabling colours, animations, and parallel downloads for pacman."
