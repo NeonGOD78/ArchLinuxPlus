@@ -587,19 +587,54 @@ setup_users_and_passwords() {
 
 # ======================= Disk Selection ======================
 select_disk() {
-  info_print "Available block devices:"
-  lsblk -dpno NAME,SIZE | grep -Ev "boot|rpmb|loop"
+  section_print "Disk Selection"
 
-  input_print "Enter the disk to install Arch on (e.g. /dev/nvme0n1): "
-  read -r DISK
+  # Hent liste over fysiske diske (ingen loop, rom eller boot mounts)
+  mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
 
-  if [[ ! -b "$DISK" ]]; then
-    error_print "Invalid disk: $DISK"
-    return 1
+  if [[ "${#disks[@]}" -eq 0 ]]; then
+    error_print "No suitable block devices found."
+    exit 1
   fi
 
-  info_print "Selected disk: $DISK"
+  echo
+  info_print "Detected disks:"
+  for i in "${!disks[@]}"; do
+    printf "  %d) %s\n" "$((i+1))" "${disks[$i]}"
+  done
+  echo
+
+  input_print "Select the number of the disk to install Arch on (e.g. 1): "
+  read -r disk_index
+
+  # Check if input is a number in valid range
+  if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
+    error_print "Invalid selection. Aborting."
+    exit 1
+  fi
+
+  DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
+
+  echo
+  success_print "You selected: $DISK"
+  echo
+
+  info_print "Partition layout:"
+  lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
+  clear
+
+  warning_print "⚠️  This will WIPE the entire disk: $DISK"
+  input_print "Type 'yes' to confirm and continue: "
+  read -r confirm
+
+  if [[ "${confirm,,}" != "yes" ]]; then
+    error_print "Disk selection aborted."
+    exit 1
+  fi
+
+  success_print "Disk $DISK confirmed and ready for partitioning."
 }
+
 
 # ======================= LUKS Password Input ======================
 lukspass_selector() {
