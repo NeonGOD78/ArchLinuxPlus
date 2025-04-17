@@ -1,3 +1,11 @@
+#!/usr/bin/env -S bash -e
+set -o pipefail
+set -u
+IFS=$'\n\t'
+
+# Ensure we're running in Bash
+[ -z "${BASH_VERSION:-}" ] && echo "This script must be run with bash." && exit 1
+
 # ======================= Color Palette =======================
 BOLD='\e[1m'
 RESET='\e[0m'
