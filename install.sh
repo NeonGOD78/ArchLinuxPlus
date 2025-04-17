@@ -6,20 +6,10 @@ IFS=$'\n\t'
 # Ensure we're running in Bash
 [ -z "${BASH_VERSION:-}" ] && echo "This script must be run with bash." && exit 1
 
-# ======================= Color Palette =======================
-BOLD='\e[1m'
-RESET='\e[0m'
-
-BCYAN='\e[96m'     # Info
-BGREEN='\e[92m'    # Success
-BYELLOW='\e[93m'   # Warning
-BRED='\e[91m'      # Error
-BMAGENTA='\e[95m'  # Section / Banner
-BWHITE='\e[1;97m'  # Input prompt
-
 # ======================= Print Functions =======================
+
 info_print() {
-  printf "${BCYAN}[✔] %s${RESET}\n" "$1"
+  printf "${BGREEN}[✔] %s${RESET}\n" "$1"
 }
 
 warning_print() {
@@ -35,16 +25,17 @@ success_print() {
 }
 
 input_print() {
-  printf "${BWHITE}[?] %s${RESET} " "$1"
-}
-
-section_print() {
-  printf "${BMAGENTA}==> %s${RESET}\n" "$1"
+  printf "${BYELLOW}[?] %s${RESET} " "$1"
 }
 
 print_separator() {
-  printf "${BMAGENTA}------------------------------------------------------------${RESET}\n"
+  printf "${BBLUE}------------------------------------------------------------${RESET}\n"
 }
+
+section_print() {
+  printf "${BBLUE}==> %s${RESET}\n" "$1"
+}
+
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
@@ -154,7 +145,7 @@ kernel_selector () {
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
     input_print "Please select the number of the corresponding kernel (e.g. 1): " 
-    read -r kernel_choice
+    read -e -i "1" -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
         2 ) kernel="linux-hardened"; return 0;;
@@ -238,24 +229,24 @@ partition_disk() {
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
   info_print "Encrypting root partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>/dev/null
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>> \"$LOGFILE\"
   echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d -
 
   info_print "Encrypting home partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>/dev/null
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>> \"$LOGFILE\"
   echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d -
 }
 
 # ======================= Format Partitions ================
 format_partitions() {
   info_print "Formatting EFI partition as FAT32..."
-  mkfs.fat -F32 "$ESP" &>/dev/null
+  mkfs.fat -F32 "$ESP" &>> \"$LOGFILE\"
 
   info_print "Formatting root (cryptroot) as BTRFS..."
-  mkfs.btrfs /dev/mapper/cryptroot &>/dev/null
+  mkfs.btrfs /dev/mapper/cryptroot &>> \"$LOGFILE\"
 
   info_print "Formatting home (crypthome) as BTRFS..."
-  mkfs.btrfs /dev/mapper/crypthome &>/dev/null
+  mkfs.btrfs /dev/mapper/crypthome &>> \"$LOGFILE\"
 }
 
 
@@ -266,7 +257,7 @@ install_base_system() {
 if pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers \
     btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac \
     zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl \
-    btop mc git systemd ukify openssl sbsigntools sbctl &>/dev/null; then
+    btop mc git systemd ukify openssl sbsigntools sbctl &>> \"$LOGFILE\"; then
 
     success_print "Base system installed successfully."
     return 0
@@ -419,13 +410,13 @@ mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
   mount /dev/mapper/cryptroot /mnt
   for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
-    btrfs subvolume create /mnt/$subvol &>/dev/null
+    btrfs subvolume create /mnt/$subvol &>> \"$LOGFILE\"
   done
   umount /mnt
 
   info_print "Creating BTRFS subvolume on home partition..."
   mount /dev/mapper/crypthome /mnt
-  btrfs subvolume create /mnt/@home &>/dev/null
+  btrfs subvolume create /mnt/@home &>> \"$LOGFILE\"
   umount /mnt
 
   mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
@@ -492,7 +483,7 @@ rm -rf /.snapshots
 
 # Create Snapper config and replace subvolume
 snapper --no-dbus -c root create-config /
-btrfs subvolume delete /.snapshots &>/dev/null || true
+btrfs subvolume delete /.snapshots &>> \"$LOGFILE\" || true
 mkdir /.snapshots
 mount -a
 chmod 750 /.snapshots
@@ -613,7 +604,7 @@ generate_grub_cfg() {
   arch-chroot /mnt /bin/bash -e <<'EOF'
 set -euo pipefail
 
-if grub-mkconfig -o /boot/grub/grub.cfg &>/dev/null; then
+if grub-mkconfig -o /boot/grub/grub.cfg &>> \"$LOGFILE\"; then
   echo "[✓] GRUB config generated successfully."
 else
   echo "[!] Failed to generate GRUB config."
@@ -733,7 +724,7 @@ network_selector () {
     info_print "4) dhcpcd: Basic DHCP client (Ethernet connections or VMs)"
     info_print "5) I will do this on my own (only advanced users)"
     input_print "Please select the number of the corresponding networking utility (e.g. 1): "
-    read -r network_choice
+    read -e -i "1" -r network_choice
 
     case "$network_choice" in
         1)
@@ -763,7 +754,7 @@ network_selector () {
     esac
 
     info_print "Installing $network_pkg inside the chroot environment..."
-    arch-chroot /mnt pacman -Sy --noconfirm $network_pkg || {
+    arch-chroot /mnt pacman -Sy --noconfirm $network_pkg &>> \"$LOGFILE\" || {
         error_print "Failed to install $network_pkg"
         exit 1
     }
@@ -796,7 +787,7 @@ install_editor() {
     info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
-    read -r editor_choice
+    read -e -i "1" -r editor_choice
 
     case "$editor_choice" in
         1)
@@ -944,9 +935,12 @@ enable_system_services() {
 }
 
 # =========================== Final Message ===========================
-finish_installation() {
-    info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
-    info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
+finish_installation
+  show_log_if_needed() {
+  info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
+  info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
+  print_separator
+  info_print "Log file saved to: ${BOLD}/mnt/install.log${RESET} – check this if something went wrong."
 }
 
 # ====================== AUR Helper: yay Installer ======================
@@ -1164,6 +1158,17 @@ generate_fstab() {
   success_print "fstab generated."
 }
 
+
+# ======================= Show Installation Log =======================
+show_log_if_needed() {
+  input_print "Would you like to view the log file now? (y/N): "
+  read -r showlog
+  if [[ "${showlog,,}" == "y" || "${showlog,,}" == "yes" ]]; then
+    less +G "$LOGFILE"
+  fi
+}
+
+
 # ======================= Main Installer Flow ==============
 main() {
   welcome_banner
@@ -1211,6 +1216,7 @@ main() {
   configure_plymouth_theme
   save_boot_visuals_config
   finish_installation
+  show_log_if_needed
 }
 
 main
