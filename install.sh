@@ -320,7 +320,7 @@ Target = boot/initramfs-linux-fallback.img
 [Action]
 Description = Regenerating fallback Unified Kernel Image (UKI)...
 When = PostTransaction
-Exec = /bin/bash -c '/usr/bin/ukify build \
+Exec = /usr/local/bin/update-uki-fallback.sh \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
   --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
