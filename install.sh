@@ -3,6 +3,14 @@ set -o pipefail
 set -u
 IFS=$'\n\t'
 
+# Color definitions for styling
+BOLD='\e[1m'
+RESET='\e[0m'
+BRED='\e[91m'
+BBLUE='\e[34m'
+BGREEN='\e[92m'
+BYELLOW='\e[93m'
+
 # Ensure we're running in Bash
 [ -z "${BASH_VERSION:-}" ] && echo "This script must be run with bash." && exit 1
 
