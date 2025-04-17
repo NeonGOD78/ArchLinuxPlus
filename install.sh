@@ -934,6 +934,8 @@ configure_grub_theme() {
     echo "GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"" >> /mnt/etc/default/grub
     sed -i "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$gfx_mode/" /mnt/etc/default/grub
 
+    echo 'GRUB_ENABLE_CRYPTODISK=y' >> /mnt/etc/default/grub
+ 
     # Save visuals config for later use
     save_boot_visuals_config
 
