@@ -28,14 +28,47 @@ section_print() {
   printf "${BBLUE}==> %s${RESET}\n" "$1"
 }
 
+# ======================= Password Prompt Helper ======================
+get_valid_password() {
+  local prompt="$1"
+  local pass1 pass2
+
+  while true; do
+    input_print "$prompt: "
+    stty -echo
+    read -r pass1
+    stty echo
+    echo
+
+    if [[ -z "$pass1" ]]; then
+      warning_print "Password cannot be empty."
+      continue
+    fi
+
+    input_print "Confirm $prompt: "
+    stty -echo
+    read -r pass2
+    stty echo
+    echo
+
+    if [[ "$pass1" != "$pass2" ]]; then
+      warning_print "Passwords do not match. Please try again."
+    else
+      break
+    fi
+  done
+
+  echo "$pass1"
+}
+
 # ======================= Welcome Banner ======================
 welcome_banner() {
   clear
   echo -ne "${BOLD}${BYELLOW}
 ===========================================================
-    _             _     _     _            __  __
-   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _
-  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_
+    _             _     _     _            __  __     
+   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _   
+  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_ 
  / ___ \| | | (__| | | | |___| | | | | |_| |/  \_   _|
 /_/   \_\_|  \___|_| |_|_____|_|_| |_|\__,_/_/\_\|_|
 
@@ -103,7 +136,7 @@ kernel_selector () {
     info_print "2) Hardened: A security-focused Linux kernel"
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
-    input_print "Please select the number of the corresponding kernel (e.g. 1): "
+    input_print "Please select the number of the corresponding kernel (e.g. 1): " 
     read -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
@@ -128,25 +161,24 @@ microcode_detector () {
 
 # ======================= Reuse LUKS Password ======================
 reuse_password() {
-    input_print "Do you want to use the same password for root/user? (YES/no): "
+  input_print "Do you want to use the same password for root and user? (YES/no): "
 
-    old_stty_cfg=$(stty -g)
-    stty -echo -icanon
-    choice=$(head -n1 </dev/tty)
-    stty "$old_stty_cfg"
+  old_stty_cfg=$(stty -g)
+  stty -echo -icanon
+  choice=$(head -n1 </dev/tty)
+  stty "$old_stty_cfg"
+  echo
+  choice=${choice,,}
 
-    echo
-    choice=${choice:-yes}
-
-    case "$choice" in
-        y|Y|yes|YES)
-            userpass="$password"
-            rootpass="$password"
-            ;;
-        *)
-            info_print "No reusable passwords."
-            ;;
-    esac
+  if [[ "$choice" == "yes" || "$choice" == "y" || -z "$choice" ]]; then
+    rootpass="$password"
+    userpass="$password"
+    info_print "Same password will be used for root and user."
+  else
+    info_print "Separate passwords will be used."
+    rootpass=$(get_valid_password "root password")
+    userpass=$(get_valid_password "user password")
+  fi
 }
 
 # ======================= Disk Wipe Confirmation ==========
@@ -208,6 +240,7 @@ format_partitions() {
   info_print "Formatting home (crypthome) as BTRFS..."
   mkfs.btrfs /dev/mapper/crypthome &>/dev/null
 }
+
 
 # ======================= Install Base System ======================
 install_base_system() {
@@ -600,7 +633,8 @@ select_disk() {
   echo
   info_print "Detected disks:"
   for i in "${!disks[@]}"; do
-    printf "  %d) %s\n" "$((i+1))" "${disks[$i]}"
+    printf "  %d) %s
+" "$((i+1))" "${disks[$i]}"
   done
   echo
 
@@ -635,7 +669,6 @@ select_disk() {
   success_print "Disk $DISK confirmed and ready for partitioning."
 }
 
-
 # ======================= LUKS Password Input ======================
 lukspass_selector() {
   input_print "Enter password to use for disk encryption (LUKS): "
@@ -656,22 +689,11 @@ lukspass_selector() {
 
 # ======================= Root Password Setup ======================
 rootpass_selector() {
-  input_print "Enter password for root user: "
-  old_stty_cfg=$(stty -g)
-  stty -echo
-  read -r rootpass
-  stty "$old_stty_cfg"
-  echo
-
-  if [[ -z "$rootpass" ]]; then
-    error_print "Password cannot be empty."
-    exit 1
-  fi
-
+  rootpass=$(get_valid_password "root password")
   info_print "Root password has been set."
 }
 
-# ======================= User and Password Setup ======================
+# ======================= User + Password Setup ======================
 userpass_selector() {
   input_print "Enter username for new user: "
   read -r username
@@ -681,19 +703,8 @@ userpass_selector() {
     exit 1
   fi
 
-  input_print "Enter password for user $username: "
-  old_stty_cfg=$(stty -g)
-  stty -echo
-  read -r userpass
-  stty "$old_stty_cfg"
-  echo
-
-  if [[ -z "$userpass" ]]; then
-    error_print "User password cannot be empty."
-    exit 1
-  fi
-
-  info_print "User $username and password have been registered."
+  userpass=$(get_valid_password "password for user $username")
+  info_print "User $username and password registered."
 }
 
 # ======================= Network Selector ======================
@@ -999,7 +1010,7 @@ configure_grub_theme() {
     sed -i "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$gfx_mode/" /mnt/etc/default/grub
 
     echo 'GRUB_ENABLE_CRYPTODISK=y' >> /mnt/etc/default/grub
-
+ 
     # Save visuals config for later use
     save_boot_visuals_config
 
@@ -1154,9 +1165,9 @@ main() {
   encrypt_partitions
   format_partitions
   mount_btrfs_subvolumes
-
+  
   until install_base_system; do : ; done
-
+  
   generate_fstab
   configure_hostname_and_hosts
   setup_zram
@@ -1187,4 +1198,4 @@ main() {
 
 main
 
-exit                                                                                                             
+exit                                       
