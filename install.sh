@@ -1,7 +1,17 @@
-# ======================= Print Functions =======================
+# ======================= Color Palette =======================
+BOLD='\e[1m'
+RESET='\e[0m'
 
+BCYAN='\e[96m'     # Info
+BGREEN='\e[92m'    # Success
+BYELLOW='\e[93m'   # Warning
+BRED='\e[91m'      # Error
+BMAGENTA='\e[95m'  # Section / Banner
+BWHITE='\e[1;97m'  # Input prompt
+
+# ======================= Print Functions =======================
 info_print() {
-  printf "${BGREEN}[✔] %s${RESET}\n" "$1"
+  printf "${BCYAN}[✔] %s${RESET}\n" "$1"
 }
 
 warning_print() {
@@ -17,17 +27,16 @@ success_print() {
 }
 
 input_print() {
-  printf "${BYELLOW}[?] %s${RESET} " "$1"
-}
-
-print_separator() {
-  printf "${BBLUE}------------------------------------------------------------${RESET}\n"
+  printf "${BWHITE}[?] %s${RESET} " "$1"
 }
 
 section_print() {
-  printf "${BBLUE}==> %s${RESET}\n" "$1"
+  printf "${BMAGENTA}==> %s${RESET}\n" "$1"
 }
 
+print_separator() {
+  printf "${BMAGENTA}------------------------------------------------------------${RESET}\n"
+}
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
