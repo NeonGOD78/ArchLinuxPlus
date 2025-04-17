@@ -1,23 +1,31 @@
-# ======================= Basic Print Functions ======================
+# ======================= Print Functions =======================
 
 info_print() {
-  printf "${BGREEN}[+] %s${RESET}\n" "$1"
+  printf "${BGREEN}[✔] %s${RESET}\n" "$1"
 }
 
-input_print () {
-  printf "${BOLD}${BYELLOW}[ ${BGREEN}•${BYELLOW} ] $1${RESET}"
+warning_print() {
+  printf "${BYELLOW}[!] %s${RESET}\n" "$1"
 }
 
 error_print() {
-  printf "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
+  printf "${BRED}[✖] %s${RESET}\n" "$1"
 }
 
-success_print () {
-  printf "${BOLD}${BGREEN}[ ${BBLUE}✓${BGREEN} ] $1${RESET}"
+success_print() {
+  printf "${BGREEN}[✓] %s${RESET}\n" "$1"
 }
 
-warning_print () {
-  printf "${BOLD}${BYELLOW}[ ${BBLUE}!${BYELLOW} ] $1${RESET}"
+input_print() {
+  printf "${BYELLOW}[?] %s${RESET} " "$1"
+}
+
+print_separator() {
+  printf "${BBLUE}------------------------------------------------------------${RESET}\n"
+}
+
+section_print() {
+  printf "${BBLUE}==> %s${RESET}\n" "$1"
 }
 
 # ======================= Welcome Banner ======================
