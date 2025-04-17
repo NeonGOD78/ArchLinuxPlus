@@ -33,9 +33,9 @@ welcome_banner() {
   clear
   echo -ne "${BOLD}${BYELLOW}
 ===========================================================
-    _             _     _     _            __  __     
-   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _   
-  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_ 
+    _             _     _     _            __  __
+   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _
+  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_
  / ___ \| | | (__| | | | |___| | | | | |_| |/  \_   _|
 /_/   \_\_|  \___|_| |_|_____|_|_| |_|\__,_/_/\_\|_|
 
@@ -103,7 +103,7 @@ kernel_selector () {
     info_print "2) Hardened: A security-focused Linux kernel"
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
-    input_print "Please select the number of the corresponding kernel (e.g. 1): " 
+    input_print "Please select the number of the corresponding kernel (e.g. 1): "
     read -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
@@ -208,7 +208,6 @@ format_partitions() {
   info_print "Formatting home (crypthome) as BTRFS..."
   mkfs.btrfs /dev/mapper/crypthome &>/dev/null
 }
-
 
 # ======================= Install Base System ======================
 install_base_system() {
@@ -965,7 +964,7 @@ configure_grub_theme() {
     sed -i "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$gfx_mode/" /mnt/etc/default/grub
 
     echo 'GRUB_ENABLE_CRYPTODISK=y' >> /mnt/etc/default/grub
- 
+
     # Save visuals config for later use
     save_boot_visuals_config
 
@@ -1120,9 +1119,9 @@ main() {
   encrypt_partitions
   format_partitions
   mount_btrfs_subvolumes
-  
+
   until install_base_system; do : ; done
-  
+
   generate_fstab
   configure_hostname_and_hosts
   setup_zram
@@ -1153,4 +1152,4 @@ main() {
 
 main
 
-exit
+exit                                                                                                             
