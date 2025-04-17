@@ -30,6 +30,7 @@ section_print() {
 
 # ======================= Welcome Banner ======================
 welcome_banner() {
+  clear
   echo -ne "${BOLD}${BYELLOW}
 ===========================================================
     _             _     _     _            __  __     
@@ -41,6 +42,7 @@ welcome_banner() {
 ===========================================================
 ${RESET}"
   info_print "Welcome to ArchLinux+, a script made to simplify the Arch Linux installation process."
+  print_separator
 }
 
 # ======================= Keyboard Selection ======================
