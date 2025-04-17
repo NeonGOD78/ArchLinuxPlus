@@ -1081,7 +1081,6 @@ main() {
   microcode_detector
   locale_selector
   hostname_selector
-  configure_hostname_and_hosts
   userpass_selector
   rootpass_selector
   confirm_disk_wipe
@@ -1089,10 +1088,11 @@ main() {
   encrypt_partitions
   format_partitions
   mount_btrfs_subvolumes
-  generate_fstab
   
   until install_base_system; do : ; done
-
+  
+  generate_fstab
+  configure_hostname_and_hosts
   setup_zram
   network_selector
   install_editor
@@ -1108,8 +1108,6 @@ main() {
   generate_grub_cfg
   setup_users_and_passwords
   dotfiles_clone
-  clone_dotfiles_repo
-  install_dotfiles_with_stow
   configure_pacman
   configure_pacman_repos
   configure_makepkg
