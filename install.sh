@@ -333,6 +333,26 @@ EOF
 
   info_print "Enabling UKI update timer..."
   arch-chroot /mnt systemctl enable update-uki.timer &>/dev/null || warning_print "Failed to enable update-uki.timer"
+
+cat > /mnt/usr/local/bin/update-uki-fallback.sh <<'EOF'
+#!/bin/bash
+set -e
+
+CMDLINE="rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3"
+
+ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux-fallback.img \
+  --cmdline "$CMDLINE" \
+  --output /efi/EFI/Linux/arch-fallback.efi
+
+sbsign --key /etc/secureboot/db.key \
+       --cert /etc/secureboot/db.crt \
+       --output /efi/EFI/Linux/arch-fallback.efi \
+       /efi/EFI/Linux/arch-fallback.efi
+EOF
+
+chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 }
 
 # ======================= Mount BTRFS Subvolumes ================
