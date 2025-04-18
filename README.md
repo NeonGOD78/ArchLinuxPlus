@@ -1,76 +1,88 @@
-📦 What is this?
+DO NOT USE YET !!  WORK IN PROGRESS !!
 
-ArchLinux Installer+ is a fully automated, interactive installation script for Arch Linux, optimized for:
+# ArchLinux+
 
-    💾 Full-disk LUKS2 encryption (root + /home)
+**ArchLinux+** is a fully interactive and modular Arch Linux installation script, tailored for power users who want a modern, secure, and elegant system setup — quickly and with full control.
 
-    🧠 Btrfs subvolumes with Snapper & grub-btrfs integration
+---
 
-    💥 Support for Unified Kernel Images (UKI)
+## 🚀 Features
 
-    🧰 Extra features like ZRAM, yay, microcode detection, virtual guest additions, and more
+- 🖥️ **Interactive CLI interface** with colorful, user-friendly prompts
+- 🧩 **Modular architecture** for easier debugging and expansion
+- 💾 **Visual disk selector** with partition layout and verification
+- 🔐 **Full LUKS2 encryption** for root and separate `/home` partition
+- 📦 **Btrfs subvolume layout**:
+  - `@`, `@home`, `@snapshots`, `@var_log`, `@var_pkgs`, `@srv`, `@var_lib_*`
+  - CoW disabled on relevant subvolumes for performance
+- 📸 **Snapper + grub-btrfs integration** for GRUB boot menu rollback
+- 🔧 **Kernel selection**: Stable, LTS, Hardened, Zen
+- 🧠 **Microcode detection** (Intel/AMD)
+- 🛜 **Network choices**: NetworkManager, iwd, wpa_supplicant, dhcpcd
+- 🌍 **Regional defaults**:
+  - Locale: `en_DK.UTF-8`
+  - Hostname: `archlinux`
+- ✨ **ZRAM**, Plymouth splash, GRUB themes (1080p and 2K)
+- 🛡️ **Secure Boot support** with key generation, UKI build/sign automation
+- 🧰 **AUR helper** yay installed and ready to use
+- 💅 **Default shell set to ZSH**, with curated configs, aliases, and themes
+- ⚙️ **Pacman tweaks**: Color, Candy, ParallelDownloads, Testing repos (search/update only)
+- 🧬 **Dotfiles integration** with GitHub + stow support
 
-🚀 Quick Install
-bash <(curl -sL https://bit.ly/archlinuxplus)
-🛠️ Features
-Feature	Included
-Full-disk LUKS2 encryption	✅
-Separate encrypted /home	✅
-Btrfs with subvolumes	✅
-Snapper + grub-btrfs	✅
-UKI support via ukify	✅
-Auto EFI/UKI backup	✅
-Auto grub-mkconfig & entries	✅
-ZRAM via zram-generator	✅
-yay (AUR helper) installation	✅
-Network selector (NM, iwd, etc.)	✅
-Auto microcode detection	✅
-Virtualization guest tools	✅
-Default zsh + custom dotfiles	✅
-🧠 Subvolume layout
-Subvolume	Mountpoint	Notes
-@	/	Main root filesystem
-@home	/home	On separate LUKS volume
-@snapshots	/.snapshots	For Snapper
-@var_pkgs	/var/cache/pacman/pkg	NOCOW
-@var_log	/var/log	NOCOW
-@var_lib_machines	/var/lib/machines	NOCOW
-@var_lib_portables	/var/lib/portables	NOCOW
-@srv	/srv	
-@root	/root	750 permissions
-🔐 Encryption layout
+---
 
-    / is on /dev/mapper/cryptroot (LUKS2)
+## 🛠️ How to Use
 
-    /home is on /dev/mapper/crypthome (LUKS2)
+1. Boot into the official Arch Linux ISO
+2. Run this command:
+```bash
+bash <(curl -s https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/main/install.sh)
+```
 
-    /efi is separate FAT32 ESP
+---
 
-Uses rd.luks.name=UUID=cryptroot in GRUB and UKI.
-🎯 Requirements
+## 📝 Dotfiles Support
 
-    UEFI system
+During the installation, you can optionally enter a GitHub URL for your dotfiles repo.  
+The script will:
+- Clone to `~/.dotfiles`
+- Automatically apply folders using `stow`
 
-    Stable internet connection
+---
 
-    GPT-partitioned disk
+## 📜 Secure Boot
 
-    At least 30 GB+ free space recommended
+If Secure Boot is enabled:
+- Keys are generated
+- UKI and GRUB are signed
+- You can later use `update-uki` or `sign-grub` after kernel/boot updates
 
-📸 Screenshots (optional)
-💬 Credits
+---
 
-Script and structure by NeonGOD78
+## 🧪 Future Plans
 
-    Inspired by ArchWiki, archinstall, Snapper guides, and the community.
+- Optional desktop environment selection: KDE, XFCE, Hyprland, Sway
+- Remote LUKS unlock (Dropbear, SSH)
+- System health features (smartd, btrfs stats)
+- Server profiles (Docker, NAS, Hypervisor)
 
-🧪 Warning
+---
 
-This script will erase your selected disk. Be sure to back up any important data. Use at your own risk.
-📬 Feedback & Contributions
+## ❤️ Credits
 
-Pull requests, issues, and ideas are welcome on GitHub!
+- The Arch Linux community
+- Tools: `snapper`, `btrfs-progs`, `grub-btrfs`, `ukify`, `sbctl`
+- [adi1090x](https://github.com/adi1090x) for Plymouth themes
 
-👉 View the repository
+---
 
+## ⚠️ Disclaimer
 
+This script wipes all data on the selected disk and performs a full system installation.  
+**Use at your own risk**. You are responsible for your data.
+
+---
+
+## 🌐 GitHub Repository
+
+**https://github.com/NeonGOD78/ArchLinuxPlus**
