@@ -638,51 +638,62 @@ setup_users_and_passwords() {
 select_disk() {
   section_print "Disk Selection"
 
-  # Hent liste over fysiske diske (ingen loop, rom eller boot mounts)
-  mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
+  while true; do
+    mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
 
-  if [[ "${#disks[@]}" -eq 0 ]]; then
-    error_print "No suitable block devices found."
-    exit 1
-  fi
+    if [[ "${#disks[@]}" -eq 0 ]]; then
+      error_print "No suitable block devices found."
+      exit 1
+    fi
 
-  echo
-  info_print "Detected disks:"
-  for i in "${!disks[@]}"; do
-    printf "  %d) %s
+    echo
+    info_print "Detected disks:"
+    for i in "${!disks[@]}"; do
+      printf "  %d) %s
 " "$((i+1))" "${disks[$i]}"
+    done
+    echo
+
+    input_print "Select disk (1-${#disks[@]}), or q to quit: "
+    read -r disk_index </dev/tty
+
+    if [[ "$disk_index" == "q" ]]; then
+      error_print "Disk selection aborted."
+      exit 1
+    fi
+
+    if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
+      warning_print "Invalid selection. Try again."
+      continue
+    fi
+
+    DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
+    success_print "You selected: $DISK"
+    echo
+
+    while true; do
+      info_print "Partition layout for $DISK:"
+      lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
+      echo
+      input_print "Confirm this disk? (yes / b = back / v = view again): "
+      read -r confirm </dev/tty
+      case "${confirm,,}" in
+        yes)
+          success_print "Disk $DISK confirmed and ready for partitioning."
+          return 0
+          ;;
+        b)
+          break
+          ;;
+        v)
+          continue
+          ;;
+        *)
+          warning_print "Invalid input. Please type yes, b or v."
+          ;;
+      esac
+    done
   done
-  echo
-
-  input_print "Select the number of the disk to install Arch on (e.g. 1): "
-  read -r disk_index </dev/tty
-
-  # Check if input is a number in valid range
-  if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
-    error_print "Invalid selection. Aborting."
-    exit 1
-  fi
-
-  DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
-
-  echo
-  success_print "You selected: $DISK"
-  echo
-
-  info_print "Partition layout:"
-  lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
-  clear
-
-  warning_print "⚠️  This will WIPE the entire disk: $DISK"
-  input_print "Type 'yes' to confirm and continue: "
-  read -r confirm </dev/tty
-
-  if [[ "${confirm,,}" != "yes" ]]; then
-    error_print "Disk selection aborted."
-    exit 1
-  fi
-
-  success_print "Disk $DISK confirmed and ready for partitioning."
 }
 
 # ======================= LUKS Password Input ======================
@@ -1217,4 +1228,4 @@ main() {
 
 main
 
-exit                                     
+exit                                                   
