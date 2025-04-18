@@ -52,7 +52,7 @@ get_valid_password() {
   while true; do
     input_print "$prompt: "
     stty -echo
-    read -r pass1
+    read -r pass1 </dev/tty
     stty echo
     echo
 
@@ -63,7 +63,7 @@ get_valid_password() {
 
     input_print "Confirm $prompt: "
     stty -echo
-    read -r pass2
+    read -r pass2 </dev/tty
     stty echo
     echo
 
@@ -97,7 +97,7 @@ ${RESET}"
 # ======================= Keyboard Selection ======================
 keyboard_selector () {
     input_print "Please insert the keyboard layout to use in console (enter empty to use US, or \"/\" to look up for keyboard layouts): "
-    read -r kblayout
+    read -r kblayout </dev/tty
     case "$kblayout" in
         '') kblayout="us"
             info_print "The standard US keyboard layout will be used."
@@ -118,7 +118,7 @@ keyboard_selector () {
 # ======================= Locale Selection ======================
 locale_selector () {
     input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_US, or \"/\" to search locales): "
-    read -r locale
+    read -r locale </dev/tty
     case "$locale" in
         '') locale="en_US.UTF-8"
             info_print "$locale will be the default locale."
@@ -137,7 +137,7 @@ locale_selector () {
 # ======================= Hostname Setup ======================
 hostname_selector () {
     input_print "Please enter the hostname: "
-    read -r hostname
+    read -r hostname </dev/tty
     if [[ -z "$hostname" ]]; then
         error_print "You need to enter a hostname in order to continue."
         return 1
@@ -200,7 +200,7 @@ reuse_password() {
 # ======================= Disk Wipe Confirmation ==========
 confirm_disk_wipe() {
   input_print "This will delete the current partition table on $DISK. Proceed? [y/N]: "
-  read -r response
+  read -r response </dev/tty
   if ! [[ "${response,,}" =~ ^(yes|y)$ ]]; then
     error_print "Disk wipe cancelled."
     exit 1
@@ -213,7 +213,7 @@ confirm_disk_wipe() {
 # ======================= Partition Disk ===================
 partition_disk() {
   input_print "Enter root partition size (e.g. 100G): "
-  read -r root_size
+  read -r root_size </dev/tty
   if [[ -z "$root_size" ]]; then
     error_print "You must specify a root size."
     exit 1
@@ -655,7 +655,7 @@ select_disk() {
   echo
 
   input_print "Select the number of the disk to install Arch on (e.g. 1): "
-  read -r disk_index
+  read -r disk_index </dev/tty
 
   # Check if input is a number in valid range
   if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
@@ -675,7 +675,7 @@ select_disk() {
 
   warning_print "⚠️  This will WIPE the entire disk: $DISK"
   input_print "Type 'yes' to confirm and continue: "
-  read -r confirm
+  read -r confirm </dev/tty
 
   if [[ "${confirm,,}" != "yes" ]]; then
     error_print "Disk selection aborted."
@@ -687,19 +687,7 @@ select_disk() {
 
 # ======================= LUKS Password Input ======================
 lukspass_selector() {
-  input_print "Enter password to use for disk encryption (LUKS): "
-
-  old_stty_cfg=$(stty -g)
-  stty -echo
-  read -r password
-  stty "$old_stty_cfg"
-  echo
-
-  if [[ -z "$password" ]]; then
-    error_print "No password entered. Aborting."
-    exit 1
-  fi
-
+  password=$(get_valid_password "disk encryption")
   info_print "Disk encryption password set."
 }
 
@@ -712,7 +700,7 @@ rootpass_selector() {
 # ======================= User + Password Setup ======================
 userpass_selector() {
   input_print "Enter username for new user: "
-  read -r username
+  read -r username </dev/tty
 
   if [[ -z "$username" ]]; then
     error_print "Username cannot be empty."
@@ -992,7 +980,7 @@ configure_grub_theme() {
     info_print "1) 1080p (1920x1080)"
     info_print "2) 2K (2560x1440)"
     input_print "Enter choice (1 or 2): "
-    read -r theme_choice
+    read -r theme_choice </dev/tty
 
     theme_url_base="https://github.com/NeonGOD78/ArchLinuxPlus/raw/main/configs/boot/grub/themes"
 
@@ -1082,7 +1070,7 @@ save_boot_visuals_config() {
 # ===================== Dotfiles Setup via stow ======================
 install_dotfiles_with_stow() {
     input_print "Do you want to clone and apply dotfiles from GitHub? (y/N): "
-    read -r answer
+    read -r answer </dev/tty
 
     if [[ ! "$answer" =~ ^[Yy](es)?$ ]]; then
         info_print "Skipping dotfiles setup."
@@ -1090,7 +1078,7 @@ install_dotfiles_with_stow() {
     fi
 
     input_print "Enter your dotfiles GitHub repo URL (e.g. https://github.com/username/dotfiles): "
-    read -r dotfiles_url
+    read -r dotfiles_url </dev/tty
 
     if [[ -z "$dotfiles_url" ]]; then
         warning_print "No URL provided. Skipping."
@@ -1119,7 +1107,7 @@ EOF
 # ======================= Clone Dotfiles ======================
 clone_dotfiles_repo() {
     input_print "Enter the GitHub repository URL of your dotfiles (HTTPS, e.g. https://github.com/youruser/dotfiles): "
-    read -r repo_url
+    read -r repo_url </dev/tty
 
     if [[ -z "$repo_url" ]]; then
         warning_print "No repository URL entered. Skipping dotfiles setup."
@@ -1140,7 +1128,7 @@ EOF
 # ======================= Dotfiles Setup =======================
 dotfiles_clone() {
     input_print "Enter GitHub URL for your dotfiles repository (or leave blank to skip): "
-    read -r dotfiles_url
+    read -r dotfiles_url </dev/tty
 
     if [[ -z "$dotfiles_url" ]]; then
         info_print "No dotfiles repository specified, skipping."
@@ -1170,7 +1158,7 @@ generate_fstab() {
 # ======================= Show Installation Log =======================
 show_log_if_needed() {
   input_print "Would you like to view the log file now? (y/N): "
-  read -r showlog
+  read -r showlog </dev/tty
   if [[ "${showlog,,}" == "y" || "${showlog,,}" == "yes" ]]; then
     less +G "$LOGFILE"
   fi
@@ -1229,4 +1217,4 @@ main() {
 
 main
 
-exit                                                   
+exit                                     
