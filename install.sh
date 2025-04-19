@@ -188,44 +188,23 @@ microcode_detector () {
     fi
 }
 
-# ======================= Reuse LUKS Password ======================
-# (Replaced by user_setup)
-  user_setup() {
-  input_print "Do you want to use the same password for root and user? (YES/no): "
-  read -r choice
-  choice=${choice,,}  # to lowercase
-
-  if [[ "$choice" == "yes" || "$choice" == "y" || -z "$choice" ]]; then
-    rootpass="$password"
-    userpass="$password"
-    info_print "Same password will be used for root and user."
-  else
-    info_print "Separate passwords will be used."
-    rootpass=$(get_valid_password "root password")
-    userpass=$(get_valid_password "user password")
-  fi
-}
-
-
 # ======================= User Setup ======================
 user_setup() {
-  if [[ -z "$username" ]]; then
-    info_print "Skipping user setup since no username was provided."
-    return
+  input_print "Enter username for new user (leave empty to skip): "
+  read -r username
+
+  if [[ -n "$username" ]]; then
+    if [[ -z "${userpass:-}" ]]; then
+      userpass=$(get_valid_password "user password for $username")
+    else
+      info_print "Using previously entered password for user $username."
+    fi
   fi
 
-  input_print "Do you want to use the same password for root and user? (YES/no): "
-  read -r choice
-  choice=${choice,,}  # to lowercase
-
-  if [[ "$choice" == "yes" || "$choice" == "y" || -z "$choice" ]]; then
-    rootpass="$password"
-    userpass="$password"
-    info_print "Same password will be used for root and user."
-  else
-    info_print "Separate passwords will be used."
+  if [[ -z "${rootpass:-}" ]]; then
     rootpass=$(get_valid_password "root password")
-    userpass=$(get_valid_password "user password for $username")
+  else
+    info_print "Using previously entered password for root."
   fi
 }
 
@@ -652,20 +631,6 @@ fi
 EOF
 }
 
-setup_users_and_passwords() {
-  info_print "Setting passwords and creating user..."
-
-  echo "root:$rootpass" | arch-chroot /mnt chpasswd
-  arch-chroot /mnt usermod -s /usr/bin/zsh root
-
-  if [[ -n "$username" ]]; then
-    echo "%wheel ALL=(ALL:ALL) ALL" > /mnt/etc/sudoers.d/wheel
-    info_print "Adding the user $username to the system with root privileges..."
-    arch-chroot /mnt useradd -m -G wheel -s /usr/bin/zsh "$username"
-    echo "$username:$userpass" | arch-chroot /mnt chpasswd
-  fi
-}
-
 # ======================= Disk Selection ======================
 select_disk() {
   section_print "Disk Selection"
@@ -733,26 +698,6 @@ lukspass_selector() {
   fi
 
   info_print "Disk encryption password set."
-}
-
-# ======================= Root Password Setup ======================
-rootpass_selector() {
-  rootpass=$(get_valid_password "root password")
-  info_print "Root password has been set."
-}
-
-# ======================= User + Password Setup ======================
-userpass_selector() {
-  input_print "Enter username for new user: "
-  read -r username
-
-  if [[ -z "$username" ]]; then
-    error_print "Username cannot be empty."
-    exit 1
-  fi
-
-  userpass=$(get_valid_password "password for user $username")
-  info_print "User $username and password registered."
 }
 
 # ======================= Network Selector ======================
@@ -1205,6 +1150,25 @@ show_log_if_needed() {
   fi
 }
 
+# ======================= User Setup ======================
+user_setup() {
+  input_print "Enter username for new user (leave empty to skip): "
+  read -r username
+
+  if [[ -n "$username" ]]; then
+    if [[ -z "${userpass:-}" ]]; then
+      userpass=$(get_valid_password "user password for $username")
+    else
+      info_print "Using previously entered password for user $username."
+    fi
+  fi
+
+  if [[ -z "${rootpass:-}" ]]; then
+    rootpass=$(get_valid_password "root password")
+  else
+    info_print "Using previously entered password for root."
+  fi
+}
 
 # ======================= Main Installer Flow ==============
 main() {
@@ -1212,6 +1176,7 @@ main() {
   keyboard_selector
   select_disk
   lukspass_selector
+  ask_password_reuse
   user_setup
   kernel_selector
   microcode_detector
