@@ -1337,8 +1337,8 @@ welcome_banner
   show_log_if_needed
   info_print "[DEBUG] After: show_log_if_needed"
   sleep 1
-}}
+}
 
 main
 
-exit                                 
+exit
