@@ -51,9 +51,7 @@ get_valid_password() {
 
   while true; do
     input_print "$prompt: "
-    stty -echo
-    read -r pass1
-    stty echo
+    read -r -s pass1
     echo
 
     if [[ -z "$pass1" ]]; then
@@ -62,9 +60,7 @@ get_valid_password() {
     fi
 
     input_print "Confirm $prompt: "
-    stty -echo
-    read -r pass2
-    stty echo
+    read -r -s pass2
     echo
 
     if [[ "$pass1" != "$pass2" ]]; then
@@ -707,16 +703,13 @@ rootpass_selector() {
 # ======================= User + Password Setup ======================
 userpass_selector() {
  input_print "Enter username for new user: "
-echo "DEBUG: Waiting for username input..." >&2
 read -r username
-echo "DEBUG: Got username: '$username'" >&2
 
 if [[ -z "$username" ]]; then
   error_print "Username cannot be empty."
   exit 1
 fi
 
-echo "DEBUG: Calling get_valid_password for user $username" >&2
 userpass=$(get_valid_password "password for user $username")
 info_print "User $username and password registered."
 }
