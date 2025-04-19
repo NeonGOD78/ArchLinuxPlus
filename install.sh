@@ -962,7 +962,7 @@ enable_system_services() {
 }
 
 # =========================== Final Message ===========================
-finish_installation
+
   show_log_if_needed() {
   info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
   info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
@@ -1197,6 +1197,11 @@ show_log_if_needed() {
 
 
 # ======================= Main Installer Flow ==============
+
+finish_installation() {
+  show_log_if_needed
+}
+
 main() {
 welcome_banner
   info_print "[DEBUG] After: welcome_banner"
@@ -1326,7 +1331,7 @@ welcome_banner
   save_boot_visuals_config
   info_print "[DEBUG] After: save_boot_visuals_config"
   sleep 1
-  finish_installation
+
   info_print "[DEBUG] After: finish_installation"
   sleep 1
   show_log_if_needed
