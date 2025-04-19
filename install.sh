@@ -402,6 +402,7 @@ ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
   --cmdline "$CMDLINE" \                                                                                            ==
+}  # <== auto-inserted to close 'setup_secureboot_structure'
 mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
   mount /dev/mapper/cryptroot /mnt
@@ -433,6 +434,7 @@ EOF
 chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 }
 
+}  # <== auto-inserted to close 'mount_btrfs_subvolumes'
 # ======================= Mount BTRFS Subvolumes ================
 mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
