@@ -683,21 +683,37 @@ select_disk() {
 }
 
 # ======================= LUKS Password Input ======================
+# ======================= LUKS Password Input ======================
 lukspass_selector() {
-  input_print "Enter password to use for disk encryption (LUKS): "
+  local pass1 pass2
 
-  old_stty_cfg=$(stty -g)
-  stty -echo
-  read -r password
-  stty "$old_stty_cfg"
-  echo
+  while true; do
+    input_print "Enter password to use for disk encryption (LUKS): "
+    stty -echo
+    read -r pass1
+    stty echo
+    echo
 
-  if [[ -z "$password" ]]; then
-    error_print "No password entered. Aborting."
-    exit 1
-  fi
+    if [[ -z "$pass1" ]]; then
+      warning_print "Password cannot be empty."
+      continue
+    fi
 
-  info_print "Disk encryption password set."
+    input_print "Confirm password: "
+    stty -echo
+    read -r pass2
+    stty echo
+    echo
+
+    if [[ "$pass1" != "$pass2" ]]; then
+      warning_print "Passwords do not match. Please try again."
+    else
+      password="$pass1"
+      break
+    fi
+  done
+
+  info_print "Disk encryption password has been set."
 }
 
 # ======================= Network Selector ======================
