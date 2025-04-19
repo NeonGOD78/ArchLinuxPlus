@@ -1198,53 +1198,141 @@ show_log_if_needed() {
 
 # ======================= Main Installer Flow ==============
 main() {
-  welcome_banner
+welcome_banner
+  info_print "[DEBUG] After: welcome_banner"
+  sleep 1
   keyboard_selector
+  info_print "[DEBUG] After: keyboard_selector"
+  sleep 1
   select_disk
+  info_print "[DEBUG] After: select_disk"
+  sleep 1
   lukspass_selector
+  info_print "[DEBUG] After: lukspass_selector"
+  sleep 1
   reuse_password
+  info_print "[DEBUG] After: reuse_password"
+  sleep 1
   kernel_selector
+  info_print "[DEBUG] After: kernel_selector"
+  sleep 1
   microcode_detector
+  info_print "[DEBUG] After: microcode_detector"
+  sleep 1
   locale_selector
+  info_print "[DEBUG] After: locale_selector"
+  sleep 1
   hostname_selector
+  info_print "[DEBUG] After: hostname_selector"
+  sleep 1
   userpass_selector
+  info_print "[DEBUG] After: userpass_selector"
+  sleep 1
   rootpass_selector
+  info_print "[DEBUG] After: rootpass_selector"
+  sleep 1
   confirm_disk_wipe
+  info_print "[DEBUG] After: confirm_disk_wipe"
+  sleep 1
   partition_disk
+  info_print "[DEBUG] After: partition_disk"
+  sleep 1
   encrypt_partitions
+  info_print "[DEBUG] After: encrypt_partitions"
+  sleep 1
   format_partitions
+  info_print "[DEBUG] After: format_partitions"
+  sleep 1
   mount_btrfs_subvolumes
+  info_print "[DEBUG] After: mount_btrfs_subvolumes"
+  sleep 1
   
   until install_base_system; do : ; done
+  info_print "[DEBUG] After: until install_base_system; do : ; done"
+  sleep 1
   
   generate_fstab
+  info_print "[DEBUG] After: generate_fstab"
+  sleep 1
   configure_hostname_and_hosts
+  info_print "[DEBUG] After: configure_hostname_and_hosts"
+  sleep 1
   setup_zram
+  info_print "[DEBUG] After: setup_zram"
+  sleep 1
   network_selector
+  info_print "[DEBUG] After: network_selector"
+  sleep 1
   install_editor
+  info_print "[DEBUG] After: install_editor"
+  sleep 1
   configure_default_shell
+  info_print "[DEBUG] After: configure_default_shell"
+  sleep 1
   setup_secureboot_structure
+  info_print "[DEBUG] After: setup_secureboot_structure"
+  sleep 1
   setup_timezone_and_clock_chroot
+  info_print "[DEBUG] After: setup_timezone_and_clock_chroot"
+  sleep 1
   setup_locale_and_initramfs_chroot
+  info_print "[DEBUG] After: setup_locale_and_initramfs_chroot"
+  sleep 1
   setup_snapper_chroot
+  info_print "[DEBUG] After: setup_snapper_chroot"
+  sleep 1
   install_grub_chroot
+  info_print "[DEBUG] After: install_grub_chroot"
+  sleep 1
   sign_grub_chroot
+  info_print "[DEBUG] After: sign_grub_chroot"
+  sleep 1
   setup_grub_btrfs_chroot
+  info_print "[DEBUG] After: setup_grub_btrfs_chroot"
+  sleep 1
   build_uki_chroot
+  info_print "[DEBUG] After: build_uki_chroot"
+  sleep 1
   generate_grub_cfg
+  info_print "[DEBUG] After: generate_grub_cfg"
+  sleep 1
   setup_users_and_passwords
+  info_print "[DEBUG] After: setup_users_and_passwords"
+  sleep 1
   dotfiles_clone
+  info_print "[DEBUG] After: dotfiles_clone"
+  sleep 1
   configure_pacman
+  info_print "[DEBUG] After: configure_pacman"
+  sleep 1
   configure_pacman_repos
+  info_print "[DEBUG] After: configure_pacman_repos"
+  sleep 1
   configure_makepkg
+  info_print "[DEBUG] After: configure_makepkg"
+  sleep 1
   enable_system_services
+  info_print "[DEBUG] After: enable_system_services"
+  sleep 1
   install_yay
+  info_print "[DEBUG] After: install_yay"
+  sleep 1
   configure_grub_theme
+  info_print "[DEBUG] After: configure_grub_theme"
+  sleep 1
   configure_plymouth_theme
+  info_print "[DEBUG] After: configure_plymouth_theme"
+  sleep 1
   save_boot_visuals_config
+  info_print "[DEBUG] After: save_boot_visuals_config"
+  sleep 1
   finish_installation
+  info_print "[DEBUG] After: finish_installation"
+  sleep 1
   show_log_if_needed
-}
+  info_print "[DEBUG] After: show_log_if_needed"
+  sleep 1
+}}
 
 main
 
