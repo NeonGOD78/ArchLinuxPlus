@@ -134,6 +134,19 @@ locale_selector () {
     esac
 }
 
+
+# ======================= Set Username ======================
+set_username() {
+  input_print "Enter username for new user (leave empty to skip user creation): "
+  read -r username
+
+  if [[ -z "$username" ]]; then
+    warning_print "No username entered. User creation will be skipped."
+  else
+    info_print "Username '$username' set for user creation."
+  fi
+}
+
 # ======================= Hostname Setup ======================
 hostname_selector () {
     input_print "Please enter the hostname: "
@@ -176,7 +189,8 @@ microcode_detector () {
 }
 
 # ======================= Reuse LUKS Password ======================
-reuse_password() {
+# (Replaced by user_setup)
+  user_setup() {
   input_print "Do you want to use the same password for root and user? (YES/no): "
   read -r choice
   choice=${choice,,}  # to lowercase
@@ -189,6 +203,29 @@ reuse_password() {
     info_print "Separate passwords will be used."
     rootpass=$(get_valid_password "root password")
     userpass=$(get_valid_password "user password")
+  fi
+}
+
+
+# ======================= User Setup ======================
+user_setup() {
+  if [[ -z "$username" ]]; then
+    info_print "Skipping user setup since no username was provided."
+    return
+  fi
+
+  input_print "Do you want to use the same password for root and user? (YES/no): "
+  read -r choice
+  choice=${choice,,}  # to lowercase
+
+  if [[ "$choice" == "yes" || "$choice" == "y" || -z "$choice" ]]; then
+    rootpass="$password"
+    userpass="$password"
+    info_print "Same password will be used for root and user."
+  else
+    info_print "Separate passwords will be used."
+    rootpass=$(get_valid_password "root password")
+    userpass=$(get_valid_password "user password for $username")
   fi
 }
 
@@ -1175,7 +1212,7 @@ main() {
   keyboard_selector
   select_disk
   lukspass_selector
-  reuse_password
+    user_setup
   kernel_selector
   microcode_detector
   locale_selector
