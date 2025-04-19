@@ -51,7 +51,10 @@ get_valid_password() {
 
   while true; do
     input_print "$prompt: "
+    stty -echo
     read -r pass1
+    stty echo
+    echo
 
     if [[ -z "$pass1" ]]; then
       warning_print "Password cannot be empty."
@@ -59,7 +62,10 @@ get_valid_password() {
     fi
 
     input_print "Confirm $prompt: "
+    stty -echo
     read -r pass2
+    stty echo
+    echo
 
     if [[ "$pass1" != "$pass2" ]]; then
       warning_print "Passwords do not match. Please try again."
@@ -147,7 +153,7 @@ kernel_selector () {
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
     input_print "Please select the number of the corresponding kernel (e.g. 1): "
-    read -r kernel_choice
+    read -e -i "1" -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
         2 ) kernel="linux-hardened"; return 0;;
@@ -708,9 +714,6 @@ userpass_selector() {
     exit 1
   fi
 
-  echo "DEBUG: Got username: '$username'"
-  echo "DEBUG: Calling get_valid_password for user $username"
-
   userpass=$(get_valid_password "password for user $username")
   info_print "User $username and password registered."
 }
@@ -724,7 +727,7 @@ network_selector () {
     info_print "4) dhcpcd: Basic DHCP client (Ethernet connections or VMs)"
     info_print "5) I will do this on my own (only advanced users)"
     input_print "Please select the number of the corresponding networking utility (e.g. 1): "
-    read -r network_choice
+    read -e -i "1" -r network_choice
 
     case "$network_choice" in
         1)
@@ -787,7 +790,7 @@ install_editor() {
     info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
-    read -r editor_choice
+    read -e -i "1" -r editor_choice
 
     case "$editor_choice" in
         1)
