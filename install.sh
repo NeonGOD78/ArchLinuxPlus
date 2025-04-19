@@ -944,12 +944,8 @@ enable_system_services() {
 
 # =========================== Final Message ===========================
 finish_installation() {
-  show_log_if_needed() {
   info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
   info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
-  print_separator
-  info_print "Log file saved to: ${BOLD}/mnt/install.log${RESET} – check this if something went wrong."
-  }
 }
 
 # ====================== AUR Helper: yay Installer ======================
