@@ -153,7 +153,7 @@ kernel_selector () {
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
     input_print "Please select the number of the corresponding kernel (e.g. 1): "
-    read -e -i "1" -r kernel_choice
+    read -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
         2 ) kernel="linux-hardened"; return 0;;
@@ -178,13 +178,8 @@ microcode_detector () {
 # ======================= Reuse LUKS Password ======================
 reuse_password() {
   input_print "Do you want to use the same password for root and user? (YES/no): "
-
-  old_stty_cfg=$(stty -g)
-  stty -echo -icanon
-  choice=$(head -n1 </dev/tty)
-  stty "$old_stty_cfg"
-  echo
-  choice=${choice,,}
+  read -r choice
+  choice=${choice,,}  # to lowercase
 
   if [[ "$choice" == "yes" || "$choice" == "y" || -z "$choice" ]]; then
     rootpass="$password"
@@ -711,16 +706,19 @@ rootpass_selector() {
 
 # ======================= User + Password Setup ======================
 userpass_selector() {
-  input_print "Enter username for new user: "
-  read -r username
+ input_print "Enter username for new user: "
+echo "DEBUG: Waiting for username input..." >&2
+read -r username
+echo "DEBUG: Got username: '$username'" >&2
 
-  if [[ -z "$username" ]]; then
-    error_print "Username cannot be empty."
-    exit 1
-  fi
+if [[ -z "$username" ]]; then
+  error_print "Username cannot be empty."
+  exit 1
+fi
 
-  userpass=$(get_valid_password "password for user $username")
-  info_print "User $username and password registered."
+echo "DEBUG: Calling get_valid_password for user $username" >&2
+userpass=$(get_valid_password "password for user $username")
+info_print "User $username and password registered."
 }
 
 # ======================= Network Selector ======================
@@ -732,7 +730,7 @@ network_selector () {
     info_print "4) dhcpcd: Basic DHCP client (Ethernet connections or VMs)"
     info_print "5) I will do this on my own (only advanced users)"
     input_print "Please select the number of the corresponding networking utility (e.g. 1): "
-    read -e -i "1" -r network_choice
+    read -r network_choice
 
     case "$network_choice" in
         1)
@@ -795,7 +793,7 @@ install_editor() {
     info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
-    read -e -i "1" -r editor_choice
+    read -r editor_choice
 
     case "$editor_choice" in
         1)
