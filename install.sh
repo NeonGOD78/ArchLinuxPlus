@@ -153,7 +153,7 @@ kernel_selector () {
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
     input_print "Please select the number of the corresponding kernel (e.g. 1): " 
-    read -e -i "1" -r kernel_choice
+    read -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
         2 ) kernel="linux-hardened"; return 0;;
@@ -401,7 +401,27 @@ CMDLINE="rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot
 ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
-  --cmdline "$CMDLINE" \
+  --cmdline "$CMDLINE" \                                                                                            ==
+mount_btrfs_subvolumes() {
+  info_print "Creating BTRFS subvolumes on root partition..."
+  mount /dev/mapper/cryptroot /mnt
+  for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
+    btrfs subvolume create /mnt/$subvol &>> \"$LOGFILE\"
+  done
+  umount /mnt
+
+  info_print "Creating BTRFS subvolume on home partition..."
+  mount /dev/mapper/crypthome /mnt
+  btrfs subvolume create /mnt/@home &>> \"$LOGFILE\"
+  umount /mnt
+
+  mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
+
+  info_print "Mounting root subvolume (@) to /mnt..."
+  mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
+
+  info_print "Creating mount directories..."
+  mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt
   --output /efi/EFI/Linux/arch-fallback.efi
 
 sbsign --key /etc/secureboot/db.key \
@@ -731,7 +751,7 @@ network_selector () {
     info_print "4) dhcpcd: Basic DHCP client (Ethernet connections or VMs)"
     info_print "5) I will do this on my own (only advanced users)"
     input_print "Please select the number of the corresponding networking utility (e.g. 1): "
-    read -e -i "1" -r network_choice
+    read -r network_choice
 
     case "$network_choice" in
         1)
@@ -794,7 +814,7 @@ install_editor() {
     info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
-    read -e -i "1" -r editor_choice
+    read -r editor_choice
 
     case "$editor_choice" in
         1)
@@ -1228,4 +1248,4 @@ main() {
 
 main
 
-exit                                                   
+exit                                 
