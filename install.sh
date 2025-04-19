@@ -51,8 +51,7 @@ get_valid_password() {
 
   while true; do
     input_print "$prompt: "
-    read -r -s pass1
-    echo
+    read -r pass1
 
     if [[ -z "$pass1" ]]; then
       warning_print "Password cannot be empty."
@@ -60,8 +59,7 @@ get_valid_password() {
     fi
 
     input_print "Confirm $prompt: "
-    read -r -s pass2
-    echo
+    read -r pass2
 
     if [[ "$pass1" != "$pass2" ]]; then
       warning_print "Passwords do not match. Please try again."
@@ -702,16 +700,19 @@ rootpass_selector() {
 
 # ======================= User + Password Setup ======================
 userpass_selector() {
- input_print "Enter username for new user: "
-read -r username
+  input_print "Enter username for new user: "
+  read -r username
 
-if [[ -z "$username" ]]; then
-  error_print "Username cannot be empty."
-  exit 1
-fi
+  if [[ -z "$username" ]]; then
+    error_print "Username cannot be empty."
+    exit 1
+  fi
 
-userpass=$(get_valid_password "password for user $username")
-info_print "User $username and password registered."
+  echo "DEBUG: Got username: '$username'"
+  echo "DEBUG: Calling get_valid_password for user $username"
+
+  userpass=$(get_valid_password "password for user $username")
+  info_print "User $username and password registered."
 }
 
 # ======================= Network Selector ======================
