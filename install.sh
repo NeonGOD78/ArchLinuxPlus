@@ -1212,7 +1212,7 @@ main() {
   keyboard_selector
   select_disk
   lukspass_selector
-    user_setup
+  user_setup
   kernel_selector
   microcode_detector
   locale_selector
