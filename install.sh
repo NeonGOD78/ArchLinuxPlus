@@ -3,20 +3,21 @@ set -o pipefail
 set -u
 IFS=$'\n\t'
 
-# ======================= Color Palette =======================
+# Color definitions for styling
 BOLD='\e[1m'
 RESET='\e[0m'
+BRED='\e[91m'
+BBLUE='\e[34m'
+BGREEN='\e[92m'
+BYELLOW='\e[93m'
 
-BBLUE='\e[94m'     # Info
-BGREEN='\e[92m'    # Success
-BYELLOW='\e[93m'   # Warning
-BRED='\e[91m'      # Error
-BMAGENTA='\e[95m'  # Section Header
-BWHITE='\e[1;97m'  # Input prompt
+# Ensure we're running in Bash
+[ -z "${BASH_VERSION:-}" ] && echo "This script must be run with bash." && exit 1
 
 # ======================= Print Functions =======================
+
 info_print() {
-  printf "${BBLUE}[ℹ] %s${RESET}\n" "$1"
+  printf "${BGREEN}[✔] %s${RESET}\n" "$1"
 }
 
 warning_print() {
@@ -32,16 +33,15 @@ success_print() {
 }
 
 input_print() {
-  printf "${BWHITE}[?] %s${RESET} " "$1"
-}
-
-section_print() {
-  printf "${BMAGENTA}==> %s${RESET}\n" "$1"
+  printf "${BYELLOW}[?] %s${RESET} " "$1"
 }
 
 print_separator() {
-  local width=$(tput cols)
-  printf "${BMAGENTA}%${width}s${RESET}\\n" | tr ' ' '─'
+  printf "${BBLUE}------------------------------------------------------------${RESET}\n"
+}
+
+section_print() {
+  printf "${BBLUE}==> %s${RESET}\n" "$1"
 }
 
 # ======================= Password Prompt Helper ======================
@@ -52,7 +52,7 @@ get_valid_password() {
   while true; do
     input_print "$prompt: "
     stty -echo
-    read -r pass1 </dev/tty
+    read -r pass1
     stty echo
     echo
 
@@ -63,7 +63,7 @@ get_valid_password() {
 
     input_print "Confirm $prompt: "
     stty -echo
-    read -r pass2 </dev/tty
+    read -r pass2
     stty echo
     echo
 
@@ -82,9 +82,9 @@ welcome_banner() {
   clear
   echo -ne "${BOLD}${BYELLOW}
 ===========================================================
-    _             _     _     _            __  __     
-   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _   
-  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_ 
+    _             _     _     _            __  __
+   / \   _ __ ___| |__ | |   (_)_ __  _   _\ \/ / _
+  / _ \ | '__/ __| '_ \| |   | | '_ \| | | |\  /_| |_
  / ___ \| | | (__| | | | |___| | | | | |_| |/  \_   _|
 /_/   \_\_|  \___|_| |_|_____|_|_| |_|\__,_/_/\_\|_|
 
@@ -97,7 +97,7 @@ ${RESET}"
 # ======================= Keyboard Selection ======================
 keyboard_selector () {
     input_print "Please insert the keyboard layout to use in console (enter empty to use US, or \"/\" to look up for keyboard layouts): "
-    read -r kblayout </dev/tty
+    read -r kblayout
     case "$kblayout" in
         '') kblayout="us"
             info_print "The standard US keyboard layout will be used."
@@ -118,7 +118,7 @@ keyboard_selector () {
 # ======================= Locale Selection ======================
 locale_selector () {
     input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_US, or \"/\" to search locales): "
-    read -r locale </dev/tty
+    read -r locale
     case "$locale" in
         '') locale="en_US.UTF-8"
             info_print "$locale will be the default locale."
@@ -137,7 +137,7 @@ locale_selector () {
 # ======================= Hostname Setup ======================
 hostname_selector () {
     input_print "Please enter the hostname: "
-    read -r hostname </dev/tty
+    read -r hostname
     if [[ -z "$hostname" ]]; then
         error_print "You need to enter a hostname in order to continue."
         return 1
@@ -152,8 +152,8 @@ kernel_selector () {
     info_print "2) Hardened: A security-focused Linux kernel"
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
-    input_print "Please select the number of the corresponding kernel (e.g. 1): " 
-    read -r kernel_choice
+    input_print "Please select the number of the corresponding kernel (e.g. 1): "
+    read -e -i "1" -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
         2 ) kernel="linux-hardened"; return 0;;
@@ -200,7 +200,7 @@ reuse_password() {
 # ======================= Disk Wipe Confirmation ==========
 confirm_disk_wipe() {
   input_print "This will delete the current partition table on $DISK. Proceed? [y/N]: "
-  read -r response </dev/tty
+  read -r response
   if ! [[ "${response,,}" =~ ^(yes|y)$ ]]; then
     error_print "Disk wipe cancelled."
     exit 1
@@ -213,7 +213,7 @@ confirm_disk_wipe() {
 # ======================= Partition Disk ===================
 partition_disk() {
   input_print "Enter root partition size (e.g. 100G): "
-  read -r root_size </dev/tty
+  read -r root_size
   if [[ -z "$root_size" ]]; then
     error_print "You must specify a root size."
     exit 1
@@ -401,28 +401,7 @@ CMDLINE="rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot
 ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
-  --cmdline "$CMDLINE" \                                                                                            ==
-}  # <== auto-inserted to close 'setup_secureboot_structure'
-mount_btrfs_subvolumes() {
-  info_print "Creating BTRFS subvolumes on root partition..."
-  mount /dev/mapper/cryptroot /mnt
-  for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
-    btrfs subvolume create /mnt/$subvol &>> \"$LOGFILE\"
-  done
-  umount /mnt
-
-  info_print "Creating BTRFS subvolume on home partition..."
-  mount /dev/mapper/crypthome /mnt
-  btrfs subvolume create /mnt/@home &>> \"$LOGFILE\"
-  umount /mnt
-
-  mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
-
-  info_print "Mounting root subvolume (@) to /mnt..."
-  mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
-
-  info_print "Creating mount directories..."
-  mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt
+  --cmdline "$CMDLINE" \
   --output /efi/EFI/Linux/arch-fallback.efi
 
 sbsign --key /etc/secureboot/db.key \
@@ -434,7 +413,6 @@ EOF
 chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 }
 
-}  # <== auto-inserted to close 'mount_btrfs_subvolumes'
 # ======================= Mount BTRFS Subvolumes ================
 mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
@@ -660,67 +638,68 @@ setup_users_and_passwords() {
 select_disk() {
   section_print "Disk Selection"
 
-  while true; do
-    mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
+  # Hent liste over fysiske diske (ingen loop, rom eller boot mounts)
+  mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
 
-    if [[ "${#disks[@]}" -eq 0 ]]; then
-      error_print "No suitable block devices found."
-      exit 1
-    fi
+  if [[ "${#disks[@]}" -eq 0 ]]; then
+    error_print "No suitable block devices found."
+    exit 1
+  fi
 
-    echo
-    info_print "Detected disks:"
-    for i in "${!disks[@]}"; do
-      printf "  %d) %s
+  echo
+  info_print "Detected disks:"
+  for i in "${!disks[@]}"; do
+    printf "  %d) %s
 " "$((i+1))" "${disks[$i]}"
-    done
-    echo
-
-    input_print "Select disk (1-${#disks[@]}), or q to quit: "
-    read -r disk_index </dev/tty
-
-    if [[ "$disk_index" == "q" ]]; then
-      error_print "Disk selection aborted."
-      exit 1
-    fi
-
-    if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
-      warning_print "Invalid selection. Try again."
-      continue
-    fi
-
-    DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
-    success_print "You selected: $DISK"
-    echo
-
-    while true; do
-      info_print "Partition layout for $DISK:"
-      lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
-      echo
-      input_print "Confirm this disk? (yes / b = back / v = view again): "
-      read -r confirm </dev/tty
-      case "${confirm,,}" in
-        yes)
-          success_print "Disk $DISK confirmed and ready for partitioning."
-          return 0
-          ;;
-        b)
-          break
-          ;;
-        v)
-          continue
-          ;;
-        *)
-          warning_print "Invalid input. Please type yes, b or v."
-          ;;
-      esac
-    done
   done
+  echo
+
+  input_print "Select the number of the disk to install Arch on (e.g. 1): "
+  read -r disk_index
+
+  # Check if input is a number in valid range
+  if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
+    error_print "Invalid selection. Aborting."
+    exit 1
+  fi
+
+  DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
+
+  echo
+  success_print "You selected: $DISK"
+  echo
+
+  info_print "Partition layout:"
+  lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
+  clear
+
+  warning_print "⚠️  This will WIPE the entire disk: $DISK"
+  input_print "Type 'yes' to confirm and continue: "
+  read -r confirm
+
+  if [[ "${confirm,,}" != "yes" ]]; then
+    error_print "Disk selection aborted."
+    exit 1
+  fi
+
+  success_print "Disk $DISK confirmed and ready for partitioning."
 }
 
 # ======================= LUKS Password Input ======================
 lukspass_selector() {
-  password=$(get_valid_password "disk encryption")
+  input_print "Enter password to use for disk encryption (LUKS): "
+
+  old_stty_cfg=$(stty -g)
+  stty -echo
+  read -r password
+  stty "$old_stty_cfg"
+  echo
+
+  if [[ -z "$password" ]]; then
+    error_print "No password entered. Aborting."
+    exit 1
+  fi
+
   info_print "Disk encryption password set."
 }
 
@@ -733,7 +712,7 @@ rootpass_selector() {
 # ======================= User + Password Setup ======================
 userpass_selector() {
   input_print "Enter username for new user: "
-  read -r username </dev/tty
+  read -r username
 
   if [[ -z "$username" ]]; then
     error_print "Username cannot be empty."
@@ -753,7 +732,7 @@ network_selector () {
     info_print "4) dhcpcd: Basic DHCP client (Ethernet connections or VMs)"
     info_print "5) I will do this on my own (only advanced users)"
     input_print "Please select the number of the corresponding networking utility (e.g. 1): "
-    read -r network_choice
+    read -e -i "1" -r network_choice
 
     case "$network_choice" in
         1)
@@ -816,7 +795,7 @@ install_editor() {
     info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
-    read -r editor_choice
+    read -e -i "1" -r editor_choice
 
     case "$editor_choice" in
         1)
@@ -964,7 +943,7 @@ enable_system_services() {
 }
 
 # =========================== Final Message ===========================
-
+finish_installation
   show_log_if_needed() {
   info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
   info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
@@ -1013,7 +992,7 @@ configure_grub_theme() {
     info_print "1) 1080p (1920x1080)"
     info_print "2) 2K (2560x1440)"
     input_print "Enter choice (1 or 2): "
-    read -r theme_choice </dev/tty
+    read -r theme_choice
 
     theme_url_base="https://github.com/NeonGOD78/ArchLinuxPlus/raw/main/configs/boot/grub/themes"
 
@@ -1050,7 +1029,7 @@ configure_grub_theme() {
     sed -i "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$gfx_mode/" /mnt/etc/default/grub
 
     echo 'GRUB_ENABLE_CRYPTODISK=y' >> /mnt/etc/default/grub
- 
+
     # Save visuals config for later use
     save_boot_visuals_config
 
@@ -1103,7 +1082,7 @@ save_boot_visuals_config() {
 # ===================== Dotfiles Setup via stow ======================
 install_dotfiles_with_stow() {
     input_print "Do you want to clone and apply dotfiles from GitHub? (y/N): "
-    read -r answer </dev/tty
+    read -r answer
 
     if [[ ! "$answer" =~ ^[Yy](es)?$ ]]; then
         info_print "Skipping dotfiles setup."
@@ -1111,7 +1090,7 @@ install_dotfiles_with_stow() {
     fi
 
     input_print "Enter your dotfiles GitHub repo URL (e.g. https://github.com/username/dotfiles): "
-    read -r dotfiles_url </dev/tty
+    read -r dotfiles_url
 
     if [[ -z "$dotfiles_url" ]]; then
         warning_print "No URL provided. Skipping."
@@ -1140,7 +1119,7 @@ EOF
 # ======================= Clone Dotfiles ======================
 clone_dotfiles_repo() {
     input_print "Enter the GitHub repository URL of your dotfiles (HTTPS, e.g. https://github.com/youruser/dotfiles): "
-    read -r repo_url </dev/tty
+    read -r repo_url
 
     if [[ -z "$repo_url" ]]; then
         warning_print "No repository URL entered. Skipping dotfiles setup."
@@ -1161,7 +1140,7 @@ EOF
 # ======================= Dotfiles Setup =======================
 dotfiles_clone() {
     input_print "Enter GitHub URL for your dotfiles repository (or leave blank to skip): "
-    read -r dotfiles_url </dev/tty
+    read -r dotfiles_url
 
     if [[ -z "$dotfiles_url" ]]; then
         info_print "No dotfiles repository specified, skipping."
@@ -1191,7 +1170,7 @@ generate_fstab() {
 # ======================= Show Installation Log =======================
 show_log_if_needed() {
   input_print "Would you like to view the log file now? (y/N): "
-  read -r showlog </dev/tty
+  read -r showlog
   if [[ "${showlog,,}" == "y" || "${showlog,,}" == "yes" ]]; then
     less +G "$LOGFILE"
   fi
@@ -1199,146 +1178,53 @@ show_log_if_needed() {
 
 
 # ======================= Main Installer Flow ==============
-
-finish_installation() {
-  show_log_if_needed
-}
-
 main() {
-welcome_banner
-  info_print "[DEBUG] After: welcome_banner"
-  sleep 1
+  welcome_banner
   keyboard_selector
-  info_print "[DEBUG] After: keyboard_selector"
-  sleep 1
   select_disk
-  info_print "[DEBUG] After: select_disk"
-  sleep 1
   lukspass_selector
-  info_print "[DEBUG] After: lukspass_selector"
-  sleep 1
   reuse_password
-  info_print "[DEBUG] After: reuse_password"
-  sleep 1
   kernel_selector
-  info_print "[DEBUG] After: kernel_selector"
-  sleep 1
   microcode_detector
-  info_print "[DEBUG] After: microcode_detector"
-  sleep 1
   locale_selector
-  info_print "[DEBUG] After: locale_selector"
-  sleep 1
   hostname_selector
-  info_print "[DEBUG] After: hostname_selector"
-  sleep 1
   userpass_selector
-  info_print "[DEBUG] After: userpass_selector"
-  sleep 1
   rootpass_selector
-  info_print "[DEBUG] After: rootpass_selector"
-  sleep 1
   confirm_disk_wipe
-  info_print "[DEBUG] After: confirm_disk_wipe"
-  sleep 1
   partition_disk
-  info_print "[DEBUG] After: partition_disk"
-  sleep 1
   encrypt_partitions
-  info_print "[DEBUG] After: encrypt_partitions"
-  sleep 1
   format_partitions
-  info_print "[DEBUG] After: format_partitions"
-  sleep 1
   mount_btrfs_subvolumes
-  info_print "[DEBUG] After: mount_btrfs_subvolumes"
-  sleep 1
-  
-  until install_base_system; do : ; done
-  info_print "[DEBUG] After: until install_base_system; do : ; done"
-  sleep 1
-  
-  generate_fstab
-  info_print "[DEBUG] After: generate_fstab"
-  sleep 1
-  configure_hostname_and_hosts
-  info_print "[DEBUG] After: configure_hostname_and_hosts"
-  sleep 1
-  setup_zram
-  info_print "[DEBUG] After: setup_zram"
-  sleep 1
-  network_selector
-  info_print "[DEBUG] After: network_selector"
-  sleep 1
-  install_editor
-  info_print "[DEBUG] After: install_editor"
-  sleep 1
-  configure_default_shell
-  info_print "[DEBUG] After: configure_default_shell"
-  sleep 1
-  setup_secureboot_structure
-  info_print "[DEBUG] After: setup_secureboot_structure"
-  sleep 1
-  setup_timezone_and_clock_chroot
-  info_print "[DEBUG] After: setup_timezone_and_clock_chroot"
-  sleep 1
-  setup_locale_and_initramfs_chroot
-  info_print "[DEBUG] After: setup_locale_and_initramfs_chroot"
-  sleep 1
-  setup_snapper_chroot
-  info_print "[DEBUG] After: setup_snapper_chroot"
-  sleep 1
-  install_grub_chroot
-  info_print "[DEBUG] After: install_grub_chroot"
-  sleep 1
-  sign_grub_chroot
-  info_print "[DEBUG] After: sign_grub_chroot"
-  sleep 1
-  setup_grub_btrfs_chroot
-  info_print "[DEBUG] After: setup_grub_btrfs_chroot"
-  sleep 1
-  build_uki_chroot
-  info_print "[DEBUG] After: build_uki_chroot"
-  sleep 1
-  generate_grub_cfg
-  info_print "[DEBUG] After: generate_grub_cfg"
-  sleep 1
-  setup_users_and_passwords
-  info_print "[DEBUG] After: setup_users_and_passwords"
-  sleep 1
-  dotfiles_clone
-  info_print "[DEBUG] After: dotfiles_clone"
-  sleep 1
-  configure_pacman
-  info_print "[DEBUG] After: configure_pacman"
-  sleep 1
-  configure_pacman_repos
-  info_print "[DEBUG] After: configure_pacman_repos"
-  sleep 1
-  configure_makepkg
-  info_print "[DEBUG] After: configure_makepkg"
-  sleep 1
-  enable_system_services
-  info_print "[DEBUG] After: enable_system_services"
-  sleep 1
-  install_yay
-  info_print "[DEBUG] After: install_yay"
-  sleep 1
-  configure_grub_theme
-  info_print "[DEBUG] After: configure_grub_theme"
-  sleep 1
-  configure_plymouth_theme
-  info_print "[DEBUG] After: configure_plymouth_theme"
-  sleep 1
-  save_boot_visuals_config
-  info_print "[DEBUG] After: save_boot_visuals_config"
-  sleep 1
 
-  info_print "[DEBUG] After: finish_installation"
-  sleep 1
+  until install_base_system; do : ; done
+
+  generate_fstab
+  configure_hostname_and_hosts
+  setup_zram
+  network_selector
+  install_editor
+  configure_default_shell
+  setup_secureboot_structure
+  setup_timezone_and_clock_chroot
+  setup_locale_and_initramfs_chroot
+  setup_snapper_chroot
+  install_grub_chroot
+  sign_grub_chroot
+  setup_grub_btrfs_chroot
+  build_uki_chroot
+  generate_grub_cfg
+  setup_users_and_passwords
+  dotfiles_clone
+  configure_pacman
+  configure_pacman_repos
+  configure_makepkg
+  enable_system_services
+  install_yay
+  configure_grub_theme
+  configure_plymouth_theme
+  save_boot_visuals_config
+  finish_installation
   show_log_if_needed
-  info_print "[DEBUG] After: show_log_if_needed"
-  sleep 1
 }
 
 main
