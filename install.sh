@@ -235,53 +235,31 @@ partition_disk() {
 
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
-  # Check if password is defined
-  if [[ -z "$password" ]]; then
-    error_print "Error: Password is not defined. Aborting."
-    exit 1
+  info_print "Checking if LUKS partition already exists..."
+  
+  # Check if LUKS is already setup
+  cryptsetup status "$CRYPTROOT" &>/dev/null && error_print "LUKS already exists on root partition!" && return 1
+  cryptsetup status "$CRYPTHOME" &>/dev/null && error_print "LUKS already exists on home partition!" && return 1
+
+  info_print "Creating LUKS encryption on root partition..."
+  # Try to create LUKS encryption on the root partition
+  if ! cryptsetup luksFormat "$CRYPTROOT" --type luks2; then
+    error_print "Failed to create LUKS encryption on root partition"
+    return 1
   fi
 
-  # Debug: Check if the variables are defined
-  if [[ -z "$CRYPTROOT" || -z "$CRYPTHOME" ]]; then
-    error_print "Error: $CRYPTROOT or $CRYPTHOME is not defined."
-    exit 1
-  else
-    info_print "Debug: CRYPTROOT is defined as $CRYPTROOT"
-    info_print "Debug: CRYPTHOME is defined as $CRYPTHOME"
+  info_print "Creating LUKS encryption on home partition..."
+  # Try to create LUKS encryption on the home partition
+  if ! cryptsetup luksFormat "$CRYPTHOME" --type luks2; then
+    error_print "Failed to create LUKS encryption on home partition"
+    return 1
   fi
-
-  # Proceed with encryption using the password we already set in the previous function
-  info_print "Encrypting root partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>> "$LOGFILE"
-
-  if [[ $? -ne 0 ]]; then
-    error_print "Failed to create LUKS encryption on root partition."
-    exit 1
-  fi
-
+  
   info_print "Opening encrypted root partition..."
-  echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d - &>> "$LOGFILE"
-
-  if [[ $? -ne 0 ]]; then
-    error_print "Failed to open LUKS root partition."
-    exit 1
-  fi
-
-  info_print "Encrypting home partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>> "$LOGFILE"
-
-  if [[ $? -ne 0 ]]; then
-    error_print "Failed to create LUKS encryption on home partition."
-    exit 1
-  fi
+  cryptsetup open "$CRYPTROOT" cryptroot
 
   info_print "Opening encrypted home partition..."
-  echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d - &>> "$LOGFILE"
-
-  if [[ $? -ne 0 ]]; then
-    error_print "Failed to open LUKS home partition."
-    exit 1
-  fi
+  cryptsetup open "$CRYPTHOME" crypthome
 }
 
 # ======================= Format Partitions ================
@@ -290,14 +268,18 @@ format_partitions() {
   mkfs.fat -F32 "$ESP" &>> "$LOGFILE"
 
   info_print "Formatting root (cryptroot) as BTRFS..."
-  # sørg for at formatere den rigtige enhed
-  mkfs.btrfs /dev/mapper/cryptroot &>> "$LOGFILE"
+  # Format the root partition as BTRFS
+  mkfs.btrfs /dev/mapper/cryptroot &>> "$LOGFILE" || {
+    error_print "Failed to format root partition as BTRFS"
+    return 1
+  }
 
   info_print "Formatting home (crypthome) as BTRFS..."
-  # sørg for at formatere den rigtige enhed
-  mkfs.btrfs /dev/mapper/crypthome &>> "$LOGFILE"
-  
-  info_print "Partition formatting complete."
+  # Format the home partition as BTRFS
+  mkfs.btrfs /dev/mapper/crypthome &>> "$LOGFILE" || {
+    error_print "Failed to format home partition as BTRFS"
+    return 1
+  }
 }
 
 
@@ -457,28 +439,58 @@ chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 }
 
 # ======================= Mount BTRFS Subvolumes ================
+# ======================= Mount BTRFS Subvolumes ================
 mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
   mount /dev/mapper/cryptroot /mnt
-  # Kontroller om vi allerede har subvolumes
   for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
-    btrfs subvolume create /mnt/$subvol &>> "$LOGFILE" || info_print "Failed to create subvolume $subvol"
+    btrfs subvolume create /mnt/$subvol &>> "$LOGFILE" || {
+      error_print "Failed to create BTRFS subvolume $subvol"
+      return 1
+    }
   done
   umount /mnt
 
   info_print "Creating BTRFS subvolume on home partition..."
   mount /dev/mapper/crypthome /mnt
-  btrfs subvolume create /mnt/@home &>> "$LOGFILE" || info_print "Failed to create subvolume @home"
+  btrfs subvolume create /mnt/@home &>> "$LOGFILE" || {
+    error_print "Failed to create BTRFS subvolume @home"
+    return 1
+  }
   umount /mnt
 
-  # Mount the root subvolume
   mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
+
   info_print "Mounting root subvolume (@) to /mnt..."
   mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
 
-  # Create other mount directories
+  info_print "Creating mount directories..."
   mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt,var/lib/machines,var/lib/portables,srv,efi,boot,home,root}
   chmod 750 /mnt/root
+
+  # Mount remaining subvolumes with CoW disabled where needed
+  declare -A mounts=(
+    [@snapshots]=.snapshots
+    [@var_log]=var/log
+    [@var_pkgs]=var/cache/pacman/pkg
+    [@var_lib_libvirt]=var/lib/libvirt
+    [@var_lib_machines]=var/lib/machines
+    [@var_lib_portables]=var/lib/portables
+    [@srv]=srv
+  )
+
+  for subvol in "${!mounts[@]}"; do
+    target="${mounts[$subvol]}"
+    info_print "Mounting $subvol on /mnt/$target"
+    mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "/mnt/$target"
+    chattr +C "/mnt/$target" 2>/dev/null || info_print "Could not disable CoW on /mnt/$target"
+  done
+
+  info_print "Mounting home subvolume on /mnt/home..."
+  mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
+
+  info_print "Mounting EFI partition on /mnt/efi..."
+  mount "$ESP" /mnt/efi
 }
 
 # ======================= Setup timezone & Clock ======================
@@ -1218,6 +1230,7 @@ main() {
   welcome_banner
   keyboard_selector
   select_disk
+  confirm_disk_wipe
   lukspass_selector
   ask_password_reuse
   user_setup
@@ -1225,7 +1238,6 @@ main() {
   microcode_detector
   locale_selector
   hostname_selector
-  confirm_disk_wipe
   partition_disk
   encrypt_partitions
   format_partitions
