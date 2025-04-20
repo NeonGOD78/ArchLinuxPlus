@@ -193,7 +193,7 @@ microcode_detector () {
     fi
 }
 
-# ======================= Disk Wipe Confirmation ==========
+# ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
   input_print "This will delete the current partition table on $DISK. Proceed? [y/N]: "
   read -r response
@@ -202,14 +202,21 @@ confirm_disk_wipe() {
     exit 1
   fi
   info_print "Wiping $DISK..."
-  # Use wipefs to wipe all signatures from the disk
-  wipefs -af "$DISK" &>/dev/null
-  # Re-partition the disk
-  sgdisk -Zo "$DISK" &>/dev/null
-  # Ensure we're clearing the LUKS signatures from each partition
-  wipefs -a /dev/sda2 &>/dev/null
-  wipefs -a /dev/sda3 &>/dev/null
-}
+
+  # Fjerne eksisterende partitioner og signaturer (LUKS m.m.)
+  wipefs -af "$DISK" 
+  # Fjern alle LUKS signaturer på disken
+  cryptsetup luksErase "$DISK" 
+  
+  # Fjern partitionstabel og opret en ny
+  sgdisk -Zo "$DISK" 
+
+  
+  info_print "Checking for existing LUKS signatures on $DISK..."
+  cryptsetup luksDump "$DISK" && info_print "LUKS signature still exists!" || info_print "No LUKS signature found."
+  info_print "Disk wiped successfully."
+  }
+
 
 # ======================= Partition Disk ===================
 partition_disk() {
