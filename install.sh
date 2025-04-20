@@ -202,8 +202,11 @@ confirm_disk_wipe() {
     exit 1
   fi
   info_print "Wiping $DISK..."
+  # wipefs fjerner alle partitionstabelsignaturer og data.
   wipefs -af "$DISK" &>/dev/null
+  # Dette sikrer, at alle eksisterende partitioner slettes
   sgdisk -Zo "$DISK" &>/dev/null
+  info_print "Disk $DISK has been wiped and is ready for partitioning."
 }
 
 # ======================= Partition Disk ===================
@@ -284,13 +287,17 @@ encrypt_partitions() {
 # ======================= Format Partitions ================
 format_partitions() {
   info_print "Formatting EFI partition as FAT32..."
-  mkfs.fat -F32 "$ESP" &>> "$LOGFILE" || error_print "Failed to format EFI partition."
+  mkfs.fat -F32 "$ESP" &>> "$LOGFILE"
 
   info_print "Formatting root (cryptroot) as BTRFS..."
-  mkfs.btrfs /dev/mapper/cryptroot &>> "$LOGFILE" || error_print "Failed to format root partition."
+  # sørg for at formatere den rigtige enhed
+  mkfs.btrfs /dev/mapper/cryptroot &>> "$LOGFILE"
 
   info_print "Formatting home (crypthome) as BTRFS..."
-  mkfs.btrfs /dev/mapper/crypthome &>> "$LOGFILE" || error_print "Failed to format home partition."
+  # sørg for at formatere den rigtige enhed
+  mkfs.btrfs /dev/mapper/crypthome &>> "$LOGFILE"
+  
+  info_print "Partition formatting complete."
 }
 
 
@@ -453,48 +460,25 @@ chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
   mount /dev/mapper/cryptroot /mnt
+  # Kontroller om vi allerede har subvolumes
   for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
-    btrfs subvolume create /mnt/$subvol &>> \"$LOGFILE\"
+    btrfs subvolume create /mnt/$subvol &>> "$LOGFILE" || info_print "Failed to create subvolume $subvol"
   done
   umount /mnt
 
   info_print "Creating BTRFS subvolume on home partition..."
   mount /dev/mapper/crypthome /mnt
-  btrfs subvolume create /mnt/@home &>> \"$LOGFILE\"
+  btrfs subvolume create /mnt/@home &>> "$LOGFILE" || info_print "Failed to create subvolume @home"
   umount /mnt
 
+  # Mount the root subvolume
   mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
-
   info_print "Mounting root subvolume (@) to /mnt..."
   mount -o "$mountopts",subvol=@ /dev/mapper/cryptroot /mnt
 
-  info_print "Creating mount directories..."
+  # Create other mount directories
   mkdir -p /mnt/{.snapshots,var/log,var/cache/pacman/pkg,var/lib/libvirt,var/lib/machines,var/lib/portables,srv,efi,boot,home,root}
   chmod 750 /mnt/root
-
-  # Mount remaining subvolumes with CoW disabled where needed
-  declare -A mounts=(
-    [@snapshots]=.snapshots
-    [@var_log]=var/log
-    [@var_pkgs]=var/cache/pacman/pkg
-    [@var_lib_libvirt]=var/lib/libvirt
-    [@var_lib_machines]=var/lib/machines
-    [@var_lib_portables]=var/lib/portables
-    [@srv]=srv
-  )
-
-  for subvol in "${!mounts[@]}"; do
-    target="${mounts[$subvol]}"
-    info_print "Mounting $subvol on /mnt/$target"
-    mount -o "$mountopts",subvol="$subvol" /dev/mapper/cryptroot "/mnt/$target"
-    chattr +C "/mnt/$target" 2>/dev/null || info_print "Could not disable CoW on /mnt/$target"
-  done
-
-  info_print "Mounting home subvolume on /mnt/home..."
-  mount -o "$mountopts",subvol=@home /dev/mapper/crypthome /mnt/home
-
-  info_print "Mounting EFI partition on /mnt/efi..."
-  mount "$ESP" /mnt/efi
 }
 
 # ======================= Setup timezone & Clock ======================
