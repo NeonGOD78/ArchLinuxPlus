@@ -194,6 +194,7 @@ microcode_detector () {
 }
 
 # ======================= Disk Wipe Confirmation ==========================
+# ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
   input_print "This will delete the current partition table on $DISK. Proceed? [y/N]: "
   read -r response
@@ -203,19 +204,29 @@ confirm_disk_wipe() {
   fi
   info_print "Wiping $DISK..."
 
-  # Fjerne eksisterende partitioner og signaturer (LUKS m.m.)
-  wipefs -af "$DISK" 
-  # Fjern alle LUKS signaturer på disken
-  cryptsetup luksErase "$DISK" 
-  
-  # Fjern partitionstabel og opret en ny
-  sgdisk -Zo "$DISK" 
+  # Fjerne eksisterende LUKS signatur
+  wipefs -af "$DISK" &>/dev/null
 
-  
-  info_print "Checking for existing LUKS signatures on $DISK..."
-  cryptsetup luksDump "$DISK" && info_print "LUKS signature still exists!" || info_print "No LUKS signature found."
-  info_print "Disk wiped successfully."
+  # Fjern LUKS signatur eksplicit med cryptsetup luksFormat
+  cryptsetup luksFormat "$DISK" --type luks2 --batch-mode &>/dev/null || {
+    error_print "Failed to format LUKS partition."
+    exit 1
   }
+
+  # Opret partitionstabellen og skriv den til disken
+  sgdisk --zap-all "$DISK" &>/dev/null || {
+    error_print "Failed to create new partition table on $DISK."
+    exit 1
+  }
+
+  # Brug partprobe til at opdatere partitionstabellen i kernel
+  partprobe "$DISK" &>/dev/null || {
+    error_print "Failed to update partition table with partprobe."
+    exit 1
+  }
+
+  info_print "Disk wiped and partition table updated successfully."
+}
 
 
 # ======================= Partition Disk ===================
