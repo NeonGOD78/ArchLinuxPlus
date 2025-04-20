@@ -1183,8 +1183,6 @@ main() {
   microcode_detector
   locale_selector
   hostname_selector
-  userpass_selector
-  rootpass_selector
   confirm_disk_wipe
   partition_disk
   encrypt_partitions
