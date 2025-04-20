@@ -134,19 +134,6 @@ locale_selector () {
     esac
 }
 
-
-# ======================= Set Username ======================
-set_username() {
-  input_print "Enter username for new user (leave empty to skip user creation): "
-  read -r username
-
-  if [[ -z "$username" ]]; then
-    warning_print "No username entered. User creation will be skipped."
-  else
-    info_print "Username '$username' set for user creation."
-  fi
-}
-
 # ======================= Hostname Setup ======================
 hostname_selector () {
     input_print "Please enter the hostname: "
@@ -186,26 +173,6 @@ microcode_detector () {
         info_print "An Intel CPU has been detected, the Intel microcode will be installed."
         microcode="intel-ucode"
     fi
-}
-
-# ======================= User Setup ======================
-user_setup() {
-  input_print "Enter username for new user (leave empty to skip): "
-  read -r username
-
-  if [[ -n "$username" ]]; then
-    if [[ -z "${userpass:-}" ]]; then
-      userpass=$(get_valid_password "user password for $username")
-    else
-      info_print "Using previously entered password for user $username."
-    fi
-  fi
-
-  if [[ -z "${rootpass:-}" ]]; then
-    rootpass=$(get_valid_password "root password")
-  else
-    info_print "Using previously entered password for root."
-  fi
 }
 
 # ======================= Disk Wipe Confirmation ==========
@@ -472,6 +439,7 @@ mount_btrfs_subvolumes() {
   mount "$ESP" /mnt/efi
 }
 
+# ======================= Setup timezone & Clock ======================
 setup_timezone_and_clock_chroot() {
   info_print "Setting timezone and synchronizing hardware clock (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
@@ -482,6 +450,7 @@ hwclock --systohc || echo "[!] Failed to sync hardware clock"
 EOF
 }
 
+# ======================= Setup Locale ======================
 setup_locale_and_initramfs_chroot() {
   info_print "Generating locale and initramfs (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
@@ -491,6 +460,7 @@ mkinitcpio -P || echo "[!] mkinitcpio failed"
 EOF
 }
 
+# ======================= setup Snapper ======================
 setup_snapper_chroot() {
   info_print "Setting up Snapper configuration (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
@@ -509,6 +479,7 @@ chmod 750 /.snapshots
 EOF
 }
 
+# ======================= Install GRUB ======================
 install_grub_chroot() {
   info_print "Installing GRUB bootloader (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
@@ -534,6 +505,7 @@ fi
 EOF
 }
 
+# ======================= Setup GRUB-BTRFS ======================
 setup_grub_btrfs_chroot() {
   info_print "Configuring grub-btrfs in chroot..."
 
@@ -581,6 +553,7 @@ chmod +x /etc/grub.d/41_fallback
 EOF
 }
 
+# ======================= Build UKI  ======================
 build_uki_chroot() {
   info_print "Building and signing Unified Kernel Images (UKIs)..."
 
@@ -668,8 +641,7 @@ select_disk() {
 
   info_print "Partition layout:"
   lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
-  clear
-
+  
   warning_print "⚠️  This will WIPE the entire disk: $DISK"
   input_print "Type 'yes' to confirm and continue: "
   read -r confirm
@@ -682,8 +654,7 @@ select_disk() {
   success_print "Disk $DISK confirmed and ready for partitioning."
 }
 
-# ======================= LUKS Password Input ======================
-# ======================= LUKS Password Input ======================
+# ======================= LUKS Password Input =====================
 lukspass_selector() {
   local pass1 pass2
 
@@ -781,6 +752,7 @@ EOF
   success_print "ZRAM configured with dynamic size (up to 8 GB) using zstd compression."
 }
 
+# ======================= Install editor ======================
 install_editor() {
     info_print "Select a default text editor to install:"
     info_print "1) Nano (simple editor)"
@@ -820,6 +792,7 @@ install_editor() {
     echo "VISUAL=$editor_bin" >> /mnt/etc/environment
 }
 
+# ======================= Configure default shell ======================
 configure_default_shell() {
     info_print "Setting default shell to zsh system-wide."
     sed -i 's|^SHELL=/usr/bin/bash|SHELL=/usr/bin/zsh|' /mnt/etc/default/useradd
@@ -839,6 +812,7 @@ configure_default_shell() {
     curl -sSLo /mnt/etc/skel/.aliases https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.aliases
 }
 
+# ======================= Configure hostname & hosts ======================
 configure_hostname_and_hosts() {
     info_print "Setting hostname..."
     echo "$hostname" > /mnt/etc/hostname
@@ -1186,6 +1160,17 @@ user_setup() {
   fi
 }
 
+# =================== Ask for Password Reuse ====================
+ask_password_reuse() {
+  input_print "Do you want to reuse the LUKS password for root/user? (YES/no): "
+  read -r reuse_choice
+  reuse_choice=${reuse_choice,,}  # to lowercase
+
+  if [[ "$reuse_choice" == "yes" || "$reuse_choice" == "y" || -z "$reuse_choice" ]]; then
+    rootpass="$password"
+    userpass="$password"
+  fi
+}
 # ======================= Main Installer Flow ==============
 main() {
   welcome_banner
