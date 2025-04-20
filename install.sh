@@ -202,11 +202,13 @@ confirm_disk_wipe() {
     exit 1
   fi
   info_print "Wiping $DISK..."
-  # wipefs fjerner alle partitionstabelsignaturer og data.
+  # Use wipefs to wipe all signatures from the disk
   wipefs -af "$DISK" &>/dev/null
-  # Dette sikrer, at alle eksisterende partitioner slettes
+  # Re-partition the disk
   sgdisk -Zo "$DISK" &>/dev/null
-  info_print "Disk $DISK has been wiped and is ready for partitioning."
+  # Ensure we're clearing the LUKS signatures from each partition
+  wipefs -a /dev/sda2 &>/dev/null
+  wipefs -a /dev/sda3 &>/dev/null
 }
 
 # ======================= Partition Disk ===================
@@ -1231,17 +1233,20 @@ main() {
   keyboard_selector
   select_disk
   confirm_disk_wipe
+  partition_disk
+  
   lukspass_selector
   ask_password_reuse
   user_setup
+  
+  encrypt_partitions
+  format_partitions
+  mount_btrfs_subvolumes
+
   kernel_selector
   microcode_detector
   locale_selector
   hostname_selector
-  partition_disk
-  encrypt_partitions
-  format_partitions
-  mount_btrfs_subvolumes
 
   until install_base_system; do : ; done
   
