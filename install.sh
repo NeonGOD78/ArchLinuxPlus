@@ -284,13 +284,13 @@ encrypt_partitions() {
 # ======================= Format Partitions ================
 format_partitions() {
   info_print "Formatting EFI partition as FAT32..."
-  mkfs.fat -F32 "$ESP" &>> \"$LOGFILE\"
+  mkfs.fat -F32 "$ESP" &>> "$LOGFILE" || error_print "Failed to format EFI partition."
 
   info_print "Formatting root (cryptroot) as BTRFS..."
-  mkfs.btrfs /dev/mapper/cryptroot &>> \"$LOGFILE\"
+  mkfs.btrfs /dev/mapper/cryptroot &>> "$LOGFILE" || error_print "Failed to format root partition."
 
   info_print "Formatting home (crypthome) as BTRFS..."
-  mkfs.btrfs /dev/mapper/crypthome &>> \"$LOGFILE\"
+  mkfs.btrfs /dev/mapper/crypthome &>> "$LOGFILE" || error_print "Failed to format home partition."
 }
 
 
