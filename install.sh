@@ -232,41 +232,53 @@ partition_disk() {
 
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
+  # Check if password is defined
+  if [[ -z "$password" ]]; then
+    error_print "Error: Password is not defined. Aborting."
+    exit 1
+  fi
+
+  # Debug: Check if the variables are defined
+  if [[ -z "$CRYPTROOT" || -z "$CRYPTHOME" ]]; then
+    error_print "Error: $CRYPTROOT or $CRYPTHOME is not defined."
+    exit 1
+  else
+    info_print "Debug: CRYPTROOT is defined as $CRYPTROOT"
+    info_print "Debug: CRYPTHOME is defined as $CRYPTHOME"
+  fi
+
+  # Proceed with encryption using the password we already set in the previous function
   info_print "Encrypting root partition..."
-  
-  # Create LUKS encryption for the root partition
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" --type luks2 --batch-mode -d - >> "$LOGFILE" 2>&1
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>> "$LOGFILE"
+
   if [[ $? -ne 0 ]]; then
     error_print "Failed to create LUKS encryption on root partition."
     exit 1
   fi
-  info_print "Root partition encrypted successfully."
 
-  # Open the root partition with LUKS
-  echo -n "$password" | cryptsetup luksOpen "$CRYPTROOT" cryptroot -d - >> "$LOGFILE" 2>&1
+  info_print "Opening encrypted root partition..."
+  echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d - &>> "$LOGFILE"
+
   if [[ $? -ne 0 ]]; then
-    error_print "Failed to open root LUKS partition."
+    error_print "Failed to open LUKS root partition."
     exit 1
   fi
-  info_print "Root partition opened successfully."
 
   info_print "Encrypting home partition..."
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>> "$LOGFILE"
 
-  # Create LUKS encryption for the home partition
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" --type luks2 --batch-mode -d - >> "$LOGFILE" 2>&1
   if [[ $? -ne 0 ]]; then
     error_print "Failed to create LUKS encryption on home partition."
     exit 1
   fi
-  info_print "Home partition encrypted successfully."
 
-  # Open the home partition with LUKS
-  echo -n "$password" | cryptsetup luksOpen "$CRYPTHOME" crypthome -d - >> "$LOGFILE" 2>&1
+  info_print "Opening encrypted home partition..."
+  echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d - &>> "$LOGFILE"
+
   if [[ $? -ne 0 ]]; then
-    error_print "Failed to open home LUKS partition."
+    error_print "Failed to open LUKS home partition."
     exit 1
   fi
-  info_print "Home partition opened successfully."
 }
 
 # ======================= Format Partitions ================
