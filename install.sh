@@ -44,6 +44,24 @@ section_print() {
   printf "${BBLUE}==> %s${RESET}\n" "$1"
 }
 
+# ======================= Define Log File =======================
+LOGFILE="/tmp/archinstall.log"
+touch "$LOGFILE"
+chmod 600 "$LOGFILE"
+info_print "Log file created at $LOGFILE"
+
+# ======================= Move Log File =======================
+move_log_file() {
+  if [[ -d "/mnt" ]]; then
+    mkdir -p /mnt/var/log
+    cp "$LOGFILE" /mnt/var/log/archinstall.log
+    LOGFILE="/mnt/var/log/archinstall.log"
+    info_print "Log file moved to $LOGFILE"
+  else
+    error_print "Error: /mnt directory is not mounted. Log file not moved."
+  fi
+}
+
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
@@ -1190,7 +1208,8 @@ main() {
   mount_btrfs_subvolumes
 
   until install_base_system; do : ; done
-
+  
+  move_log_file
   generate_fstab
   configure_hostname_and_hosts
   setup_zram
