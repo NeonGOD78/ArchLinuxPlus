@@ -171,7 +171,7 @@ kernel_selector () {
     info_print "3) Longterm: Long-term support (LTS) Linux kernel"
     info_print "4) Zen Kernel: A Linux kernel optimized for desktop usage"
     input_print "Please select the number of the corresponding kernel (e.g. 1): "
-    read -e -i "1" -r kernel_choice
+    read -r kernel_choice
     case $kernel_choice in
         1 ) kernel="linux"; return 0;;
         2 ) kernel="linux-hardened"; return 0;;
@@ -233,12 +233,40 @@ partition_disk() {
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
   info_print "Encrypting root partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>> \"$LOGFILE\"
-  echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d -
+  
+  # Create LUKS encryption for the root partition
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" --type luks2 --batch-mode -d - >> "$LOGFILE" 2>&1
+  if [[ $? -ne 0 ]]; then
+    error_print "Failed to create LUKS encryption on root partition."
+    exit 1
+  fi
+  info_print "Root partition encrypted successfully."
+
+  # Open the root partition with LUKS
+  echo -n "$password" | cryptsetup luksOpen "$CRYPTROOT" cryptroot -d - >> "$LOGFILE" 2>&1
+  if [[ $? -ne 0 ]]; then
+    error_print "Failed to open root LUKS partition."
+    exit 1
+  fi
+  info_print "Root partition opened successfully."
 
   info_print "Encrypting home partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -d - &>> \"$LOGFILE\"
-  echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -d -
+
+  # Create LUKS encryption for the home partition
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" --type luks2 --batch-mode -d - >> "$LOGFILE" 2>&1
+  if [[ $? -ne 0 ]]; then
+    error_print "Failed to create LUKS encryption on home partition."
+    exit 1
+  fi
+  info_print "Home partition encrypted successfully."
+
+  # Open the home partition with LUKS
+  echo -n "$password" | cryptsetup luksOpen "$CRYPTHOME" crypthome -d - >> "$LOGFILE" 2>&1
+  if [[ $? -ne 0 ]]; then
+    error_print "Failed to open home LUKS partition."
+    exit 1
+  fi
+  info_print "Home partition opened successfully."
 }
 
 # ======================= Format Partitions ================
@@ -714,7 +742,7 @@ network_selector () {
     info_print "4) dhcpcd: Basic DHCP client (Ethernet connections or VMs)"
     info_print "5) I will do this on my own (only advanced users)"
     input_print "Please select the number of the corresponding networking utility (e.g. 1): "
-    read -e -i "1" -r network_choice
+    read -r network_choice
 
     case "$network_choice" in
         1)
@@ -778,7 +806,7 @@ install_editor() {
     info_print "3) Vim (classic editor)"
     info_print "4) Micro (user-friendly terminal editor)"
     input_print "Please select the number of the corresponding editor (e.g. 1): "
-    read -e -i "1" -r editor_choice
+    read -r editor_choice
 
     case "$editor_choice" in
         1)
