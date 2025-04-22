@@ -217,40 +217,23 @@ microcode_detector () {
 encrypt_partitions() {
   section_print "Encrypting partitions with LUKS"
 
-  # Close any existing LUKS mappings if they exist
-  for dev in cryptroot crypthome; do
-    if [[ -e "/dev/mapper/$dev" ]]; then
-      info_print "Closing existing LUKS mapping: $dev"
-      cryptsetup close "$dev" 2>/dev/null
-    fi
-  done
-
-  # Wait for partition devices to settle and become available
   udevadm settle
   sleep 1
 
-  # Defensive check: avoid "unbound variable" error
-  if [[ -z "${password:-}" ]]; then
-    password=$(get_valid_password "Enter password to use for disk encryption (LUKS)")
-    success_print "Disk encryption password has been set."
-  fi
+  password=$(get_valid_password "Enter password to use for disk encryption (LUKS)")
 
-  # Encrypt root partition
   info_print "Creating LUKS encryption on root partition..."
   echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -q --type luks2 -
   echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -
-
   if [[ $? -ne 0 ]]; then
     error_print "ERROR: Failed to create or open LUKS encryption on root partition"
     exit 1
   fi
   success_print "LUKS encrypted root partition created."
 
-  # Encrypt home partition
   info_print "Creating LUKS encryption on home partition..."
   echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -q --type luks2 -
   echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -
-
   if [[ $? -ne 0 ]]; then
     error_print "ERROR: Failed to create or open LUKS encryption on home partition"
     exit 1
