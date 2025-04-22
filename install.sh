@@ -253,10 +253,16 @@ encrypt_partitions() {
   fi
 
   info_print "Opening encrypted root partition..."
-  cryptsetup open "$CRYPTROOT" cryptroot
+  if ! echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot --key-file=-; then
+    error_print "Failed to open root partition"
+    return 1
+  fi
 
   info_print "Opening encrypted home partition..."
-  cryptsetup open "$CRYPTHOME" crypthome
+  if ! echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome --key-file=-; then
+    error_print "Failed to open home partition"
+    return 1
+  fi
 }
 
 # ======================= Format Partitions ================
@@ -659,50 +665,55 @@ EOF
 select_disk() {
   section_print "Disk Selection"
 
-  # Hent liste over fysiske diske (ingen loop, rom eller boot mounts)
-  mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
+  while true; do
+    # Get list of physical disks (no loop, rom, or boot mounts)
+    mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
 
-  if [[ "${#disks[@]}" -eq 0 ]]; then
-    error_print "No suitable block devices found."
-    exit 1
-  fi
+    if [[ "${#disks[@]}" -eq 0 ]]; then
+      error_print "No suitable block devices found."
+      exit 1
+    fi
 
-  echo
-  info_print "Detected disks:"
-  for i in "${!disks[@]}"; do
-    printf "  %d) %s
-" "$((i+1))" "${disks[$i]}"
+    echo
+    info_print "Detected disks:"
+    for i in "${!disks[@]}"; do
+      printf "  %d) %s\n" "$((i+1))" "${disks[$i]}"
+    done
+    echo
+
+    input_print "Select the number of the disk to install Arch on (or press Enter to cancel): "
+    read -r disk_index
+
+    if [[ -z "$disk_index" ]]; then
+      error_print "Disk selection cancelled by user."
+      exit 1
+    fi
+
+    if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
+      warning_print "Invalid selection. Please try again."
+      continue
+    fi
+
+    DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
+
+    echo
+    success_print "You selected: $DISK"
+    echo
+
+    info_print "Partition layout:"
+    lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
+
+    input_print "Do you want to proceed with this disk? [y/N]: "
+    read -r confirm
+
+    if [[ "${confirm,,}" == "y" ]]; then
+      success_print "Disk $DISK confirmed and ready for partitioning."
+      break
+    else
+      warning_print "Disk not confirmed. You can select another disk."
+      echo
+    fi
   done
-  echo
-
-  input_print "Select the number of the disk to install Arch on (e.g. 1): "
-  read -r disk_index
-
-  # Check if input is a number in valid range
-  if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
-    error_print "Invalid selection. Aborting."
-    exit 1
-  fi
-
-  DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
-
-  echo
-  success_print "You selected: $DISK"
-  echo
-
-  info_print "Partition layout:"
-  lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
-  
-  warning_print "⚠️  This will WIPE the entire disk: $DISK"
-  input_print "Type 'yes' to confirm and continue: "
-  read -r confirm
-
-  if [[ "${confirm,,}" != "yes" ]]; then
-    error_print "Disk selection aborted."
-    exit 1
-  fi
-
-  success_print "Disk $DISK confirmed and ready for partitioning."
 }
 
 # ======================= LUKS Password Input =====================
