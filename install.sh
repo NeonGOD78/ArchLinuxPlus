@@ -196,19 +196,21 @@ microcode_detector () {
 # ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
     echo -e "${BBLUE}Selected disk: ${BOLD}$DISK${RESET}"
-    read -rp "$(echo -e ${BYELLOW}"Are you sure you want to wipe this disk? This will erase all data on ${BOLD}$DISK${RESET}${BYELLOW}. Type YES to continue: "${RESET})" confirm
+    read -rp "$(echo -e ${BYELLOW}Are you sure you want to wipe this disk? This will erase all data on ${BOLD}$DISK${RESET}${BYELLOW}. Type YES to continue: ${RESET})" confirm
 
     if [[ $confirm == "YES" ]]; then
         echo -e "${BBLUE}Wiping existing partition signatures...${RESET}"
         wipefs -a "$DISK"
 
-        echo -e "${BBLUE}Zeroing start and end of the disk to remove old headers...${RESET}"
-        dd if=/dev/zero of="$DISK" bs=1M count=10 status=none
+        echo -e "${BBLUE}Zeroing the first and last 100MB of the disk to remove old LUKS/filesystem headers...${RESET}"
+        # Overwrite first 100MB
+        dd if=/dev/zero of="$DISK" bs=1M count=100 status=progress
 
+        # Overwrite last 100MB
         size=$(blockdev --getsz "$DISK")
-        dd if=/dev/zero of="$DISK" bs=512 seek=$((size - 20480)) count=20480 status=none
+        dd if=/dev/zero of="$DISK" bs=512 seek=$((size - 204800)) count=204800 status=progress
 
-        echo -e "${BGREEN}Disk $DISK wiped successfully.${RESET}"
+        echo -e "${BGREEN}Disk $DISK wiped and securely zeroed successfully.${RESET}"
     else
         echo -e "${BRED}Disk wipe cancelled. Exiting...${RESET}"
         exit 1
