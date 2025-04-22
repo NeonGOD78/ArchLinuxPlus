@@ -714,7 +714,8 @@ select_disk() {
     echo
 
     info_print "Partition layout:"
-    lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
+    lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,VENDOR "$DISK"
+    echo
 
     warning_print "ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST."
     input_print "Do you want to proceed with this disk? [y/N]: "
