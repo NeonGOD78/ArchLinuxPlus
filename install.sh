@@ -321,7 +321,7 @@ install_base_system() {
 }
 
 # ======================= Setup Secure Boot Files ======================
-setup_secureboot_structure() {
+setup_secureboot() {
   info_print "Setting up Secure Boot file structure and tools..."
 
   mkdir -p /mnt/etc/secureboot
@@ -557,15 +557,111 @@ EOF
 }
 
 # ======================= Install GRUB ======================
-install_grub_chroot() {
-  info_print "Installing GRUB bootloader (in chroot)..."
-  arch-chroot /mnt /bin/bash -e <<'EOF'
-set -euo pipefail
+setup_grub() {
+  section_print "GRUB Bootloader Installation and Theme Setup"
 
-grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB
-EOF
+  theme_url_base="https://github.com/NeonGOD78/ArchLinuxPlus/raw/main/configs/boot/grub/themes"
+
+  info_print "Select GRUB theme resolution:"
+  info_print "1) 2K (2560x1440) [default]"
+  info_print "2) 1080p (1920x1080)"
+  input_print "Enter choice (1 or 2) [default: 1]: "
+  read -r theme_choice
+  theme_choice=${theme_choice:-1}
+
+  case "$theme_choice" in
+      1)
+          theme_file="arch-2K.zip"
+          theme_dir="arch-2K"
+          gfx_mode="2560x1440"
+          ;;
+      2)
+          theme_file="arch-1080p.zip"
+          theme_dir="arch-1080p"
+          gfx_mode="1920x1080"
+          ;;
+      *)
+          warning_print "Invalid choice, defaulting to 2K."
+          theme_file="arch-2K.zip"
+          theme_dir="arch-2K"
+          gfx_mode="2560x1440"
+          ;;
+  esac
+
+  info_print "Downloading and installing GRUB theme: $theme_dir"
+  mkdir -p "/mnt/boot/grub/themes/$theme_dir"
+  if ! curl -L "$theme_url_base/$theme_file" -o /tmp/theme.zip; then
+      warning_print "Failed to download GRUB theme. Skipping theme installation."
+  else
+      bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir"
+  fi
+
+  # Configure GRUB settings cleanly in /etc/default/grub
+  grub_cfg_file="/mnt/etc/default/grub"
+  declare -A grub_vars=(
+    ["GRUB_ENABLE_CRYPTODISK"]="y"
+    ["GRUB_GFXMODE"]="$gfx_mode"
+    ["GRUB_GFXPAYLOAD_LINUX"]="keep"
+    ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
+    ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
+  )
+
+  info_print "Writing GRUB configuration to /etc/default/grub..."
+  for key in "${!grub_vars[@]}"; do
+    value="${grub_vars[$key]}"
+    if grep -q "^$key=" "$grub_cfg_file"; then
+      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file"
+    elif grep -q "^#\s*$key=" "$grub_cfg_file"; then
+      sed -i "s|^#\s*$key=.*|$key=$value|" "$grub_cfg_file"
+    else
+      echo "$key=$value" >> "$grub_cfg_file"
+    fi
+  done
+
+  # Enable Plymouth splash screen
+  info_print "Enabling Plymouth boot splash..."
+
+  if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
+    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file"
+  else
+    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
+  fi
+
+  # Add or modify GRUB_CMDLINE_LINUX to include quiet splash
+  if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
+    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file"
+  else
+    echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
+  fi
+
+  # Save theme + resolution to installer config
+  echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
+  echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
+
+  # Secure Boot support (always enabled)
+  info_print "Configuring Secure Boot support..."
+  setup_secureboot
+
+  # Install GRUB bootloader
+  info_print "Installing GRUB bootloader..."
+  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>> "$LOGFILE"
+  if [[ $? -ne 0 ]]; then
+    error_print "GRUB installation failed"
+    exit 1
+  fi
+
+  # Generate grub.cfg
+  info_print "Generating grub.cfg..."
+  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg &>> "$LOGFILE"
+  if [[ $? -ne 0 ]]; then
+    error_print "Failed to generate grub.cfg"
+    exit 1
+  fi
+
+  success_print "GRUB bootloader installed and configured successfully with theme, Plymouth and Secure Boot."
 }
 
+# ======================= Sign GRUB ======================
 sign_grub_chroot() {
   info_print "Signing GRUB bootloader (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
@@ -976,7 +1072,7 @@ install_yay() {
 set -e
 
 # Install required build tools
-pacman -Sy --noconfirm git base-devel
+pacman -Sy --noconfirm base-devel
 
 # Create temporary user to build yay safely
 useradd -m aurbuilder
@@ -1001,99 +1097,6 @@ echo "alias aur='yay'" >> /etc/skel/.zshrc
 EOF
 
     success_print "yay installed successfully with alias 'aur' in .bashrc and .zshrc"
-}
-
-# ======================== GRUB Theme Setup =========================
-configure_grub_theme() {
-    info_print "Select GRUB theme resolution:"
-    info_print "1) 1080p (1920x1080)"
-    info_print "2) 2K (2560x1440)"
-    input_print "Enter choice (1 or 2): "
-    read -r theme_choice
-
-    theme_url_base="https://github.com/NeonGOD78/ArchLinuxPlus/raw/main/configs/boot/grub/themes"
-
-    case "$theme_choice" in
-        1)
-            theme_file="arch-1080p.zip"
-            theme_dir="arch-1080p"
-            gfx_mode="1920x1080"
-            ;;
-        2)
-            theme_file="arch-2K.zip"
-            theme_dir="arch-2K"
-            gfx_mode="2560x1440"
-            ;;
-        *)
-            warning_print "Invalid choice, defaulting to 1080p."
-            theme_file="arch-1080p.zip"
-            theme_dir="arch-1080p"
-            gfx_mode="1920x1080"
-            ;;
-    esac
-
-    info_print "Downloading and installing $theme_dir theme for GRUB."
-
-    mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-    if ! curl -L "$theme_url_base/$theme_file" -o /tmp/theme.zip; then
-        warning_print "Failed to download GRUB theme. Skipping theme installation."
-        return 1
-    fi
-
-    bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir"
-
-    echo "GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"" >> /mnt/etc/default/grub
-    sed -i "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$gfx_mode/" /mnt/etc/default/grub
-
-    echo 'GRUB_ENABLE_CRYPTODISK=y' >> /mnt/etc/default/grub
-
-    # Save visuals config for later use
-    save_boot_visuals_config
-
-    echo 'GRUB_GFXPAYLOAD_LINUX=keep' >> /mnt/etc/default/grub
-
-    arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
-}
-
-# ======================== Plymouth Theme Setup =========================
-configure_plymouth_theme() {
-    info_print "Installing and configuring Plymouth dark theme."
-
-    arch-chroot /mnt /bin/bash -e <<'EOF'
-# Install plymouth
-pacman -Sy --noconfirm plymouth
-
-# Clone plymouth themes
-git clone https://github.com/adi1090x/plymouth-themes.git /tmp/plymouth-themes
-cp -r /tmp/plymouth-themes/arch-dark /usr/share/plymouth/themes/arch-dark
-rm -rf /tmp/plymouth-themes
-
-# Set theme
-plymouth-set-default-theme -R arch-dark
-
-# Enable splash in GRUB
-sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3"/' /etc/default/grub
-
-# Add plymouth to mkinitcpio HOOKS if not already there
-sed -i 's/^\(HOOKS=.*\)udev/\1plymouth udev/' /etc/mkinitcpio.conf
-
-# Rebuild initramfs and grub
-mkinitcpio -P
-grub-mkconfig -o /boot/grub/grub.cfg
-EOF
-}
-
-# =================== Save Boot Visuals Configuration ===================
-save_boot_visuals_config() {
-    info_print "Saving boot theme configuration to /etc/archinstaller.conf"
-
-    config_file="/mnt/etc/archinstaller.conf"
-
-    {
-        echo "GRUB_THEME_DIR=$theme_dir"
-        echo "GRUB_GFXMODE=$gfx_mode"
-        echo "PLYMOUTH_THEME=arch-dark"
-    } >> "$config_file"
 }
 
 # ===================== Dotfiles Setup via stow ======================
@@ -1314,9 +1317,6 @@ main() {
   kernel_selector
   microcode_detector
 
-    
-
-
   until install_base_system; do : ; done
   
   move_log_file
@@ -1333,7 +1333,6 @@ main() {
   setup_timezone_and_clock_chroot
   setup_locale_and_initramfs_chroot
   setup_snapper_chroot
-  install_grub_chroot
   sign_grub_chroot
   setup_grub_btrfs_chroot
   build_uki_chroot
@@ -1344,9 +1343,6 @@ main() {
   configure_makepkg
   enable_system_services
   install_yay
-  configure_grub_theme
-  configure_plymouth_theme
-  save_boot_visuals_config
   finish_installation
   show_log_if_needed
 }
