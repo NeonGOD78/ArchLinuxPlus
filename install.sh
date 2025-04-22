@@ -202,21 +202,29 @@ confirm_disk_wipe() {
         echo -e "${BBLUE}Wiping existing partition signatures...${RESET}"
         wipefs -a "$DISK"
 
-        echo -e "${BBLUE}Zeroing the first and last 100MB of the disk to remove old LUKS/filesystem headers...${RESET}"
-        # Overwrite first 100MB
+        echo -e "${BBLUE}Zeroing the first and last 100MB of the disk to remove residual headers...${RESET}"
         dd if=/dev/zero of="$DISK" bs=1M count=100 status=progress
 
-        # Overwrite last 100MB
         size=$(blockdev --getsz "$DISK")
         dd if=/dev/zero of="$DISK" bs=512 seek=$((size - 204800)) count=204800 status=progress
 
-        echo -e "${BGREEN}Disk $DISK wiped and securely zeroed successfully.${RESET}"
+        echo -e "${BBLUE}Checking for and wiping old partitions if they exist...${RESET}"
+        for part in ${DISK}p3 ${DISK}p4; do
+            if [[ -b $part ]]; then
+                echo -e "${BBLUE}Securely zeroing $part...${RESET}"
+                wipefs -a "$part"
+                dd if=/dev/zero of="$part" bs=1M count=100 status=progress
+                size=$(blockdev --getsz "$part")
+                dd if=/dev/zero of="$part" bs=512 seek=$((size - 204800)) count=204800 status=progress
+            fi
+        done
+
+        echo -e "${BGREEN}Disk $DISK and partitions securely wiped.${RESET}"
     else
         echo -e "${BRED}Disk wipe cancelled. Exiting...${RESET}"
         exit 1
     fi
 }
-
 
 # ======================= Partition Disk ===================
 partition_disk() {
