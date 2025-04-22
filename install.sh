@@ -197,7 +197,7 @@ microcode_detector () {
 confirm_disk_wipe() {
   info_print "Selected disk: $DISK"
 
-  input_print "Do you want to securely zero the entire disk now? [y/N]: "
+  input_print "Do you want to securely zero the entire disk [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" == "y" ]]; then
     info_print "Zeroing entire disk..."
@@ -207,7 +207,7 @@ confirm_disk_wipe() {
   fi
 
   warning_print "All partitions on $DISK will be removed."
-  input_print "Do you want to continue without zeroing? [y/N]: "
+  input_print "Do you want to continue? [y/N]: "
   read -r proceed
   [[ "${proceed,,}" != "y" ]] && error_print "Disk wipe cancelled." && exit 1
 
