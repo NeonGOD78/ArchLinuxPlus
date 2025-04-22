@@ -215,29 +215,47 @@ microcode_detector () {
 
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
+  section_print "Encrypting partitions with LUKS"
+
+  # Close any existing LUKS mappings if they exist
+  for dev in cryptroot crypthome; do
+    if [[ -e "/dev/mapper/$dev" ]]; then
+      info_print "Closing existing LUKS mapping: $dev"
+      cryptsetup close "$dev" 2>/dev/null
+    fi
+  done
+
+  # Wait for partition devices to settle and become available
+  udevadm settle
+  sleep 1
+
+  # Ask for encryption password if not already set
+  if [[ -z "$password" ]]; then
+    password=$(get_valid_password "Enter password to use for disk encryption (LUKS)")
+    success_print "Disk encryption password has been set."
+  fi
+
+  # Encrypt root partition
   info_print "Creating LUKS encryption on root partition..."
-  if ! echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" --type luks2 --batch-mode --label=CRYPTROOT -; then
-    error_print "Failed to create LUKS encryption on root partition"
-    return 1
-  fi
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -q --type luks2 -
+  echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -
 
+  if [[ $? -ne 0 ]]; then
+    error_print "ERROR: Failed to create or open LUKS encryption on root partition"
+    exit 1
+  fi
+  success_print "LUKS encrypted root partition created."
+
+  # Encrypt home partition
   info_print "Creating LUKS encryption on home partition..."
-  if ! echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" --type luks2 --batch-mode --label=CRYPTHOME -; then
-    error_print "Failed to create LUKS encryption on home partition"
-    return 1
-  fi
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -q --type luks2 -
+  echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -
 
-  info_print "Opening encrypted root partition..."
-  if ! echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot --key-file=-; then
-    error_print "Failed to open root partition"
-    return 1
+  if [[ $? -ne 0 ]]; then
+    error_print "ERROR: Failed to create or open LUKS encryption on home partition"
+    exit 1
   fi
-
-  info_print "Opening encrypted home partition..."
-  if ! echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome --key-file=-; then
-    error_print "Failed to open home partition"
-    return 1
-  fi
+  success_print "LUKS encrypted home partition created."
 }
 
 # ======================= Format Partitions ================
@@ -696,38 +714,6 @@ select_disk() {
   done
 }
 
-# ======================= LUKS Password Input =====================
-lukspass_selector() {
-  local pass1 pass2
-
-  while true; do
-    input_print "Enter password to use for disk encryption (LUKS): "
-    stty -echo
-    read -r pass1
-    stty echo
-    echo
-
-    if [[ -z "$pass1" ]]; then
-      warning_print "Password cannot be empty."
-      continue
-    fi
-
-    input_print "Confirm password: "
-    stty -echo
-    read -r pass2
-    stty echo
-    echo
-
-    if [[ "$pass1" != "$pass2" ]]; then
-      warning_print "Passwords do not match. Please try again."
-    else
-      password="$pass1"
-      break
-    fi
-  done
-
-  info_print "Disk encryption password has been set."
-}
 
 # ======================= Network Selector ======================
 network_selector () {
@@ -1284,7 +1270,6 @@ main() {
   keyboard_selector
   select_disk
   prepare_disk
-  lukspass_selector
   encrypt_partitions
   format_partitions
   mount_btrfs_subvolumes
