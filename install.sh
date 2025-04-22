@@ -212,41 +212,6 @@ microcode_detector () {
     fi
 }
 
-# ======================= Partition Disk ===================
-partition_disk() {
-  # Calculate default root partition size (50% of total disk size in GB)
-  DISK_SIZE_GB=$(lsblk -bno SIZE "$DISK" | awk '{printf "%.0f", $1 / (1024*1024*1024)}')
-  DEFAULT_ROOT_SIZE=$((DISK_SIZE_GB / 2))
-
-  input_print "Enter root partition size (e.g. ${DEFAULT_ROOT_SIZE}G). Default is ${DEFAULT_ROOT_SIZE}G: "
-  read -r root_size
-  root_size=${root_size:-${DEFAULT_ROOT_SIZE}G}
-
-  info_print "Creating partitions on $DISK..."
-  parted -s "$DISK" \
-    mklabel gpt \
-    mkpart ESP fat32 1MiB 1025MiB \
-    set 1 esp on \
-    mkpart CRYPTROOT 1025MiB "$root_size" \
-    mkpart CRYPTHOME "$root_size" 100% &>/dev/null
-
-  partprobe "$DISK"
-
-  if [[ "$DISK" =~ nvme ]]; then
-    PART1="${DISK}p1"
-    PART2="${DISK}p2"
-    PART3="${DISK}p3"
-  else
-    PART1="${DISK}1"
-    PART2="${DISK}2"
-    PART3="${DISK}3"
-  fi
-
-  ESP="$PART1"
-  CRYPTROOT="$PART2"
-  CRYPTHOME="$PART3"
-}
-
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
   info_print "Creating LUKS encryption on root partition..."
@@ -1250,9 +1215,15 @@ prepare_disk() {
 
   partprobe "$DISK" &>/dev/null
 
-  ESP="${DISK}p1"
-  CRYPTROOT="${DISK}p2"
-  CRYPTHOME="${DISK}p3"
+  if [[ "$DISK" =~ nvme ]]; then
+    part_prefix="p"
+  else
+    part_prefix=""
+  fi
+
+  ESP="${DISK}${part_prefix}1"
+  CRYPTROOT="${DISK}${part_prefix}2"
+  CRYPTHOME="${DISK}${part_prefix}3"
 
   luks_found=false
   info_print "Checking for existing LUKS headers on partitions..."
