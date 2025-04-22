@@ -197,12 +197,12 @@ microcode_detector () {
 confirm_disk_wipe() {
   info_print "Selected disk: $DISK"
 
-  input_print "Do you want to securely zero the entire disk [y/N]: "
+  input_print "Do you want to securely wipe the entire disk [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" == "y" ]]; then
-    info_print "Zeroing entire disk..."
-    dd if=/dev/zero of="$DISK" bs=1M status=progress
-    success_print "Disk $DISK has been securely zeroed."
+    info_print "Secure wiping entire disk... (Can take a long time depending on disk size)"
+    dd if=/dev/zero of="$DISK" bs=1M status=none
+    success_print "Disk $DISK has been securely wiped."
     return 0
   fi
 
@@ -227,8 +227,8 @@ confirm_disk_wipe() {
 
   if [[ "$luks_found" == true ]]; then
     warning_print "LUKS partitions still detected on $DISK after wiping."
-    info_print "Securely zeroing disk is required to proceed."
-    dd if=/dev/zero of="$DISK" bs=1M status=progress
+    info_print "Securely zeroing disk is required to proceed.. (Can take a long time depending on disk size)"
+    dd if=/dev/zero of="$DISK" bs=1M status=none
     success_print "Disk $DISK has been securely zeroed."
   else
     success_print "No LUKS partitions detected. Proceeding without zeroing."
