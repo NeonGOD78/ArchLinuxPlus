@@ -1242,15 +1242,6 @@ show_log_if_needed() {
 
 # ======================= Prepare disk ==============
 prepare_disk() {
-  info_print "Selected disk: $DISK"
-
-  input_print "!! ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST. Proceed? [y/N]: "
-  read -r response
-  if ! [[ "${response,,}" =~ ^(yes|y)$ ]]; then
-    error_print "Disk preparation cancelled."
-    exit 1
-  fi
-
   input_print "Do you want to securely wipe the entire disk $DISK now? [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" =~ ^(yes|y)$ ]]; then
