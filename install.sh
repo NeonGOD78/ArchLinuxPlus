@@ -65,13 +65,14 @@ move_log_file() {
 
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
-  if ! tty -s; then
-    error_print "ERROR: No TTY detected. Cannot prompt for password interactively."
-    exit 1
-  fi
-  
   local prompt="$1"
   local pass1 pass2
+
+  # Check for TTY
+  if ! tty -s; then
+    error_print "ERROR: No TTY detected. Cannot prompt for password."
+    exit 1
+  fi
 
   while true; do
     input_print "$prompt: "
