@@ -1239,61 +1239,127 @@ show_log_if_needed() {
   fi
 }
 
-# ======================= User Setup ======================
-user_setup() {
-  input_print "Enter username for new user (leave empty to skip): "
+
+# ======================= Prepare disk ==============
+prepare_disk() {
+  info_print "Selected disk: $DISK"
+
+  input_print "!! ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST. Proceed? [y/N]: "
+  read -r response
+  if ! [[ "${response,,}" =~ ^(yes|y)$ ]]; then
+    error_print "Disk preparation cancelled."
+    exit 1
+  fi
+
+  input_print "Do you want to securely wipe the entire disk $DISK now? [y/N]: "
+  read -r initial_zero
+  if [[ "${initial_zero,,}" =~ ^(yes|y)$ ]]; then
+    info_print "Zeroing entire disk $DISK..."
+    dd if=/dev/zero of="$DISK" bs=1M status=none
+    success_print "Disk $DISK has been securely zeroed."
+    return 0
+  fi
+
+  info_print "Wiping existing signatures and partition table on $DISK..."
+  sgdisk --zap-all "$DISK" &>/dev/null
+  wipefs -af "$DISK" &>/dev/null
+  partprobe "$DISK" &>/dev/null
+
+  # Beregn root størrelse (50 % af disk)
+  DISK_SIZE_GB=$(lsblk -bno SIZE "$DISK" | awk '{printf "%.0f", $1 / (1024*1024*1024)}')
+  DEFAULT_ROOT_SIZE=$((DISK_SIZE_GB / 2))
+
+  input_print "Enter root partition size (e.g. 50G). Default is ${DEFAULT_ROOT_SIZE}G: "
+  read -r root_size
+  root_size=${root_size:-${DEFAULT_ROOT_SIZE}G}
+
+  info_print "Creating partitions on $DISK..."
+  parted -s "$DISK" \
+    mklabel gpt \
+    mkpart ESP fat32 1MiB 1025MiB \
+    set 1 esp on \
+    mkpart CRYPTROOT 1025MiB "$root_size" \
+    mkpart CRYPTHOME "$root_size" 100% &>/dev/null
+
+  partprobe "$DISK" &>/dev/null
+
+  ESP="/dev/disk/by-partlabel/ESP"
+  CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
+  CRYPTHOME="/dev/disk/by-partlabel/CRYPTHOME"
+
+  luks_found=false
+  info_print "Checking for existing LUKS headers on partitions..."
+  for part in "$CRYPTROOT" "$CRYPTHOME"; do
+    if [[ -b $part ]] && cryptsetup isLuks "$part" &>/dev/null; then
+      warning_print "LUKS header detected on $part"
+      luks_found=true
+    fi
+  done
+
+  if [[ "$luks_found" == true ]]; then
+    warning_print "LUKS headers detected. Secure wiping is required."
+    dd if=/dev/zero of="$DISK" bs=1M status=none
+    success_print "Disk $DISK has been securely zeroed."
+  else
+    success_print "No LUKS partitions detected. Proceeding without zeroing."
+  fi
+
+  success_print "Disk prepared and partitions created successfully."
+}
+
+
+# ======================= Setup Users & Passwords ==============
+setup_users_and_passwords() {
+  section_print "User and Password Setup"
+
+  input_print "Enter a system username (leave empty to only create root user): "
   read -r username
 
-  if [[ -n "$username" ]]; then
-    if [[ -z "${userpass:-}" ]]; then
-      userpass=$(get_valid_password "user password for $username")
-    else
-      info_print "Using previously entered password for user $username."
-    fi
-  fi
-
-  if [[ -z "${rootpass:-}" ]]; then
-    rootpass=$(get_valid_password "root password")
+  input_print "Do you want to reuse the LUKS password for user and root? [Y/n]: "
+  read -r reuse
+  if [[ "${reuse,,}" =~ ^(n|no)$ ]]; then
+    password=$(get_valid_password "Enter new system password")
   else
-    info_print "Using previously entered password for root."
+    info_print "Reusing LUKS password for user and root accounts."
   fi
+
+  if [[ -n "$username" ]]; then
+    if [[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+      useradd -m -G wheel -s /bin/bash "$username"
+      echo "$username:$password" | chpasswd
+      success_print "User '$username' created."
+    else
+      warning_print "Invalid username. Skipping user creation."
+    fi
+  else
+    info_print "No username provided. Only root account will be created."
+  fi
+
+  echo "root:$password" | chpasswd
+  success_print "Root password set."
 }
 
-# =================== Ask for Password Reuse ====================
-ask_password_reuse() {
-  input_print "Do you want to reuse the LUKS password for root/user? (YES/no): "
-  read -r reuse_choice
-  reuse_choice=${reuse_choice,,}  # to lowercase
-
-  if [[ "$reuse_choice" == "yes" || "$reuse_choice" == "y" || -z "$reuse_choice" ]]; then
-    rootpass="$password"
-    userpass="$password"
-  fi
-}
 # ======================= Main Installer Flow ==============
 main() {
   welcome_banner
   keyboard_selector
   select_disk
-  confirm_disk_wipe
-  partition_disk
-  
+  prepare_disk
   lukspass_selector
-  ask_password_reuse
-  user_setup
-  
   encrypt_partitions
   format_partitions
   mount_btrfs_subvolumes
-
   kernel_selector
   microcode_detector
   locale_selector
   hostname_selector
+    
+
 
   until install_base_system; do : ; done
   
   move_log_file
+  setup_users_and_passwords
   generate_fstab
   configure_hostname_and_hosts
   setup_zram
