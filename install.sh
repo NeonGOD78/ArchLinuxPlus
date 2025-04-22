@@ -638,10 +638,6 @@ setup_grub() {
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Secure Boot support (always enabled)
-  info_print "Configuring Secure Boot support..."
-  setup_secureboot
-
   # Install GRUB bootloader
   info_print "Installing GRUB bootloader..."
   arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB &>> "$LOGFILE"
@@ -1329,7 +1325,7 @@ main() {
   network_selector
   install_editor
   configure_default_shell
-  setup_secureboot_structure
+  setup_secureboot
   setup_timezone_and_clock_chroot
   setup_locale_and_initramfs_chroot
   setup_snapper_chroot
