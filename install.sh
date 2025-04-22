@@ -240,26 +240,18 @@ partition_disk() {
 
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
-  info_print "Checking if LUKS partition already exists..."
-  
-  # Check if LUKS is already setup
-  cryptsetup status "$CRYPTROOT" &>/dev/null && error_print "LUKS already exists on root partition!" && return 1
-  cryptsetup status "$CRYPTHOME" &>/dev/null && error_print "LUKS already exists on home partition!" && return 1
-
   info_print "Creating LUKS encryption on root partition..."
-  # Try to create LUKS encryption on the root partition
-  if ! cryptsetup luksFormat "$CRYPTROOT" --type luks2; then
+  if ! echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$CRYPTROOT" --type luks2 --batch-mode -; then
     error_print "Failed to create LUKS encryption on root partition"
     return 1
   fi
 
   info_print "Creating LUKS encryption on home partition..."
-  # Try to create LUKS encryption on the home partition
-  if ! cryptsetup luksFormat "$CRYPTHOME" --type luks2; then
+  if ! echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$CRYPTHOME" --type luks2 --batch-mode -; then
     error_print "Failed to create LUKS encryption on home partition"
     return 1
   fi
-  
+
   info_print "Opening encrypted root partition..."
   cryptsetup open "$CRYPTROOT" cryptroot
 
