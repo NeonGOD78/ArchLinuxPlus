@@ -195,20 +195,21 @@ microcode_detector () {
 
 # ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
-    print_info "Selected disk: ${BOLD}$DISK${RESET}"
+    info_print "Selected disk: $DISK"
 
-    read -rp "$(print_warning 'Are you sure you want to wipe this disk? This will erase all data. Type YES to continue: ')" confirm
+    warning_print "Are you sure you want to wipe this disk? This will erase all data on $DISK."
+    read -rp "Type YES to continue: " confirm
 
     if [[ $confirm == "YES" ]]; then
-        print_info "Wiping existing partition signatures on $DISK..."
+        info_print "Wiping existing partition signatures on $DISK..."
         wipefs -a "$DISK"
 
-        print_info "Zeroing the entire disk to remove all residual headers..."
+        info_print "Zeroing the entire disk to remove all residual headers..."
         dd if=/dev/zero of="$DISK" bs=1M status=progress
 
-        print_success "Disk $DISK has been securely wiped."
+        success_print "Disk $DISK has been securely wiped."
     else
-        print_error "Disk wipe cancelled. Exiting..."
+        error_print "Disk wipe cancelled. Exiting..."
         exit 1
     fi
 }
