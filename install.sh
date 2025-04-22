@@ -195,23 +195,44 @@ microcode_detector () {
 
 # ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
-    info_print "Selected disk: $DISK"
+  info_print "Selected disk: $DISK"
 
-    warning_print "Are you sure you want to wipe this disk? This will erase all data on $DISK."
-    read -rp "Type YES to continue: " confirm
+  input_print "Do you want to securely zero the entire disk now? [y/N]: "
+  read -r initial_zero
+  if [[ "${initial_zero,,}" == "y" ]]; then
+    info_print "Zeroing entire disk..."
+    dd if=/dev/zero of="$DISK" bs=1M status=progress
+    success_print "Disk $DISK has been securely zeroed."
+    return 0
+  fi
 
-    if [[ $confirm == "YES" ]]; then
-        info_print "Wiping existing partition signatures on $DISK..."
-        wipefs -a "$DISK"
+  warning_print "All partitions on $DISK will be removed."
+  input_print "Do you want to continue without zeroing? [y/N]: "
+  read -r proceed
+  [[ "${proceed,,}" != "y" ]] && error_print "Disk wipe cancelled." && exit 1
 
-        info_print "Zeroing the entire disk to remove all residual headers..."
-        dd if=/dev/zero of="$DISK" bs=1M status=progress
+  info_print "Wiping partition table and signatures on $DISK..."
+  sgdisk --zap-all "$DISK"
+  wipefs -a "$DISK"
 
-        success_print "Disk $DISK has been securely wiped."
-    else
-        error_print "Disk wipe cancelled. Exiting..."
-        exit 1
+  luks_found=false
+
+  info_print "Checking for existing LUKS headers on partitions..."
+  for part in $(ls ${DISK}* | grep -E "${DISK}p?[0-9]+"); do
+    if cryptsetup isLuks "$part" &>/dev/null; then
+      warning_print "LUKS header detected on $part"
+      luks_found=true
     fi
+  done
+
+  if [[ "$luks_found" == true ]]; then
+    warning_print "LUKS partitions still detected on $DISK after wiping."
+    info_print "Securely zeroing disk is required to proceed."
+    dd if=/dev/zero of="$DISK" bs=1M status=progress
+    success_print "Disk $DISK has been securely zeroed."
+  else
+    success_print "No LUKS partitions detected. Proceeding without zeroing."
+  fi
 }
 
 # ======================= Partition Disk ===================
@@ -441,7 +462,6 @@ EOF
 chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 }
 
-# ======================= Mount BTRFS Subvolumes ================
 # ======================= Mount BTRFS Subvolumes ================
 mount_btrfs_subvolumes() {
   info_print "Creating BTRFS subvolumes on root partition..."
