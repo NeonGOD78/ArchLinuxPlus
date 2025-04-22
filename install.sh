@@ -212,40 +212,6 @@ microcode_detector () {
     fi
 }
 
-# ======================= Disk Wipe Confirmation ==========================
-confirm_disk_wipe() {
-  input_print "Do you want to securely wipe the entire disk [y/N]: "
-  read -r initial_zero
-  if [[ "${initial_zero,,}" == "y" ]]; then
-    info_print "Secure wiping entire disk... (Can take a long time depending on disk size)"
-    dd if=/dev/zero of="$DISK" bs=1M status=none
-    success_print "Disk $DISK has been securely wiped."
-    return 0
-  fi
-
-  sgdisk --zap-all "$DISK"
-  wipefs -a "$DISK"
-
-  luks_found=false
-
-  info_print "Checking for existing LUKS headers on partitions..."
-  for part in $(ls ${DISK}* | grep -E "${DISK}p?[0-9]+"); do
-    if cryptsetup isLuks "$part" &>/dev/null; then
-      warning_print "LUKS header detected on $part"
-      luks_found=true
-    fi
-  done
-
-  if [[ "$luks_found" == true ]]; then
-    warning_print "LUKS partitions still detected on $DISK after wiping."
-    info_print "Securely zeroing disk is required to proceed.. (Can take a long time depending on disk size)"
-    dd if=/dev/zero of="$DISK" bs=1M status=none
-    success_print "Disk $DISK has been securely zeroed."
-  else
-    success_print "No LUKS partitions detected. Proceeding without zeroing."
-  fi
-}
-
 # ======================= Partition Disk ===================
 partition_disk() {
   # Calculate default root partition size (50% of total disk size in GB)
