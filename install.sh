@@ -241,13 +241,13 @@ partition_disk() {
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
   info_print "Creating LUKS encryption on root partition..."
-  if ! echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$CRYPTROOT" --type luks2 --batch-mode -; then
+  if ! echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" --type luks2 --batch-mode -; then
     error_print "Failed to create LUKS encryption on root partition"
     return 1
   fi
 
   info_print "Creating LUKS encryption on home partition..."
-  if ! echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$CRYPTHOME" --type luks2 --batch-mode -; then
+  if ! echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" --type luks2 --batch-mode -; then
     error_print "Failed to create LUKS encryption on home partition"
     return 1
   fi
