@@ -239,53 +239,68 @@ microcode_detector () {
 
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
-  section_print "Encrypting partitions with LUKS"
+  section_print "Encrypting root and home partitions with LUKS2"
 
   udevadm settle
   sleep 1
 
-  # Prompt for password once using lukspass_selector
+  # Prompt for LUKS password
   lukspass_selector
 
-  info_print "Creating LUKS encryption on root partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -q --type luks2 -
-  echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -
-  if [[ $? -ne 0 ]]; then
-    error_print "ERROR: Failed to create or open LUKS encryption on root partition"
+  # Encrypt and open root partition
+  info_print "Encrypting root partition: $CRYPTROOT"
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -q --type luks2 - || {
+    error_print "Failed to format LUKS on $CRYPTROOT"
     exit 1
-  fi
-  success_print "LUKS encrypted root partition created."
+  }
 
-  info_print "Creating LUKS encryption on home partition..."
-  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -q --type luks2 -
-  echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome -
-  if [[ $? -ne 0 ]]; then
-    error_print "ERROR: Failed to create or open LUKS encryption on home partition"
+  echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot - || {
+    error_print "Failed to open LUKS root partition"
     exit 1
-  fi
-  success_print "LUKS encrypted home partition created."
+  }
+
+  # Encrypt and open home partition
+  info_print "Encrypting home partition: $CRYPTHOME"
+  echo -n "$password" | cryptsetup luksFormat "$CRYPTHOME" -q --type luks2 - || {
+    error_print "Failed to format LUKS on $CRYPTHOME"
+    exit 1
+  }
+
+  echo -n "$password" | cryptsetup open "$CRYPTHOME" crypthome - || {
+    error_print "Failed to open LUKS home partition"
+    exit 1
+  }
+
+  success_print "LUKS encryption completed and both devices are opened."
 }
 
 # ======================= Format Partitions ================
 format_partitions() {
-  info_print "Formatting EFI partition as FAT32..."
-  mkfs.fat -F32 "$ESP" &>> "$LOGFILE"
+  section_print "Formatting partitions"
 
-  info_print "Formatting root (cryptroot) as BTRFS..."
-  # Format the root partition as BTRFS
+  # Format EFI system partition
+  info_print "Formatting EFI partition as FAT32..."
+  mkfs.fat -F32 "$ESP" &>> "$LOGFILE" || {
+    error_print "Failed to format EFI partition ($ESP) as FAT32"
+    return 1
+  }
+
+  # Format encrypted root partition with Btrfs
+  info_print "Formatting root partition (cryptroot) as BTRFS..."
   mkfs.btrfs /dev/mapper/cryptroot &>> "$LOGFILE" || {
     error_print "Failed to format root partition as BTRFS"
     return 1
   }
 
-  info_print "Formatting home (crypthome) as BTRFS..."
-  # Format the home partition as BTRFS
+  # Format encrypted home partition with Btrfs
+  info_print "Formatting home partition (crypthome) as BTRFS..."
   mkfs.btrfs /dev/mapper/crypthome &>> "$LOGFILE" || {
     error_print "Failed to format home partition as BTRFS"
     return 1
   }
-}
 
+  success_print "All partitions formatted successfully."
+}
 
 # ======================= Install Base System ======================
 install_base_system() {
@@ -444,6 +459,8 @@ chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
 
 # ======================= Mount BTRFS Subvolumes ================
 mount_btrfs_subvolumes() {
+ 
+  section_print "Mounting Btrfs subvolumes and system partitions"
   info_print "Creating BTRFS subvolumes on root partition..."
   mount /dev/mapper/cryptroot /mnt
   for subvol in @ @snapshots @var_pkgs @var_log @srv @var_lib_portables @var_lib_machines @var_lib_libvirt; do
