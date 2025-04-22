@@ -217,8 +217,10 @@ microcode_detector () {
 encrypt_partitions() {
   section_print "Encrypting partitions with LUKS"
 
+  info_print "→ Calling udevadm settle..."
   udevadm settle
   sleep 1
+  info_print "→ udevadm complete. Prompting for password..."
 
   password=$(get_valid_password "Enter password to use for disk encryption (LUKS)")
 
