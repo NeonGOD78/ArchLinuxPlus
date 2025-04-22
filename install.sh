@@ -266,9 +266,19 @@ partition_disk() {
 
   partprobe "$DISK"
 
-  ESP="/dev/disk/by-partlabel/ESP"
-  CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
-  CRYPTHOME="/dev/disk/by-partlabel/CRYPTHOME"
+  if [[ "$DISK" =~ nvme ]]; then
+    PART1="${DISK}p1"
+    PART2="${DISK}p2"
+    PART3="${DISK}p3"
+  else
+    PART1="${DISK}1"
+    PART2="${DISK}2"
+    PART3="${DISK}3"
+  fi
+
+  ESP="$PART1"
+  CRYPTROOT="$PART2"
+  CRYPTHOME="$PART3"
 }
 
 # ======================= Encrypt Partitions ===============
