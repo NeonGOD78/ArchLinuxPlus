@@ -762,7 +762,7 @@ network_selector () {
     esac
 
     info_print "Installing $network_pkg inside the chroot environment..."
-    arch-chroot /mnt pacman -Sy --noconfirm $network_pkg &>> \"$LOGFILE\" || {
+    arch-chroot /mnt pacman -Sy --noconfirm $network_pkg &>> "$LOGFILE" || {
         error_print "Failed to install $network_pkg"
         exit 1
     }
@@ -1283,14 +1283,15 @@ main() {
   mount_btrfs_subvolumes
   kernel_selector
   microcode_detector
-  locale_selector
-  hostname_selector
+
     
 
 
   until install_base_system; do : ; done
   
   move_log_file
+  locale_selector
+  hostname_selector
   setup_users_and_passwords
   generate_fstab
   configure_hostname_and_hosts
