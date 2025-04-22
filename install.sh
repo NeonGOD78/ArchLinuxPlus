@@ -544,6 +544,9 @@ setup_locale_and_initramfs_chroot() {
   info_print "Generating locale and initramfs (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
 set -euo pipefail
+echo "LANG=en_DK.UTF-8" > /etc/locale.conf
+echo "LC_TIME=da_DK.UTF-8" >> /etc/locale.conf
+echo "KEYMAP=dk" > /etc/vconsole.conf
 locale-gen || echo "[!] Failed to generate locale"
 mkinitcpio -P || echo "[!] mkinitcpio failed"
 EOF
@@ -733,10 +736,10 @@ select_disk() {
     echo
 
     info_print "Partition layout:"
-    lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,LABEL,UUID,MODEL,VENDOR "$DISK"
+    lsblk -p -e7 -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
     echo
 
-    warning_print "ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST."
+    warning_print "!! ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST."
     input_print "Do you want to proceed with this disk? [y/N]: "
     read -r confirm
 
