@@ -257,7 +257,6 @@ encrypt_partitions() {
   fi
   success_print "LUKS encrypted home partition created."
 }
-}
 
 # ======================= Format Partitions ================
 format_partitions() {
