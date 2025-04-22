@@ -1273,9 +1273,9 @@ prepare_disk() {
 
   partprobe "$DISK" &>/dev/null
 
-  ESP="/dev/disk/by-partlabel/ESP"
-  CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
-  CRYPTHOME="/dev/disk/by-partlabel/CRYPTHOME"
+  ESP="${DISK}p1"
+  CRYPTROOT="${DISK}p2"
+  CRYPTHOME="${DISK}p3"
 
   luks_found=false
   info_print "Checking for existing LUKS headers on partitions..."
