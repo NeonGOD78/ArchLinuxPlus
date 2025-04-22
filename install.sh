@@ -1242,16 +1242,15 @@ show_log_if_needed() {
 
 # ======================= Prepare disk ==============
 prepare_disk() {
-  input_print "Do you want to securely wipe the entire disk $DISK now? [y/N]: "
+  input_print "Do you want to secure wipe $DISK ? [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" =~ ^(yes|y)$ ]]; then
-    info_print "Zeroing entire disk $DISK..."
+    info_print "Secure wiping $DISK..."
     dd if=/dev/zero of="$DISK" bs=1M status=none
-    success_print "Disk $DISK has been securely zeroed."
+    success_print "Disk $DISK has been securely wiped."
     return 0
   fi
 
-  info_print "Wiping existing signatures and partition table on $DISK..."
   sgdisk --zap-all "$DISK" &>/dev/null
   wipefs -af "$DISK" &>/dev/null
   partprobe "$DISK" &>/dev/null
@@ -1260,7 +1259,7 @@ prepare_disk() {
   DISK_SIZE_GB=$(lsblk -bno SIZE "$DISK" | awk '{printf "%.0f", $1 / (1024*1024*1024)}')
   DEFAULT_ROOT_SIZE=$((DISK_SIZE_GB / 2))
 
-  input_print "Enter root partition size (e.g. 50G). Default is ${DEFAULT_ROOT_SIZE}G: "
+  input_print "Enter root partition size (e.g. ${DEFAULT_ROOT_SIZE}G). Default is ${DEFAULT_ROOT_SIZE}G: "
   read -r root_size
   root_size=${root_size:-${DEFAULT_ROOT_SIZE}G}
 
