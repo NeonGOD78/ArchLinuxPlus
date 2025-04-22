@@ -233,7 +233,7 @@ partition_disk() {
   DISK_SIZE_GB=$(lsblk -bno SIZE "$DISK" | awk '{printf "%.0f", $1 / (1024*1024*1024)}')
   DEFAULT_ROOT_SIZE=$((DISK_SIZE_GB / 2))
 
-  input_print "Enter root partition size (e.g. 100G). Default is ${DEFAULT_ROOT_SIZE}G: "
+  input_print "Enter root partition size (e.g. ${DEFAULT_ROOT_SIZE}G). Default is ${DEFAULT_ROOT_SIZE}G: "
   read -r root_size
   root_size=${root_size:-${DEFAULT_ROOT_SIZE}G}
 
@@ -243,7 +243,7 @@ partition_disk() {
     mkpart ESP fat32 1MiB 1025MiB \
     set 1 esp on \
     mkpart CRYPTROOT 1025MiB "$root_size" \
-    mkpart CRYPTHOME "$root_size" 100%
+    mkpart CRYPTHOME "$root_size" 100% &>/dev/null
 
   partprobe "$DISK"
 
@@ -716,7 +716,7 @@ select_disk() {
     info_print "Partition layout:"
     lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
 
-    error_print "ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST."
+    warning_print "ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST."
     input_print "Do you want to proceed with this disk? [y/N]: "
     read -r confirm
 
