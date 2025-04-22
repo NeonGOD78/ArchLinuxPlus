@@ -229,8 +229,8 @@ encrypt_partitions() {
   udevadm settle
   sleep 1
 
-  # Ask for encryption password if not already set
-  if [[ -z "$password" ]]; then
+  # Defensive check: avoid "unbound variable" error
+  if [[ -z "${password:-}" ]]; then
     password=$(get_valid_password "Enter password to use for disk encryption (LUKS)")
     success_print "Disk encryption password has been set."
   fi
@@ -256,6 +256,7 @@ encrypt_partitions() {
     exit 1
   fi
   success_print "LUKS encrypted home partition created."
+}
 }
 
 # ======================= Format Partitions ================
