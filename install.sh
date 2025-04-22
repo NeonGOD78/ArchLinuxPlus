@@ -1179,6 +1179,8 @@ show_log_if_needed() {
 
 # ======================= Prepare disk ==============
 prepare_disk() {
+  section_print "Disk Partitioning and Setup"
+
   input_print "Do you want to secure wipe $DISK before install? [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" =~ ^(yes|y)$ ]]; then
@@ -1192,7 +1194,7 @@ prepare_disk() {
   wipefs -af "$DISK" &>/dev/null
   partprobe "$DISK" &>/dev/null
 
-  # Beregn root størrelse (50 % af disk)
+  # Calculate root partition size (50% of total disk)
   DISK_SIZE_GB=$(lsblk -bno SIZE "$DISK" | awk '{printf "%.0f", $1 / (1024*1024*1024)}')
   DEFAULT_ROOT_SIZE=$((DISK_SIZE_GB / 2))
 
@@ -1209,12 +1211,24 @@ prepare_disk() {
     mkpart CRYPTHOME "$root_size" 100% &>/dev/null
 
   partprobe "$DISK" &>/dev/null
+  udevadm settle
+  sleep 2
 
+  # Add partition prefix (e.g., "p" for NVMe)
   if [[ "$DISK" =~ nvme ]]; then
     part_prefix="p"
   else
     part_prefix=""
   fi
+
+  # Wait for partitions to become available
+  for part in 1 2 3; do
+    dev="${DISK}${part_prefix}${part}"
+    until [ -b "$dev" ]; do
+      warning_print "Waiting for $dev to become available..."
+      sleep 1
+    done
+  done
 
   ESP="${DISK}${part_prefix}1"
   CRYPTROOT="${DISK}${part_prefix}2"
@@ -1239,7 +1253,6 @@ prepare_disk() {
 
   success_print "Disk prepared and partitions created successfully."
 }
-
 
 # ======================= Setup Users & Passwords ==============
 setup_users_and_passwords() {
