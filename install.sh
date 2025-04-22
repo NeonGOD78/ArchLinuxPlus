@@ -1308,7 +1308,6 @@ main() {
   setup_grub_btrfs_chroot
   build_uki_chroot
   generate_grub_cfg
-  setup_users_and_passwords
   dotfiles_clone
   configure_pacman
   configure_pacman_repos
