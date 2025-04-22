@@ -237,12 +237,13 @@ confirm_disk_wipe() {
 
 # ======================= Partition Disk ===================
 partition_disk() {
-  input_print "Enter root partition size (e.g. 100G): "
+  # Calculate default root partition size (50% of total disk size in GB)
+  DISK_SIZE_GB=$(lsblk -bno SIZE "$DISK" | awk '{printf "%.0f", $1 / (1024*1024*1024)}')
+  DEFAULT_ROOT_SIZE=$((DISK_SIZE_GB / 2))
+
+  input_print "Enter root partition size (e.g. 100G). Default is ${DEFAULT_ROOT_SIZE}G: "
   read -r root_size
-  if [[ -z "$root_size" ]]; then
-    error_print "You must specify a root size."
-    exit 1
-  fi
+  root_size=${root_size:-${DEFAULT_ROOT_SIZE}G}
 
   info_print "Creating partitions on $DISK..."
   parted -s "$DISK" \
