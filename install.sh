@@ -114,41 +114,60 @@ ${RESET}"
 
 # ======================= Keyboard Selection ======================
 keyboard_selector () {
-    input_print "Please insert the keyboard layout to use in console (enter empty to use US, or \"/\" to look up for keyboard layouts): "
+    input_print "Please insert the keyboard layout to use in console (enter empty to use DK, or \"/\" to look up for keyboard layouts): "
     read -r kblayout
     case "$kblayout" in
-        '') kblayout="us"
-            info_print "The standard US keyboard layout will be used."
-            return 0;;
-        '/') localectl list-keymaps
-             clear
-             return 1;;
-        *) if ! localectl list-keymaps | grep -Fxq "$kblayout"; then
-               error_print "The specified keymap doesn't exist."
-               return 1
-           fi
-        info_print "Changing console layout to $kblayout."
-        loadkeys "$kblayout"
-        return 0
+        '')
+            kblayout="dk"
+            info_print "The Danish keyboard layout will be used."
+            loadkeys "$kblayout"
+            return 0
+            ;;
+        '/')
+            localectl list-keymaps
+            clear
+            return 1
+            ;;
+        *)
+            if ! localectl list-keymaps | grep -Fxq "$kblayout"; then
+                error_print "The specified keymap doesn't exist."
+                return 1
+            fi
+            info_print "Changing console layout to $kblayout."
+            loadkeys "$kblayout"
+            return 0
+            ;;
     esac
 }
 
 # ======================= Locale Selection ======================
 locale_selector () {
-    input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_US, or \"/\" to search locales): "
+    input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_DK.UTF-8, or \"/\" to search locales): "
     read -r locale
     case "$locale" in
-        '') locale="en_US.UTF-8"
+        '') 
+            locale="en_DK.UTF-8"
             info_print "$locale will be the default locale."
-            return 0;;
-        '/') sed -E '/^# +|^#$/d;s/^#| *$//g;s/ .*/ (Charset:&)/' /etc/locale.gen | less -M
-                clear
-                return 1;;
-        *)  if ! grep -q "^#\?$(sed 's/[]\\.*[]/\\&/g' <<< "$locale") " /etc/locale.gen; then
-                error_print "The specified locale doesn't exist or isn't supported."
+            echo "$locale UTF-8" >> /etc/locale.gen
+            locale-gen
+            echo "LANG=$locale" > /etc/locale.conf
+            return 0
+            ;;
+        '/')
+            sed -E '/^# +|^#$/d;s/^#| *$//g;s/ .*/ (Charset:&)/' /etc/locale.gen | less -M
+            clear
+            return 1
+            ;;
+        *)
+            if ! grep -q "^#\?$(sed 's/[]\\.*[]/\\&/g' <<< "$locale") " /etc/locale.gen; then
+                error_print "The specified locale doesn’t exist or isn’t supported."
                 return 1
             fi
+            echo "$locale UTF-8" >> /etc/locale.gen
+            locale-gen
+            echo "LANG=$locale" > /etc/locale.conf
             return 0
+            ;;
     esac
 }
 
