@@ -195,8 +195,6 @@ microcode_detector () {
 
 # ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
-  info_print "Selected disk: $DISK"
-
   input_print "Do you want to securely wipe the entire disk [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" == "y" ]]; then
@@ -206,12 +204,6 @@ confirm_disk_wipe() {
     return 0
   fi
 
-  warning_print "All partitions on $DISK will be removed."
-  input_print "Do you want to continue? [y/N]: "
-  read -r proceed
-  [[ "${proceed,,}" != "y" ]] && error_print "Disk wipe cancelled." && exit 1
-
-  info_print "Wiping partition table and signatures on $DISK..."
   sgdisk --zap-all "$DISK"
   wipefs -a "$DISK"
 
@@ -729,6 +721,7 @@ select_disk() {
 
     if [[ "${confirm,,}" == "y" ]]; then
       success_print "Disk $DISK confirmed and ready for partitioning."
+	  warning_print "⚠️  All data on $DISK will be irreversibly lost."
       break
     else
       warning_print "Disk not confirmed. You can select another disk."
