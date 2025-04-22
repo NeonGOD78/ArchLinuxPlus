@@ -699,7 +699,7 @@ select_disk() {
     lsblk -p -e7 -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
     echo
 
-    warning_print "!! ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST !!"
+    error_print "!! ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST !!"
 	echo
     input_print "Do you want to proceed with this disk? [y/N]: "
     read -r confirm
