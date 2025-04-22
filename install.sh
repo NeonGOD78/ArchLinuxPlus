@@ -195,33 +195,20 @@ microcode_detector () {
 
 # ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
-    echo -e "${BBLUE}Selected disk: ${BOLD}$DISK${RESET}"
-    read -rp "$(echo -e ${BYELLOW}Are you sure you want to wipe this disk? This will erase all data on ${BOLD}$DISK${RESET}${BYELLOW}. Type YES to continue: ${RESET})" confirm
+    print_info "Selected disk: ${BOLD}$DISK${RESET}"
+
+    read -rp "$(print_warning 'Are you sure you want to wipe this disk? This will erase all data. Type YES to continue: ')" confirm
 
     if [[ $confirm == "YES" ]]; then
-        echo -e "${BBLUE}Wiping existing partition signatures...${RESET}"
+        print_info "Wiping existing partition signatures on $DISK..."
         wipefs -a "$DISK"
 
-        echo -e "${BBLUE}Zeroing the first and last 100MB of the disk to remove residual headers...${RESET}"
-        dd if=/dev/zero of="$DISK" bs=1M count=100 status=progress
+        print_info "Zeroing the entire disk to remove all residual headers..."
+        dd if=/dev/zero of="$DISK" bs=1M status=progress
 
-        size=$(blockdev --getsz "$DISK")
-        dd if=/dev/zero of="$DISK" bs=512 seek=$((size - 204800)) count=204800 status=progress
-
-        echo -e "${BBLUE}Checking for and wiping old partitions if they exist...${RESET}"
-        for part in ${DISK}p3 ${DISK}p4; do
-            if [[ -b $part ]]; then
-                echo -e "${BBLUE}Securely zeroing $part...${RESET}"
-                wipefs -a "$part"
-                dd if=/dev/zero of="$part" bs=1M count=100 status=progress
-                size=$(blockdev --getsz "$part")
-                dd if=/dev/zero of="$part" bs=512 seek=$((size - 204800)) count=204800 status=progress
-            fi
-        done
-
-        echo -e "${BGREEN}Disk $DISK and partitions securely wiped.${RESET}"
+        print_success "Disk $DISK has been securely wiped."
     else
-        echo -e "${BRED}Disk wipe cancelled. Exiting...${RESET}"
+        print_error "Disk wipe cancelled. Exiting..."
         exit 1
     fi
 }
