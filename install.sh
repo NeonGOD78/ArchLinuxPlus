@@ -194,38 +194,25 @@ microcode_detector () {
 }
 
 # ======================= Disk Wipe Confirmation ==========================
-# ======================= Disk Wipe Confirmation ==========================
 confirm_disk_wipe() {
-  input_print "This will delete the current partition table on $DISK. Proceed? [y/N]: "
-  read -r response
-  if ! [[ "${response,,}" =~ ^(yes|y)$ ]]; then
-    error_print "Disk wipe cancelled."
-    exit 1
-  fi
-  info_print "Wiping $DISK..."
+    echo -e "${BBLUE}Selected disk: ${BOLD}$DISK${RESET}"
+    read -rp "$(echo -e ${BYELLOW}"Are you sure you want to wipe this disk? This will erase all data on ${BOLD}$DISK${RESET}${BYELLOW}. Type YES to continue: "${RESET})" confirm
 
-  # Fjerne eksisterende LUKS signatur
-  wipefs -af "$DISK" &>/dev/null
+    if [[ $confirm == "YES" ]]; then
+        echo -e "${BBLUE}Wiping existing partition signatures...${RESET}"
+        wipefs -a "$DISK"
 
-  # Fjern LUKS signatur eksplicit med cryptsetup luksFormat
-  cryptsetup luksFormat "$DISK" --type luks2 --batch-mode &>/dev/null || {
-    error_print "Failed to format LUKS partition."
-    exit 1
-  }
+        echo -e "${BBLUE}Zeroing start and end of the disk to remove old headers...${RESET}"
+        dd if=/dev/zero of="$DISK" bs=1M count=10 status=none
 
-  # Opret partitionstabellen og skriv den til disken
-  sgdisk --zap-all "$DISK" &>/dev/null || {
-    error_print "Failed to create new partition table on $DISK."
-    exit 1
-  }
+        size=$(blockdev --getsz "$DISK")
+        dd if=/dev/zero of="$DISK" bs=512 seek=$((size - 20480)) count=20480 status=none
 
-  # Brug partprobe til at opdatere partitionstabellen i kernel
-  partprobe "$DISK" &>/dev/null || {
-    error_print "Failed to update partition table with partprobe."
-    exit 1
-  }
-
-  info_print "Disk wiped and partition table updated successfully."
+        echo -e "${BGREEN}Disk $DISK wiped successfully.${RESET}"
+    else
+        echo -e "${BRED}Disk wipe cancelled. Exiting...${RESET}"
+        exit 1
+    fi
 }
 
 
