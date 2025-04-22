@@ -48,17 +48,18 @@ section_print() {
 LOGFILE="/tmp/archinstall.log"
 touch "$LOGFILE"
 chmod 600 "$LOGFILE"
+exec > >(tee -a "$LOGFILE") 2>&1
 info_print "Log file created at $LOGFILE"
 
 # ======================= Move Log File =======================
 move_log_file() {
-  if [[ -d "/mnt" ]]; then
+  if [[ -d /mnt ]]; then
     mkdir -p /mnt/var/log
     cp "$LOGFILE" /mnt/var/log/archinstall.log
     LOGFILE="/mnt/var/log/archinstall.log"
     info_print "Log file moved to $LOGFILE"
   else
-    error_print "Error: /mnt directory is not mounted. Log file not moved."
+    warning_print "Warning: /mnt is not mounted. Log file not moved."
   fi
 }
 
