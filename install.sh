@@ -1185,7 +1185,7 @@ show_log_if_needed() {
 
 # ======================= Prepare disk ==============
 prepare_disk() {
-  input_print "Do you want to secure wipe $DISK ? [y/N]: "
+  input_print "Do you want to secure wipe $DISK before install? [y/N]: "
   read -r initial_zero
   if [[ "${initial_zero,,}" =~ ^(yes|y)$ ]]; then
     info_print "Secure wiping $DISK..."
