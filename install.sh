@@ -716,12 +716,12 @@ select_disk() {
     info_print "Partition layout:"
     lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
 
+    error_print "ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST."
     input_print "Do you want to proceed with this disk? [y/N]: "
     read -r confirm
 
     if [[ "${confirm,,}" == "y" ]]; then
       success_print "Disk $DISK confirmed and ready for partitioning."
-	  warning_print "⚠️  All data on $DISK will be irreversibly lost."
       break
     else
       warning_print "Disk not confirmed. You can select another disk."
