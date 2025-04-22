@@ -311,10 +311,10 @@ format_partitions() {
 install_base_system() {
   info_print "Installing the base system (this may take a while)..."
 
-if pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers \
-    btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac \
-    zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl \
-    btop mc git systemd ukify openssl sbsigntools sbctl &>> \"$LOGFILE\"; then
+  if pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers \
+      btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac \
+      zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl \
+      btop mc git systemd ukify openssl sbsigntools sbctl &>> "$LOGFILE"; then
 
     success_print "Base system installed successfully."
     return 0
@@ -721,7 +721,7 @@ select_disk() {
     echo
 
     info_print "Partition layout:"
-    lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK" | less -S
+    lsblk -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
 
     input_print "Do you want to proceed with this disk? [y/N]: "
     read -r confirm
