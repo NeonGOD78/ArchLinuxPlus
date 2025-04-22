@@ -63,6 +63,24 @@ move_log_file() {
   fi
 }
 
+# ======================= LUKS Password Prompt =======================
+lukspass_selector() {
+  input_print "Enter password to use for disk encryption (LUKS): "
+
+  old_stty_cfg=$(stty -g)
+  stty -echo
+  read -r password
+  stty "$old_stty_cfg"
+  echo
+
+  if [[ -z "$password" ]]; then
+    error_print "No password entered. Aborting."
+    exit 1
+  fi
+
+  success_print "Disk encryption password set."
+}
+
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
@@ -223,12 +241,11 @@ microcode_detector () {
 encrypt_partitions() {
   section_print "Encrypting partitions with LUKS"
 
-  info_print "→ Calling udevadm settle..."
   udevadm settle
   sleep 1
-  info_print "→ udevadm complete. Prompting for password..."
 
-  password=$(get_valid_password "Enter password to use for disk encryption (LUKS)")
+  # Prompt for password once using lukspass_selector
+  lukspass_selector
 
   info_print "Creating LUKS encryption on root partition..."
   echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -q --type luks2 -
