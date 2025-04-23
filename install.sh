@@ -137,75 +137,6 @@ ${RESET}"
   print_separator
 }
 
-# ======================= Keyboard Selection ======================
-keyboard_selector () {
-    input_print "Please insert the keyboard layout to use in console (enter empty to use DK, or \"/\" to look up for keyboard layouts): "
-    read -r kblayout
-    case "$kblayout" in
-        '')
-            kblayout="dk"
-            info_print "The Danish keyboard layout will be used."
-            loadkeys "$kblayout"
-            return 0
-            ;;
-        '/')
-            localectl list-keymaps
-            clear
-            return 1
-            ;;
-        *)
-            if ! localectl list-keymaps | grep -Fxq "$kblayout"; then
-                error_print "The specified keymap doesn't exist."
-                return 1
-            fi
-            info_print "Changing console layout to $kblayout."
-            loadkeys "$kblayout"
-            return 0
-            ;;
-    esac
-}
-
-# ======================= Locale Selection ======================
-locale_selector () {
-    input_print "Please insert the locale you use (format: xx_XX. Enter empty to use en_DK.UTF-8, or \"/\" to search locales): "
-    read -r locale
-    case "$locale" in
-        '') 
-            locale="en_DK.UTF-8"
-            info_print "$locale will be the default locale."
-            echo "$locale UTF-8" >> /etc/locale.gen
-            locale-gen
-            echo "LANG=$locale" > /etc/locale.conf
-            return 0
-            ;;
-        '/')
-            sed -E '/^# +|^#$/d;s/^#| *$//g;s/ .*/ (Charset:&)/' /etc/locale.gen | less -M
-            clear
-            return 1
-            ;;
-        *)
-            if ! grep -q "^#\?$(sed 's/[]\\.*[]/\\&/g' <<< "$locale") " /etc/locale.gen; then
-                error_print "The specified locale doesn’t exist or isn’t supported."
-                return 1
-            fi
-            echo "$locale UTF-8" >> /etc/locale.gen
-            locale-gen
-            echo "LANG=$locale" > /etc/locale.conf
-            return 0
-            ;;
-    esac
-}
-
-# ======================= Hostname Setup ======================
-hostname_selector () {
-    input_print "Please enter the hostname: "
-    read -r hostname
-    if [[ -z "$hostname" ]]; then
-        error_print "You need to enter a hostname in order to continue."
-        return 1
-    fi
-    return 0
-}
 
 # ======================= Kernel Selection ======================
 kernel_selector () {
@@ -513,27 +444,46 @@ mount_btrfs_subvolumes() {
   mount "$ESP" /mnt/efi
 }
 
-# ======================= Setup timezone & Clock ======================
-setup_timezone_and_clock_chroot() {
+# ======================= System Configuration ======================
+setup_system() {
+  section_print "System Configuration"
+
+  # -------- Locale Selector --------
+  input_print "Enter locale or type '/' to search [default: en_DK.UTF-8]: "
+  read -r locale
+  locale=${locale:-en_DK.UTF-8}
+
+  if [[ "$locale" == "/" ]]; then
+    less /usr/share/i18n/SUPPORTED
+    input_print "Enter locale (e.g., en_US.UTF-8): "
+    read -r locale
+  fi
+
+  echo "$locale UTF-8" >> /mnt/etc/locale.gen
+  echo "LANG=$locale" > /mnt/etc/locale.conf
+  arch-chroot /mnt locale-gen &>> "$LOGFILE"
+
+  # -------- Keyboard Selector --------
+  input_print "Enter keyboard layout or type '/' to search [default: dk]: "
+  read -r keymap
+  keymap=${keymap:-dk}
+
+  if [[ "$keymap" == "/" ]]; then
+    localectl list-keymaps | less
+    input_print "Enter keyboard layout (e.g., us, dk, de-latin1): "
+    read -r keymap
+  fi
+
+  echo "KEYMAP=$keymap" > /mnt/etc/vconsole.conf
+  loadkeys "$keymap"
+
+  # -------- Timezone & Clock (via IP detection) --------
   info_print "Setting timezone and synchronizing hardware clock (in chroot)..."
   arch-chroot /mnt /bin/bash -e <<'EOF'
 set -euo pipefail
 ZONE=$(curl -s http://ip-api.com/line?fields=timezone)
 ln -sf "/usr/share/zoneinfo/$ZONE" /etc/localtime || echo "[!] Failed to set timezone"
 hwclock --systohc || echo "[!] Failed to sync hardware clock"
-EOF
-}
-
-# ======================= Setup Locale ======================
-setup_locale_and_initramfs_chroot() {
-  info_print "Generating locale and initramfs (in chroot)..."
-  arch-chroot /mnt /bin/bash -e <<'EOF'
-set -euo pipefail
-echo "LANG=en_DK.UTF-8" > /etc/locale.conf
-echo "LC_TIME=da_DK.UTF-8" >> /etc/locale.conf
-echo "KEYMAP=dk" > /etc/vconsole.conf
-locale-gen || echo "[!] Failed to generate locale"
-mkinitcpio -P || echo "[!] mkinitcpio failed"
 EOF
 }
 
@@ -759,20 +709,6 @@ fi
 EOF
 }
 
-generate_grub_cfg() {
-  info_print "Generating GRUB configuration file..."
-
-  arch-chroot /mnt /bin/bash -e <<'EOF'
-set -euo pipefail
-
-if grub-mkconfig -o /boot/grub/grub.cfg &>> \"$LOGFILE\"; then
-  echo "[✓] GRUB config generated successfully."
-else
-  echo "[!] Failed to generate GRUB config."
-fi
-EOF
-}
-
 # ======================= Disk Selection ======================
 select_disk() {
   section_print "Disk Selection"
@@ -955,19 +891,6 @@ configure_default_shell() {
 
     curl -sSLo /mnt/etc/skel/.bashrc https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.bashrc
     curl -sSLo /mnt/etc/skel/.aliases https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.aliases
-}
-
-# ======================= Configure hostname & hosts ======================
-configure_hostname_and_hosts() {
-    info_print "Setting hostname..."
-    echo "$hostname" > /mnt/etc/hostname
-
-    info_print "Configuring /etc/hosts file..."
-    cat > /mnt/etc/hosts <<HOSTFILE_EOF
-127.0.0.1   localhost
-::1         localhost
-127.0.1.1   $hostname.localdomain   $hostname
-HOSTFILE_EOF
 }
 
 # =================== Pacman Eye-Candy Setup ===================
@@ -1301,10 +1224,64 @@ setup_users_and_passwords() {
   success_print "Root password set."
 }
 
+# ======================= System Configuration ======================
+setup_system() {
+  section_print "System Configuration"
+
+  # -------- Locale Selector --------
+  input_print "Enter locale or type '/' to search [default: en_DK.UTF-8]: "
+  read -r locale
+  locale=${locale:-en_DK.UTF-8}
+
+  if [[ "$locale" == "/" ]]; then
+    less /usr/share/i18n/SUPPORTED
+    input_print "Enter locale (e.g., en_US.UTF-8): "
+    read -r locale
+  fi
+
+  echo "$locale UTF-8" >> /mnt/etc/locale.gen
+  echo "LANG=$locale" > /mnt/etc/locale.conf
+  arch-chroot /mnt locale-gen &>> "$LOGFILE"
+
+  # -------- Keyboard Selector --------
+  input_print "Enter keyboard layout or type '/' to search [default: dk]: "
+  read -r keymap
+  keymap=${keymap:-dk}
+
+  if [[ "$keymap" == "/" ]]; then
+    localectl list-keymaps | less
+    input_print "Enter keyboard layout (e.g., us, dk, de-latin1): "
+    read -r keymap
+  fi
+
+  echo "KEYMAP=$keymap" > /mnt/etc/vconsole.conf
+  loadkeys "$keymap"
+
+  # -------- Timezone & Clock (via IP detection) --------
+  info_print "Setting timezone and synchronizing hardware clock (in chroot)..."
+  arch-chroot /mnt /bin/bash -e <<'EOF'
+set -euo pipefail
+ZONE=$(curl -s http://ip-api.com/line?fields=timezone)
+ln -sf "/usr/share/zoneinfo/$ZONE" /etc/localtime || echo "[!] Failed to set timezone"
+hwclock --systohc || echo "[!] Failed to sync hardware clock"
+EOF
+
+  # -------- Hostname --------
+  input_print "Enter hostname [default: archlinux]: "
+  read -r hostname
+  hostname=${hostname:-archlinux}
+  echo "$hostname" > /mnt/etc/hostname
+
+  # /etc/hosts
+  cat <<EOF > /mnt/etc/hosts
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $hostname.localdomain $hostname
+EOF
+}
 # ======================= Main Installer Flow ==============
 main() {
   welcome_banner
-  keyboard_selector
   select_disk
   prepare_disk
   encrypt_partitions
@@ -1316,23 +1293,19 @@ main() {
   until install_base_system; do : ; done
   
   move_log_file
-  locale_selector
-  hostname_selector
+  setup_zram
+  setup_system
   setup_users_and_passwords
   generate_fstab
-  configure_hostname_and_hosts
-  setup_zram
   network_selector
   install_editor
   configure_default_shell
-  setup_secureboot
-  setup_timezone_and_clock_chroot
-  setup_locale_and_initramfs_chroot
   setup_snapper_chroot
+  setup_grub
   sign_grub_chroot
   setup_grub_btrfs_chroot
   build_uki_chroot
-  generate_grub_cfg
+  setup_secureboot
   dotfiles_clone
   configure_pacman
   configure_pacman_repos
