@@ -1067,6 +1067,21 @@ print_version() {
   echo -e "Maintained by: github.com/NeonGOD78/ArchLinuxPlus"
 }
 
+# ================== Help Display ==================
+
+print_help() {
+  echo -e ""
+  echo -e "ArchLinux+ Installer ${SCRIPT_VERSION}"
+  echo -e "Maintained by: github.com/NeonGOD78/ArchLinuxPlus"
+  echo -e ""
+  echo -e "Usage: bash install.sh [option]"
+  echo -e ""
+  echo -e "Available Options:"
+  echo -e "  --version        Show script version and exit"
+  echo -e "  --help           Show this help message and exit"
+  echo -e ""
+}
+
 # ==================== Main ====================
 
 main() {
