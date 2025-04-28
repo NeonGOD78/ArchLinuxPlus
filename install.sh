@@ -710,6 +710,58 @@ kernel_selector() {
   done
 }
 
+# ================== Editor Selection ==================
+
+editor_selector() {
+  section_header "Editor Selection"
+
+  info_print "Select a default text editor:"
+  echo
+  echo "  1) Nano   - Simple and beginner-friendly (recommended)"
+  echo "  2) Neovim - Modern Vim with Lua integration"
+  echo "  3) Vim    - Classic and powerful editor"
+  echo "  4) Micro  - Simple, easy-to-use terminal editor"
+  echo
+
+  while true; do
+    input_print "Select your preferred editor [1-4] (default: 1)"
+    read_from_tty -r editor_choice
+
+    # Default to 1 if empty
+    editor_choice="${editor_choice:-1}"
+
+    case "$editor_choice" in
+      1)
+        EDITOR_PACKAGE="nano"
+        EDITOR_BIN="nano"
+        startup_ok "Selected Nano as default editor."
+        break
+        ;;
+      2)
+        EDITOR_PACKAGE="neovim"
+        EDITOR_BIN="nvim"
+        startup_ok "Selected Neovim as default editor."
+        break
+        ;;
+      3)
+        EDITOR_PACKAGE="vim"
+        EDITOR_BIN="vim"
+        startup_ok "Selected Vim as default editor."
+        break
+        ;;
+      4)
+        EDITOR_PACKAGE="micro"
+        EDITOR_BIN="micro"
+        startup_ok "Selected Micro as default editor."
+        break
+        ;;
+      *)
+        warning_print "Invalid selection. Please select 1-4."
+        ;;
+    esac
+  done
+}
+
 # ==================== Main ====================
 
 main() {
@@ -722,6 +774,7 @@ main() {
   network_selector
   setup_hostname
   kernel_selector
+  editor_selector
   
   
   # move_logfile_to_mnt
