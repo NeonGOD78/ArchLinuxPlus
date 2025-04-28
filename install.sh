@@ -1002,10 +1002,10 @@ format_btrfs() {
 create_btrfs_subvolumes() {
   section_header "Creating Btrfs Subvolumes"
 
-  # Mount midlertidigt for at oprette subvolumes
+  # Mount midlertidigt root
   mount /dev/mapper/cryptroot /mnt
 
-  # Opret nødvendige subvolumes
+  # Opret nødvendige subvolumes på root
   btrfs subvolume create /mnt/@
   btrfs subvolume create /mnt/@home
   btrfs subvolume create /mnt/@var
@@ -1015,8 +1015,9 @@ create_btrfs_subvolumes() {
   btrfs subvolume create /mnt/@tmp
   btrfs subvolume create /mnt/@portables
   btrfs subvolume create /mnt/@machines
+  btrfs subvolume create /mnt/@snapshots
 
-  # Hvis separat /home partition er valgt, skal den også have subvolume
+  # Hvis separat /home er valgt
   if [[ "$SEPARATE_HOME" == true ]]; then
     mount /dev/mapper/crypthome /mnt/home
     btrfs subvolume create /mnt/home/@home
