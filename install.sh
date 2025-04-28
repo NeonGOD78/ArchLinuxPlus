@@ -65,41 +65,19 @@ move_log_file() {
 
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
-  local prompt="$1"
-  local pass1 pass2
-
-  # Check for TTY
-  if ! tty -s; then
-    error_print "ERROR: No TTY detected. Cannot prompt for password."
-    exit 1
-  fi
-
   while true; do
-    input_print "$prompt: "
-    stty -echo
-    read -r pass1
-    stty echo
+    read -rsp "Enter password: " password
     echo
-
-    if [[ -z "$pass1" ]]; then
-      warning_print "Password cannot be empty."
-      continue
-    fi
-
-    input_print "Confirm $prompt: "
-    stty -echo
-    read -r pass2
-    stty echo
+    read -rsp "Confirm password: " confirm_password
     echo
-
-    if [[ "$pass1" != "$pass2" ]]; then
-      warning_print "Passwords do not match. Please try again."
-    else
+    if [[ "$password" == "$confirm_password" ]]; then
+      print_success "Passwords match."
+      echo "$password"
       break
+    else
+      print_error "Passwords do not match. Please try again."
     fi
   done
-
-  echo "$pass1"
 }
 
 # ======================= Welcome Banner ======================
