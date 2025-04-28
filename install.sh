@@ -875,9 +875,6 @@ EOF
     arch-chroot /mnt /bin/bash -e <<'EOF'
 set -e
 
-# Install required build tools
-pacman -Sy --noconfirm base-devel
-
 # Create temporary user to build yay safely
 useradd -m aurbuilder
 echo "aurbuilder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/aurbuilder
@@ -894,9 +891,6 @@ sudo -u aurbuilder bash -c '
 userdel -r aurbuilder
 rm -f /etc/sudoers.d/aurbuilder
 
-# Add yay alias to default shell configs
-echo "alias aur='yay'" >> /etc/skel/.bashrc
-echo "alias aur='yay'" >> /etc/skel/.zshrc
 
 EOF
     success_print "yay installed successfully with alias 'aur' in .bashrc and .zshrc"
