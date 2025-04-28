@@ -1035,42 +1035,104 @@ create_btrfs_subvolumes() {
 mount_subvolumes() {
   section_header "Mounting Filesystems"
 
-  # Mount root subvolume first (creates /mnt)
-  mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
-
-  # Create all necessary directories immediately
-  mkdir -p /mnt/efi
-  mkdir -p /mnt/home
-  mkdir -p /mnt/var
-  mkdir -p /mnt/var/log
-  mkdir -p /mnt/var/cache
-  mkdir -p /mnt/var/tmp
-  mkdir -p /mnt/var/lib
-  mkdir -p /mnt/var/lib/portables
-  mkdir -p /mnt/var/lib/machines
-  mkdir -p /mnt/srv
-  mkdir -p /mnt/.snapshots
-
-  # THEN mount everything else
-  mount "$EFI_PARTITION" /mnt/efi
-
-  if [[ "$SEPARATE_HOME" == true ]]; then
-    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home
+  # Step 1: Mount root
+  if mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt; then
+    startup_ok "Mounted /mnt (root @)"
   else
-    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home
+    startup_fail "Failed to mount /mnt (root @)"
+    exit 1
   fi
 
-  mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var
-  mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv
-  mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log
-  mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache
-  mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp
-  mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables
-  mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines
-  mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
+  # Step 2: Create early directories
+  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home /mnt/.snapshots
 
-  startup_ok "Filesystems mounted successfully."
+  # Step 3: Mount initial subvolumes
+  if mount "$EFI_PARTITION" /mnt/efi; then
+    startup_ok "Mounted EFI partition to /mnt/efi"
+  else
+    startup_fail "Failed to mount EFI partition"
+    exit 1
+  fi
+
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home; then
+      startup_ok "Mounted separate home partition to /mnt/home"
+    else
+      startup_fail "Failed to mount separate home partition"
+      exit 1
+    fi
+  else
+    if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home; then
+      startup_ok "Mounted home subvolume from root to /mnt/home"
+    else
+      startup_fail "Failed to mount home subvolume"
+      exit 1
+    fi
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var; then
+    startup_ok "Mounted /var subvolume"
+  else
+    startup_fail "Failed to mount /var"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv; then
+    startup_ok "Mounted /srv subvolume"
+  else
+    startup_fail "Failed to mount /srv"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
+    startup_ok "Mounted /.snapshots subvolume"
+  else
+    startup_fail "Failed to mount /.snapshots"
+    exit 1
+  fi
+
+  # Step 4: Create subdirectories under /mnt/var
+  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
+
+  # Step 5: Mount var subvolumes
+  if mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log; then
+    startup_ok "Mounted /var/log subvolume"
+  else
+    startup_fail "Failed to mount /var/log"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache; then
+    startup_ok "Mounted /var/cache subvolume"
+  else
+    startup_fail "Failed to mount /var/cache"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp; then
+    startup_ok "Mounted /var/tmp subvolume"
+  else
+    startup_fail "Failed to mount /var/tmp"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables; then
+    startup_ok "Mounted /var/lib/portables subvolume"
+  else
+    startup_fail "Failed to mount /var/lib/portables"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines; then
+    startup_ok "Mounted /var/lib/machines subvolume"
+  else
+    startup_fail "Failed to mount /var/lib/machines"
+    exit 1
+  fi
+
+  startup_ok "All filesystems mounted successfully."
 }
+
 # ================== Setup NoCOW Attributes ==================
 
 nocow_setup() {
