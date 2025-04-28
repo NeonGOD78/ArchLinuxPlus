@@ -260,41 +260,6 @@ select_disk() {
   done
 }
 
-
-# ==================== Password Prompt Helper ====================
-
-get_valid_password() {
-  local prompt="$1"
-  local pass1 pass2
-
-  while true; do
-    input_print "$prompt"
-    stty -echo
-    read_from_tty -r pass1
-    stty echo
-    echo
-
-    if [[ -z "$pass1" ]]; then
-      warning_print "Password cannot be empty."
-      continue
-    fi
-
-    input_print "Confirm $prompt"
-    stty -echo
-    read_from_tty -r pass2
-    stty echo
-    echo
-
-    if [[ "$pass1" != "$pass2" ]]; then
-      warning_print "Passwords do not match. Please try again."
-    else
-      break
-    fi
-  done
-
-  echo "$pass1"
-}
-
 # ================== Partition Layout Choice ==================
 
 partition_layout_choice() {
@@ -313,21 +278,21 @@ partition_layout_choice() {
   fi
 }
 
-# ================== Password Setup ==================
+# ================== Password and User Setup ==================
 
-password_setup() {
-  section_header "Password Setup"
+password_and_user_setup() {
+  section_header "Password and User Setup"
 
-  # Ask for LUKS password
+  # Step 1: Ask for LUKS password
   while true; do
     input_print "Enter LUKS password"
     stty -echo
-    read -r luks_pass1
+    read_from_tty -r luks_pass1
     stty echo
     echo
     input_print "Confirm LUKS password"
     stty -echo
-    read -r luks_pass2
+    read_from_tty -r luks_pass2
     stty echo
     echo
 
@@ -342,40 +307,82 @@ password_setup() {
     fi
   done
 
-  # Ask if we should reuse for user/root
-  input_print "Reuse LUKS password for user and root accounts? [Y/n]"
-  read -r reuse_choice
-  reuse_choice="${reuse_choice,,}"  # to lowercase
+  # Step 2: Ask for username
+  input_print "Enter desired username (leave empty for root only)"
+  read_from_tty -r USERNAME
+
+  if [[ -z "$USERNAME" ]]; then
+    info_print "No username entered. System will only have root account."
+  else
+    startup_ok "Username set to '$USERNAME'."
+  fi
+
+  # Step 3: Ask if we reuse LUKS password
+  input_print "Reuse LUKS password for root and user accounts? [Y/n]"
+  read_from_tty -r reuse_choice
+  reuse_choice="${reuse_choice,,}"
 
   if [[ "$reuse_choice" =~ ^(n|no)$ ]]; then
+    # Step 4: Ask separately for passwords
+
+    # Root password
     while true; do
-      input_print "Enter new system password"
+      input_print "Enter root password"
       stty -echo
-      read -r system_pass1
+      read_from_tty -r root_pass1
       stty echo
       echo
-      input_print "Confirm new system password"
+      input_print "Confirm root password"
       stty -echo
-      read -r system_pass2
+      read_from_tty -r root_pass2
       stty echo
       echo
 
-      if [[ "$system_pass1" != "$system_pass2" ]]; then
+      if [[ "$root_pass1" != "$root_pass2" ]]; then
         warning_print "Passwords do not match. Please try again."
-      elif [[ -z "$system_pass1" ]]; then
+      elif [[ -z "$root_pass1" ]]; then
         warning_print "Password cannot be empty. Please try again."
       else
-        SYSTEM_PASSWORD="$system_pass1"
-        startup_ok "System password set successfully."
+        ROOT_PASSWORD="$root_pass1"
+        startup_ok "Root password set successfully."
         break
       fi
     done
+
+    # User password (only if username is set)
+    if [[ -n "$USERNAME" ]]; then
+      while true; do
+        input_print "Enter user password for $USERNAME"
+        stty -echo
+        read_from_tty -r user_pass1
+        stty echo
+        echo
+        input_print "Confirm user password for $USERNAME"
+        stty -echo
+        read_from_tty -r user_pass2
+        stty echo
+        echo
+
+        if [[ "$user_pass1" != "$user_pass2" ]]; then
+          warning_print "Passwords do not match. Please try again."
+        elif [[ -z "$user_pass1" ]]; then
+          warning_print "Password cannot be empty. Please try again."
+        else
+          USER_PASSWORD="$user_pass1"
+          startup_ok "User password for '$USERNAME' set successfully."
+          break
+        fi
+      done
+    fi
+
   else
-    SYSTEM_PASSWORD="$LUKS_PASSWORD"
-    info_print "Reusing LUKS password for user and root."
+    ROOT_PASSWORD="$LUKS_PASSWORD"
+    if [[ -n "$USERNAME" ]]; then
+      USER_PASSWORD="$LUKS_PASSWORD"
+    fi
+    info_print "Reusing LUKS password for all accounts."
   fi
 }
-
 # ==================== Main ====================
 
 main() {
@@ -384,7 +391,7 @@ main() {
   setup_keymap
   select_disk
   partition_layout_choice
-  password_setup
+  password_and_user_setup
   
   # move_logfile_to_mnt
   # save_keymap_config
