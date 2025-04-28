@@ -1139,8 +1139,8 @@ setup_users_and_passwords() {
 
   if [[ -n "$username" ]]; then
     if [[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
-      useradd -m -G wheel -s /bin/bash "$username"
-      echo "$username:$password" | chpasswd
+      arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
+      arch-chroot /mnt bash -c "echo '$username:$password' | chpasswd"
       success_print "User '$username' created."
     else
       warning_print "Invalid username. Skipping user creation."
@@ -1149,7 +1149,7 @@ setup_users_and_passwords() {
     info_print "No username provided. Only root account will be created."
   fi
 
-  echo "root:$password" | chpasswd
+  arch-chroot /mnt bash -c "echo 'root:$password' | chpasswd"
   success_print "Root password set."
 }
 
