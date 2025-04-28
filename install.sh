@@ -1037,20 +1037,20 @@ mount_subvolumes() {
   # Mount root subvolume
   mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
 
-  # Create needed directories
-  mkdir -p /mnt/{efi,boot,home,var,srv,.snapshots,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines}
+  # Opret mapper til mount points
+  mkdir -p /mnt/{efi,home,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines,srv,.snapshots}
 
-  # Mount EFI System Partition
+  # Mount EFI partition
   mount "$EFI_PARTITION" /mnt/efi
 
-  # Mount /home
+  # Mount home
   if [[ "$SEPARATE_HOME" == true ]]; then
     mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home
   else
     mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home
   fi
 
-  # Mount other subvolumes
+  # Mount the rest
   mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var
   mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv
   mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log
