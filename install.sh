@@ -1002,23 +1002,38 @@ format_btrfs() {
 create_btrfs_subvolumes() {
   section_header "Creating Btrfs Subvolumes"
 
-  # Mount temporary to create subvolumes
-  mount /dev/mapper/cryptroot /mnt
+  # Mount /dev/mapper/cryptroot temporarily
+  mount /dev/mapper/cryptroot /mnt &>> "$LOGFILE"
 
-  btrfs subvolume create /mnt/@
-  btrfs subvolume create /mnt/@home
-  btrfs subvolume create /mnt/@var
-  btrfs subvolume create /mnt/@srv
-  btrfs subvolume create /mnt/@log
-  btrfs subvolume create /mnt/@cache
-  btrfs subvolume create /mnt/@tmp
-  btrfs subvolume create /mnt/@portables
-  btrfs subvolume create /mnt/@machines
+  # Create subvolumes for root
+  btrfs subvolume create /mnt/@ &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@var &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@srv &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@log &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@cache &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@tmp &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@portables &>> "$LOGFILE"
+  btrfs subvolume create /mnt/@machines &>> "$LOGFILE"
 
-  umount /mnt
+  umount /mnt &>> "$LOGFILE"
+
+  # Now handle /home if separate
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    info_print "Separate home detected. Creating @home on crypthome."
+
+    mount /dev/mapper/crypthome /mnt &>> "$LOGFILE"
+    btrfs subvolume create /mnt/@home &>> "$LOGFILE"
+    umount /mnt &>> "$LOGFILE"
+  else
+    info_print "Creating @home on root partition."
+
+    mount /dev/mapper/cryptroot /mnt &>> "$LOGFILE"
+    btrfs subvolume create /mnt/@home &>> "$LOGFILE"
+    umount /mnt &>> "$LOGFILE"
+  fi
+
   startup_ok "Btrfs subvolumes created successfully."
 }
-
 # ================== Mount Subvolumes ==================
 
 mount_subvolumes() {
