@@ -1072,37 +1072,91 @@ mount_subvolumes() {
     exit 1
   fi
 
-  # Step 2: Create mountpoints safely
-  mkdir -p /mnt/efi
-  mkdir -p /mnt/home
-  mkdir -p /mnt/var
-  mkdir -p /mnt/var/log
-  mkdir -p /mnt/var/cache
-  mkdir -p /mnt/var/tmp
-  mkdir -p /mnt/var/lib
-  mkdir -p /mnt/var/lib/portables
-  mkdir -p /mnt/var/lib/machines
-  mkdir -p /mnt/srv
-  mkdir -p /mnt/.snapshots
+  # Step 2: Create early directories
+  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home /mnt/.snapshots
 
-  # Step 3: Mount standard partitions
-  mount "$EFI_PARTITION" /mnt/efi && startup_ok "Mounted EFI partition to /mnt/efi" || { startup_fail "Failed to mount EFI"; exit 1; }
-
-  if [[ "$SEPARATE_HOME" == true ]]; then
-    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home && startup_ok "Mounted separate home partition (@home)" || { startup_fail "Failed to mount separate home"; exit 1; }
+  # Step 3: Mount initial subvolumes
+  if mount "$EFI_PARTITION" /mnt/efi; then
+    startup_ok "Mounted EFI partition to /mnt/efi"
   else
-    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home && startup_ok "Mounted home subvolume (@home)" || { startup_fail "Failed to mount home subvolume"; exit 1; }
+    startup_fail "Failed to mount EFI partition"
+    exit 1
   fi
 
-  mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var && startup_ok "Mounted @var"
-  mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv && startup_ok "Mounted @srv"
-  mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots && startup_ok "Mounted @snapshots"
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home; then
+      startup_ok "Mounted separate home partition to /mnt/home"
+    else
+      startup_fail "Failed to mount separate home partition"
+      exit 1
+    fi
+  else
+    if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home; then
+      startup_ok "Mounted home subvolume from root to /mnt/home"
+    else
+      startup_fail "Failed to mount home subvolume"
+      exit 1
+    fi
+  fi
 
-  mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log && startup_ok "Mounted @log"
-  mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache && startup_ok "Mounted @cache"
-  mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp && startup_ok "Mounted @tmp"
-  mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables && startup_ok "Mounted @portables"
-  mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines && startup_ok "Mounted @machines"
+  if mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var; then
+    startup_ok "Mounted /var subvolume"
+  else
+    startup_fail "Failed to mount /var"
+    exit 1
+  fi
+
+  # NOW after /mnt/var exists:
+  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
+
+  if mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log; then
+    startup_ok "Mounted /var/log subvolume"
+  else
+    startup_fail "Failed to mount /var/log"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache; then
+    startup_ok "Mounted /var/cache subvolume"
+  else
+    startup_fail "Failed to mount /var/cache"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp; then
+    startup_ok "Mounted /var/tmp subvolume"
+  else
+    startup_fail "Failed to mount /var/tmp"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables; then
+    startup_ok "Mounted /var/lib/portables subvolume"
+  else
+    startup_fail "Failed to mount /var/lib/portables"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines; then
+    startup_ok "Mounted /var/lib/machines subvolume"
+  else
+    startup_fail "Failed to mount /var/lib/machines"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv; then
+    startup_ok "Mounted /srv subvolume"
+  else
+    startup_fail "Failed to mount /srv"
+    exit 1
+  fi
+
+  if mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
+    startup_ok "Mounted /.snapshots subvolume"
+  else
+    startup_fail "Failed to mount /.snapshots"
+    exit 1
+  fi
 
   startup_ok "All filesystems mounted successfully."
 }
