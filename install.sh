@@ -785,11 +785,19 @@ confirm_installation() {
 
   echo
   info_print "Disk:          $DISK"
+  
+  if [[ "$SECURE_WIPE" == true ]]; then
+    info_print "Wipe Method:   Secure Full Wipe (slow)"
+  else
+    info_print "Wipe Method:   Quick Partition Table Zap"
+  fi
+
   if [[ "$SEPARATE_HOME" == true ]]; then
     info_print "Partitioning:  Separate root and home (root size: ${ROOT_SIZE_GB}GB)"
   else
     info_print "Partitioning:  Single root partition (no separate /home)"
   fi
+
   info_print "Keymap:        $KEYMAP"
   info_print "Locale:        $LOCALE"
   
