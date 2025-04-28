@@ -27,29 +27,27 @@ startup_warn() {
   printf "\r${DARKGRAY}[${YELLOW} WARN ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
 }
 
-# ==================== Simuleret Opstart ====================
 
-sleep 0.5
-startup_print "Wiping disk..."
-sleep 1
-startup_ok "Wiping disk..."
+# ==================== Section Header Helper ====================
 
-sleep 0.5
-startup_print "Partitioning disk..."
-sleep 1
-startup_fail "Partitioning disk..."
+section_header() {
+  local title="$1"
+  local char="${2:--}"   # Standard "-" hvis ikke andet
+  local color="${3:-$DARKGRAY}"  # Standard mørkegrå
+  local width padding
 
-sleep 0.5
-startup_print "Encrypting root partition..."
-sleep 1
-startup_ok "Encrypting root partition..."
+  width=$(tput cols 2>/dev/null || echo 80)  # Terminal bredde
 
-sleep 0.5
-startup_print "Formatting filesystem..."
-sleep 1
-startup_warn "Formatting filesystem..."
+  # Top line
+  printf "${color}"
+  printf "%${width}s" "" | tr " " "$char"
+  printf "${RESET}\n"
 
-sleep 0.5
-startup_print "Mounting filesystems..."
-sleep 1
-startup_ok "Mounting filesystems..."
+  # Centered title
+  padding=$(( (width - ${#title}) / 2 ))
+  printf "${color}%*s%s\n" "$padding" "" "$title"
+  
+  # Bottom line
+  printf "%${width}s" "" | tr " " "$char"
+  printf "${RESET}\n"
+}
