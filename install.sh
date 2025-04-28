@@ -143,7 +143,8 @@ microcode_detector () {
 # ======================= Encrypt Partitions ===============
 encrypt_partitions() {
   section_print "Encrypting root and home partitions with LUKS2"
-
+  
+  partprobe "$DISK"
   udevadm settle
   sleep 1
 
