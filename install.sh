@@ -11,11 +11,38 @@ GREEN='\e[92m'
 YELLOW='\e[93m'
 CYAN='\e[96m'
 
+# ==================== Global Variables ====================
+
+LOGFILE="/var/log/archinstall.log"
+
 # ==================== Basic Helpers ====================
 
 # Safe reading function
 read_from_tty() {
   IFS= read "$@"
+}
+
+# Logging
+log_msg() {
+  printf "%s\n" "$1" >> "$LOGFILE"
+}
+
+log_start() {
+  echo "========== ArchLinuxPlus Install Log ==========" > "$LOGFILE"
+  echo "Started on: $(date)" >> "$LOGFILE"
+  echo "===============================================" >> "$LOGFILE"
+  echo "" >> "$LOGFILE"
+}
+
+move_logfile_to_mnt() {
+  if [[ -f "$LOGFILE" ]]; then
+    mkdir -p /mnt/var/log
+    mv "$LOGFILE" /mnt/var/log/
+    LOGFILE="/mnt/var/log/archinstall.log"
+    startup_ok "Logfile moved to $LOGFILE."
+  else
+    startup_warn "Original logfile not found. Skipping move."
+  fi
 }
 
 # Printing functions
@@ -37,14 +64,17 @@ startup_print() {
 
 startup_ok() {
   printf "\r${DARKGRAY}[${GREEN}  OK  ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  log_msg "[ OK ] $1"
 }
 
 startup_fail() {
   printf "\r${DARKGRAY}[${RED} FAIL ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  log_msg "[FAIL] $1"
 }
 
 startup_warn() {
   printf "\r${DARKGRAY}[${YELLOW} WARN ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  log_msg "[WARN] $1"
 }
 
 input_print() {
@@ -53,14 +83,17 @@ input_print() {
 
 info_print() {
   printf "${DARKGRAY}[ i  ]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  log_msg "[INFO] $1"
 }
 
 warning_print() {
   printf "${DARKGRAY}[${YELLOW}!${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  log_msg "[WARN] $1"
 }
 
 error_print() {
   printf "${DARKGRAY}[${RED}✖${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  log_msg "[ERR ] $1"
 }
 
 section_header() {
@@ -156,23 +189,22 @@ save_keymap_config() {
   fi
 }
 
-# ==================== Main Function ====================
+# ==================== Main ====================
 
 main() {
   banner_archlinuxplus
+  log_start
   setup_keymap
 
-  # Future steps:
+  # Here would come the flow:
   # gather_user_input
   # map_kernel_choice
-  # map_desktop_choice
-  # map_network_choice
-
   # partition_disks
   # encrypt_partitions
   # format_filesystems
   # mount_filesystems
 
+  # move_logfile_to_mnt
   # save_keymap_config
 }
 
