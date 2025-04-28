@@ -67,13 +67,21 @@ move_log_file() {
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
+  local show_password=""
   local pass1 pass2
+
+  input_print "Show password while typing? [y/N]:"
+  read -r show_password < /dev/tty
+  echo
 
   while true; do
     input_print "$prompt"
-    echo "(Password will be hidden. Just type and press Enter)"
-    stty -echo
-    read -r pass1
+    if [[ "${show_password,,}" == "y" ]]; then
+      stty echo
+    else
+      stty -echo
+    fi
+    read -r pass1 < /dev/tty
     stty echo
     echo
 
@@ -83,9 +91,12 @@ get_valid_password() {
     fi
 
     input_print "Confirm $prompt"
-    echo "(Password will be hidden. Just type and press Enter)"
-    stty -echo
-    read -r pass2
+    if [[ "${show_password,,}" == "y" ]]; then
+      stty echo
+    else
+      stty -echo
+    fi
+    read -r pass2 < /dev/tty
     stty echo
     echo
 
