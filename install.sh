@@ -762,6 +762,59 @@ editor_selector() {
   done
 }
 
+# ================== Confirm Installation ==================
+
+confirm_installation() {
+  section_header "Review Your Choices"
+
+  echo
+  info_print "Disk:          $DISK"
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    info_print "Partitioning:  Separate root and home (root size: ${ROOT_SIZE_GB}GB)"
+  else
+    info_print "Partitioning:  Single root partition (no separate /home)"
+  fi
+  info_print "Keymap:        $KEYMAP"
+  info_print "Locale:        $LOCALE"
+  
+  if [[ -n "$USERNAME" ]]; then
+    info_print "Username:      $USERNAME"
+  else
+    info_print "Username:      (root only)"
+  fi
+
+  if [[ -n "$NETWORK_PKGS" ]]; then
+    info_print "Network:       $NETWORK_PKGS"
+  else
+    info_print "Network:       (manual setup)"
+  fi
+
+  info_print "Hostname:      $HOSTNAME"
+  info_print "Kernel:        $KERNEL_PACKAGE"
+  info_print "Editor:        $EDITOR_PACKAGE"
+
+  if [[ "$INSTALL_DOTFILES" == true ]]; then
+    info_print "Dotfiles:      Yes (Repo: $DOTFILES_REPO)"
+  else
+    info_print "Dotfiles:      No"
+  fi
+
+  echo
+  warning_print "WARNING: This will ERASE all data on $DISK!"
+
+  echo
+  input_print "Do you want to proceed? [y/N]"
+  read_from_tty -r final_confirm
+  final_confirm="${final_confirm,,}"
+
+  if [[ "$final_confirm" =~ ^(y|yes)$ ]]; then
+    startup_ok "Installation confirmed. Proceeding..."
+  else
+    error_print "Installation aborted by user."
+    exit 1
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -775,6 +828,7 @@ main() {
   setup_hostname
   kernel_selector
   editor_selector
+  confirm_installation
   
   
   # move_logfile_to_mnt
