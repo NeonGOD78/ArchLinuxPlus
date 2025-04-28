@@ -1003,31 +1003,49 @@ format_btrfs() {
 create_btrfs_subvolumes() {
   section_header "Creating Btrfs Subvolumes"
 
+  # Mount root temporarily to create subvolumes
   mount /dev/mapper/cryptroot /mnt
 
-  # Altid disse på root
-  btrfs subvolume create /mnt/@
-  btrfs subvolume create /mnt/@var
-  btrfs subvolume create /mnt/@srv
-  btrfs subvolume create /mnt/@log
-  btrfs subvolume create /mnt/@cache
-  btrfs subvolume create /mnt/@tmp
-  btrfs subvolume create /mnt/@portables
-  btrfs subvolume create /mnt/@machines
-  btrfs subvolume create /mnt/@snapshots
+  local subvolumes=(
+    "@"
+    "@var"
+    "@srv"
+    "@log"
+    "@cache"
+    "@tmp"
+    "@portables"
+    "@machines"
+    "@snapshots"
+  )
 
-  # Håndter home afhængigt af setup
+  for subvol in "${subvolumes[@]}"; do
+    if btrfs subvolume create "/mnt/$subvol" &>/dev/null; then
+      startup_ok "Created subvolume /mnt/$subvol"
+    else
+      warning_print "Failed to create subvolume /mnt/$subvol"
+    fi
+  done
+
+  # Handle home separately if SEPARATE_HOME is true
   if [[ "$SEPARATE_HOME" == true ]]; then
-    mkdir -p /mnt/home
     mount /dev/mapper/crypthome /mnt/home
-    btrfs subvolume create /mnt/home/@home
+    if btrfs subvolume create /mnt/home/@home &>/dev/null; then
+      startup_ok "Created subvolume /mnt/home/@home"
+    else
+      warning_print "Failed to create subvolume /mnt/home/@home"
+    fi
     umount /mnt/home
   else
-    btrfs subvolume create /mnt/@home
+    if btrfs subvolume create /mnt/@home &>/dev/null; then
+      startup_ok "Created subvolume /mnt/@home"
+    else
+      warning_print "Failed to create subvolume /mnt/@home"
+    fi
   fi
 
   umount /mnt
-  startup_ok "Btrfs subvolumes created successfully."
+
+  startup_ok "All Btrfs subvolumes created successfully."
 }
 
 # ================== Mount Subvolumes ==================
