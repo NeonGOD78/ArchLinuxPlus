@@ -71,11 +71,11 @@ get_valid_password() {
     read -rsp "Confirm password: " confirm_password
     echo
     if [[ "$password" == "$confirm_password" ]]; then
-      print_success "Passwords match."
+      success_print "Passwords match."
       echo "$password"
       break
     else
-      print_error "Passwords do not match. Please try again."
+      error_print "Passwords do not match. Please try again."
     fi
   done
 }
@@ -136,7 +136,7 @@ encrypt_partitions() {
   sleep 1
 
   # Prompt for LUKS password
-  print_info "Setting up LUKS password..."
+  info_print "Setting up LUKS password..."
   luks_password=$(get_valid_password) 
 
   # Encrypt and open root partition
@@ -214,28 +214,28 @@ install_base_system() {
 
 # ======================= Setup Secure Boot Files ======================
 setup_secureboot() {
-  print_info "Setting up Secure Boot..."
+  info_print "Setting up Secure Boot..."
 
   # Ensure the cryptroot device is defined
   cryptroot="/dev/mapper/cryptroot"
   root_uuid=$(blkid -s UUID -o value "$cryptroot")
-  print_success "Found root UUID: $root_uuid"
+  success_print "Found root UUID: $root_uuid"
 
   # Create Secure Boot directory
-  print_info "Creating Secure Boot directory..."
+  info_print "Creating Secure Boot directory..."
   arch-chroot /mnt mkdir -p /etc/secureboot
 
   # Generate Secure Boot keys
-  print_info "Generating Secure Boot keys..."
+  info_print "Generating Secure Boot keys..."
   openssl req -new -x509 -newkey rsa:2048 -keyout /mnt/etc/secureboot/db.key -out /mnt/etc/secureboot/db.crt -nodes -days 36500 -subj "/CN=My Secure Boot Signing Key/"
 
   # Create kernel command line
-  print_info "Creating /etc/kernel/cmdline..."
+  info_print "Creating /etc/kernel/cmdline..."
   arch-chroot /mnt mkdir -p /etc/kernel
   echo "root=UUID=$root_uuid rw loglevel=3 quiet splash" | tee /mnt/etc/kernel/cmdline
 
   # Create update-uki helper script
-  print_info "Creating update-uki script..."
+  info_print "Creating update-uki script..."
   arch-chroot /mnt bash -c "cat > /usr/local/bin/update-uki << 'EOF'
 #!/bin/bash
 ukify build \
@@ -248,7 +248,7 @@ EOF"
   arch-chroot /mnt chmod +x /usr/local/bin/update-uki
 
   # Create UKI Pacman Hook
-  print_info "Creating 95-ukify.hook..."
+  info_print "Creating 95-ukify.hook..."
   arch-chroot /mnt mkdir -p /etc/pacman.d/hooks
   arch-chroot /mnt bash -c "cat > /etc/pacman.d/hooks/95-ukify.hook << 'EOF'
 [Trigger]
@@ -264,7 +264,7 @@ Exec = /usr/local/bin/update-uki
 EOF"
 
   # Create UKI Fallback Pacman Hook
-  print_info "Creating 96-ukify-fallback.hook..."
+  info_print "Creating 96-ukify-fallback.hook..."
   arch-chroot /mnt bash -c "cat > /etc/pacman.d/hooks/96-ukify-fallback.hook << 'EOF'
 [Trigger]
 Type = Path
@@ -286,7 +286,7 @@ Exec = /usr/bin/bash -c \"ukify build \
 EOF"
 
   # Create UKI Update Service
-  print_info "Creating update-uki.service..."
+  info_print "Creating update-uki.service..."
   arch-chroot /mnt bash -c "cat > /etc/systemd/system/update-uki.service << 'EOF'
 [Unit]
 Description=Update and sign Unified Kernel Image
@@ -298,7 +298,7 @@ ExecStart=/usr/local/bin/update-uki
 EOF"
 
   # Create UKI Update Timer
-  print_info "Creating update-uki.timer..."
+  info_print "Creating update-uki.timer..."
   arch-chroot /mnt bash -c "cat > /etc/systemd/system/update-uki.timer << 'EOF'
 [Unit]
 Description=Run update-uki weekly
@@ -313,7 +313,7 @@ WantedBy=timers.target
 EOF"
 
   # Enable UKI Update Timer
-  print_success "Enabling update-uki.timer..."
+  success_print "Enabling update-uki.timer..."
   arch-chroot /mnt systemctl enable update-uki.timer
 }
 
@@ -1122,7 +1122,7 @@ setup_users_and_passwords() {
 
   if [[ -n "$username" ]]; then
     if [[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
-      print_info "Creating user '$username' and adding to wheel group..."
+      info_print "Creating user '$username' and adding to wheel group..."
       arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
       arch-chroot /mnt bash -c "echo '$username:$password' | chpasswd"
       success_print "User '$username' created and password set."
@@ -1133,11 +1133,11 @@ setup_users_and_passwords() {
     info_print "No username provided. Only root account will be created."
   fi
 
-  print_info "Setting root password..."
+  info_print "Setting root password..."
   arch-chroot /mnt bash -c "echo 'root:$password' | chpasswd"
   success_print "Root password set."
 
-  print_info "Ensuring sudo access for wheel group..."
+  info_print "Ensuring sudo access for wheel group..."
   arch-chroot /mnt sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
   success_print "Sudo access enabled for wheel group."
 }
