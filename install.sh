@@ -1039,33 +1039,38 @@ create_btrfs_subvolumes() {
 mount_subvolumes() {
   section_header "Mounting Filesystems"
 
-  # Mount root
-  mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt &>> "$LOGFILE"
+  mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
 
-  # Create necessary folders
-  mkdir -p /mnt/{boot/efi,home,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines,srv} &>> "$LOGFILE"
+  # Make sure necessary folders exist BEFORE mounting subvolumes
+  mkdir -p /mnt/boot/efi
+  mkdir -p /mnt/home
+  mkdir -p /mnt/var
+  mkdir -p /mnt/var/log
+  mkdir -p /mnt/var/cache
+  mkdir -p /mnt/var/tmp
+  mkdir -p /mnt/var/lib/portables
+  mkdir -p /mnt/var/lib/machines
+  mkdir -p /mnt/srv
 
-  # Mount EFI
-  mount "$EFI_PARTITION" /mnt/boot/efi &>> "$LOGFILE"
+  mount "$EFI_PARTITION" /mnt/boot/efi
 
-  # Mount @home
   if [[ "$SEPARATE_HOME" == true ]]; then
-    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home &>> "$LOGFILE"
+    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home
   else
-    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home &>> "$LOGFILE"
+    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home
   fi
 
-  # Mount other subvolumes
-  mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var &>> "$LOGFILE"
-  mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv &>> "$LOGFILE"
-  mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log &>> "$LOGFILE"
-  mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache &>> "$LOGFILE"
-  mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp &>> "$LOGFILE"
-  mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables &>> "$LOGFILE"
-  mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines &>> "$LOGFILE"
+  mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var
+  mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv
+  mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log
+  mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache
+  mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp
+  mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables
+  mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines
 
   startup_ok "Filesystems mounted successfully."
 }
+
 # ================== Setup NoCOW Attributes ==================
 
 nocow_setup() {
