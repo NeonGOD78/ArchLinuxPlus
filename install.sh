@@ -1085,6 +1085,17 @@ print_help() {
 # ==================== Main ====================
 
 main() {
+  # Help functions
+  if [[ "$1" == "--version" ]]; then
+    print_version
+    exit 0
+  fi
+
+  if [[ "$1" == "--help" ]]; then
+    print_help
+    exit 0
+  fi
+  
   # User Input
   banner_archlinuxplus
   log_start
