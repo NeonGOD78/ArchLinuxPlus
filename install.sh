@@ -363,6 +363,22 @@ select_disk() {
 partition_layout_choice() {
   section_header "Partition Layout Setup"
 
+  # Ask if user wants secure wipe
+  input_print "Do you want to perform a full secure wipe of the disk? (very slow) [y/N]"
+  read_from_tty -r wipe_choice
+  wipe_choice="${wipe_choice,,}"
+
+  if [[ "$wipe_choice" =~ ^(y|yes)$ ]]; then
+    SECURE_WIPE=true
+    warning_print "Secure wipe selected. This can take a LONG time!"
+  else
+    SECURE_WIPE=false
+    info_print "Normal wipe selected (quick erase of partition table only)."
+  fi
+
+  echo
+
+  # Ask about separate /home
   input_print "Do you want to create a separate encrypted /home partition? [Y/n]"
   read_from_tty -r separate_home_choice
   separate_home_choice="${separate_home_choice,,}"  # to lowercase
@@ -374,7 +390,7 @@ partition_layout_choice() {
     SEPARATE_HOME=true
     info_print "Will create a separate encrypted /home partition."
 
-    # Find total disk size in GB (assumes DISK variable already set!)
+    # Find total disk size in GB (assumes DISK variable already set)
     local total_size_gb
     total_size_gb=$(lsblk -dnbo SIZE "$DISK" | awk '{print int($1/1024/1024/1024)}')
     local default_root_size=$(( total_size_gb / 2 ))
