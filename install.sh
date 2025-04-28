@@ -12,6 +12,7 @@ YELLOW='\e[93m'
 CYAN='\e[96m'
 
 # ==================== Global Variables ====================
+
 SCRIPT_VERSION="v1.0"
 LOGFILE="/var/log/archinstall.log"
 DEBUG=false
