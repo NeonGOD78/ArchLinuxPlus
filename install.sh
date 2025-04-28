@@ -187,7 +187,92 @@ setup_keymap() {
   done
 }
 
-# ==================== Save Keymap to System ====================
+# ================== Keymap and Locale Setup ==================
+
+setup_keymap_and_locale() {
+  section_header "Keyboard Layout and Locale Setup"
+
+  # Keymap Selection
+  while true; do
+    input_print "Enter desired keymap (type part to search, default: dk)"
+    read_from_tty -r keymap_input
+
+    if [[ -z "$keymap_input" ]]; then
+      KEYMAP="dk"
+      info_print "Defaulting keymap to 'dk'."
+      break
+    fi
+
+    mapfile -t keymaps < <(localectl list-keymaps | grep -i "$keymap_input")
+
+    if (( ${#keymaps[@]} == 0 )); then
+      warning_print "No matching keymaps found. Please try again."
+    elif (( ${#keymaps[@]} == 1 )); then
+      KEYMAP="${keymaps[0]}"
+      startup_ok "Keymap set to '$KEYMAP'."
+      break
+    else
+      info_print "Multiple matches found:"
+      for i in "${!keymaps[@]}"; do
+        echo "  $((i+1))) ${keymaps[$i]}"
+      done
+
+      input_print "Enter number to select keymap"
+      read_from_tty -r km_select
+
+      if [[ "$km_select" =~ ^[0-9]+$ ]] && (( km_select >= 1 && km_select <= ${#keymaps[@]} )); then
+        KEYMAP="${keymaps[$((km_select-1))]}"
+        startup_ok "Keymap set to '$KEYMAP'."
+        break
+      else
+        warning_print "Invalid selection. Try again."
+      fi
+    fi
+  done
+
+  # Load keymap immediately
+  loadkeys "$KEYMAP" || warning_print "Failed to load keymap '$KEYMAP'. Continuing anyway."
+
+  # Locale Selection
+  while true; do
+    input_print "Enter desired system locale (type part to search, default: en_DK.UTF-8)"
+    read_from_tty -r locale_input
+
+    if [[ -z "$locale_input" ]]; then
+      LOCALE="en_DK.UTF-8"
+      info_print "Defaulting locale to 'en_DK.UTF-8'."
+      break
+    fi
+
+    mapfile -t locales < <(awk '/UTF-8/ {print $1}' /etc/locale.gen | grep -i "$locale_input")
+
+    if (( ${#locales[@]} == 0 )); then
+      warning_print "No matching locales found. Please try again."
+    elif (( ${#locales[@]} == 1 )); then
+      LOCALE="${locales[0]}"
+      startup_ok "Locale set to '$LOCALE'."
+      break
+    else
+      info_print "Multiple matches found:"
+      for i in "${!locales[@]}"; do
+        echo "  $((i+1))) ${locales[$i]}"
+      done
+
+      input_print "Enter number to select locale"
+      read_from_tty -r loc_select
+
+      if [[ "$loc_select" =~ ^[0-9]+$ ]] && (( loc_select >= 1 && loc_select <= ${#locales[@]} )); then
+        LOCALE="${locales[$((loc_select-1))]}"
+        startup_ok "Locale set to '$LOCALE'."
+        break
+      else
+        warning_print "Invalid selection. Try again."
+      fi
+    fi
+  done
+}
+
+# ================== Save Keymap Config ==================
 
 save_keymap_config() {
   section_header "Saving Keyboard Layout"
@@ -197,6 +282,19 @@ save_keymap_config() {
     startup_ok "Saved keymap '$KEYMAP' to /mnt/etc/vconsole.conf."
   else
     startup_warn "No keymap to save. Skipping vconsole.conf setup."
+  fi
+}
+
+# ================== Save Locale Config ==================
+
+save_locale_config() {
+  section_header "Saving Locale Setup"
+
+  if [[ -n "$LOCALE" ]]; then
+    echo "LANG=$LOCALE" > /mnt/etc/locale.conf
+    startup_ok "Saved locale '$LOCALE' to /mnt/etc/locale.conf."
+  else
+    startup_warn "No locale to save. Skipping locale.conf setup."
   fi
 }
 
@@ -487,15 +585,17 @@ setup_hostname() {
 main() {
   banner_archlinuxplus
   log_start
-  setup_keymap
+  setup_keymap_and_locale
   select_disk
   partition_layout_choice
   password_and_user_setup
   network_selector
+  setup_hostname
   
   
   # move_logfile_to_mnt
   # save_keymap_config
+  # save_locale_config
 }
 
 # ==================== Start Script ====================
