@@ -12,6 +12,12 @@ YELLOW='\e[93m'
 CYAN='\e[96m'
 PURPLE='\e[95m'
 
+# ==================== Input Helper ====================
+
+read_from_tty() {
+  IFS= read "$@"
+}
+
 # ==================== Print Helpers ====================
 
 draw_line() {
