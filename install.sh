@@ -72,6 +72,17 @@ check_tty() {
   fi
 }
 
+read_from_tty() {
+  if [ -e /dev/tty ] && [ -r /dev/tty ]; then
+    read "$@" < /dev/tty
+  elif [ -e /dev/console ] && [ -r /dev/console ]; then
+    read "$@" < /dev/console
+  else
+    error_print "No usable terminal device found for input."
+    exit 1
+  fi
+}
+
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
