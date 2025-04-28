@@ -80,7 +80,7 @@ startup_warn() {
 }
 
 input_print() {
-  printf "${DARKGRAY}[${YELLOW}¿?${DARKGRAY}]${RESET} ${LIGHTGRAY}%s: ${RESET}" "$1"
+  printf "${DARKGRAY}[ ${YELLOW}¿? ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s: ${RESET}" "$1"
 }
 
 info_print() {
@@ -89,12 +89,12 @@ info_print() {
 }
 
 warning_print() {
-  printf "\r${DARKGRAY}[${YELLOW}!!${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[${YELLOW}!! ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[WARN] $1"
 }
 
 error_print() {
-  printf "\r${DARKGRAY}[${RED}!!${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[${RED}!! ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[ERR ] $1"
 }
 
