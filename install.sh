@@ -26,7 +26,7 @@ draw_line() {
   printf "${RESET}\n"
 }
 
-banner_archlinuxplus() {
+banner() {
   clear
   draw_line "-"
   
@@ -44,7 +44,7 @@ banner_archlinuxplus() {
 # ==================== Main ====================
 
 main() {
-  banner_archlinuxplus
+  banner
 
   # Here you continue with your script, eg:
   # check_tty
