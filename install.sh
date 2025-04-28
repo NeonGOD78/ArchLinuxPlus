@@ -155,8 +155,8 @@ encrypt_partitions() {
 
   # Prompt for LUKS password
   info_print "Setting up LUKS password..."
-  password=$(get_valid_password) 
-
+  password=$(get_valid_password "Enter LUKS password")
+  
   # Encrypt and open root partition
   info_print "Encrypting root partition: $CRYPTROOT"
   echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -q --type luks2 - || {
