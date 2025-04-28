@@ -66,10 +66,13 @@ move_log_file() {
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   while true; do
-    read -rsp "Enter password: " password
+    input_print "Enter password:"
+    read -rsp "" password
     echo
-    read -rsp "Confirm password: " confirm_password
+    input_print "Confirm password:"
+    read -rsp "" confirm_password
     echo
+
     if [[ "$password" == "$confirm_password" ]]; then
       success_print "Passwords match."
       echo "$password"
@@ -79,7 +82,6 @@ get_valid_password() {
     fi
   done
 }
-
 # ======================= Welcome Banner ======================
 welcome_banner() {
   clear
