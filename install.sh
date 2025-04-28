@@ -1051,18 +1051,18 @@ create_btrfs_subvolumes() {
 mount_subvolumes() {
   section_header "Mounting Filesystems"
 
-  # Step 1: Mount root
+  # Mount root
   if mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt; then
-    startup_ok "Mounted /mnt (root @)"
+    startup_ok "Mounted root subvolume (@) to /mnt"
   else
-    startup_fail "Failed to mount /mnt (root @)"
+    startup_fail "Failed to mount root subvolume"
     exit 1
   fi
 
-  # Step 2: Create early directories
-  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home /mnt/.snapshots
+  # Create early mount folders
+  mkdir -p /mnt/efi /mnt/home /mnt/var /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines /mnt/srv /mnt/.snapshots
 
-  # Step 3: Mount initial subvolumes
+  # Mount EFI
   if mount "$EFI_PARTITION" /mnt/efi; then
     startup_ok "Mounted EFI partition to /mnt/efi"
   else
@@ -1070,81 +1070,43 @@ mount_subvolumes() {
     exit 1
   fi
 
+  # Mount Home
   if [[ "$SEPARATE_HOME" == true ]]; then
     if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home; then
-      startup_ok "Mounted separate home partition to /mnt/home"
+      startup_ok "Mounted separate home partition (@home) to /mnt/home"
     else
       startup_fail "Failed to mount separate home partition"
       exit 1
     fi
   else
     if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home; then
-      startup_ok "Mounted home subvolume from root to /mnt/home"
+      startup_ok "Mounted home subvolume (@home) from root to /mnt/home"
     else
       startup_fail "Failed to mount home subvolume"
       exit 1
     fi
   fi
 
-  if mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var; then
-    startup_ok "Mounted /var subvolume"
-  else
-    startup_fail "Failed to mount /var"
-    exit 1
-  fi
+  # Mount remaining subvolumes
+  declare -A mounts=(
+    ["/mnt/var"]="subvol=@var"
+    ["/mnt/srv"]="subvol=@srv"
+    ["/mnt/.snapshots"]="subvol=@snapshots"
+    ["/mnt/var/log"]="subvol=@log"
+    ["/mnt/var/cache"]="subvol=@cache"
+    ["/mnt/var/tmp"]="subvol=@tmp"
+    ["/mnt/var/lib/portables"]="subvol=@portables"
+    ["/mnt/var/lib/machines"]="subvol=@machines"
+  )
 
-  if mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv; then
-    startup_ok "Mounted /srv subvolume"
-  else
-    startup_fail "Failed to mount /srv"
-    exit 1
-  fi
-
-  if mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
-    startup_ok "Mounted /.snapshots subvolume"
-  else
-    startup_fail "Failed to mount /.snapshots"
-    exit 1
-  fi
-
-  # Step 4: Create subdirectories under /mnt/var
-  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
-
-  # Step 5: Mount var subvolumes
-  if mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log; then
-    startup_ok "Mounted /var/log subvolume"
-  else
-    startup_fail "Failed to mount /var/log"
-    exit 1
-  fi
-
-  if mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache; then
-    startup_ok "Mounted /var/cache subvolume"
-  else
-    startup_fail "Failed to mount /var/cache"
-    exit 1
-  fi
-
-  if mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp; then
-    startup_ok "Mounted /var/tmp subvolume"
-  else
-    startup_fail "Failed to mount /var/tmp"
-    exit 1
-  fi
-
-  if mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables; then
-    startup_ok "Mounted /var/lib/portables subvolume"
-  else
-    startup_fail "Failed to mount /var/lib/portables"
-    exit 1
-  fi
-
-  if mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines; then
-    startup_ok "Mounted /var/lib/machines subvolume"
-  else
-    startup_fail "Failed to mount /var/lib/machines"
-    exit 1
-  fi
+  for mount_point in "${!mounts[@]}"; do
+    if mount -o noatime,compress=zstd,"${mounts[$mount_point]}" /dev/mapper/cryptroot "$mount_point"; then
+      startup_ok "Mounted ${mounts[$mount_point]} to $mount_point"
+    else
+      startup_fail "Failed to mount ${mounts[$mount_point]} to $mount_point"
+      exit 1
+    fi
+  done
 
   startup_ok "All filesystems mounted successfully."
 }
