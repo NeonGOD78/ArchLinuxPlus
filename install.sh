@@ -343,7 +343,7 @@ When = PostTransaction
 Exec = /usr/local/bin/update-uki
 EOF
 
-  cat > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook <<'EOF'
+ cat << 'EOF' > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook
 [Trigger]
 Type = Path
 Operation = Install
