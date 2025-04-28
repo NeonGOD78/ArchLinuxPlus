@@ -66,31 +66,35 @@ move_log_file() {
 
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
-    local password confirm_password
+  local prompt="$1"
+  local pass1 pass2
 
-    while true; do
-        input_print "Enter password:"
-        sleep 0.1
-        read -rsp "" password
-        echo
-        input_print "Confirm password:"
-        sleep 0.1
-        read -rsp "" confirm_password
-        echo
+  while true; do
+    input_print "$prompt: "
+    stty -echo
+    read -r pass1
+    stty echo
+    echo
 
-        if [[ -z "$password" ]]; then
-            warning_print "Password cannot be empty. Please try again."
-            continue
-        fi
+    if [[ -z "$pass1" ]]; then
+      warning_print "Password cannot be empty."
+      continue
+    fi
 
-        if [[ "$password" == "$confirm_password" ]]; then
-            success_print "Passwords match."
-            echo "$password"
-            return 0
-        else
-            warning_print "Passwords do not match. Please try again."
-        fi
-    done
+    input_print "Confirm $prompt: "
+    stty -echo
+    read -r pass2
+    stty echo
+    echo
+
+    if [[ "$pass1" != "$pass2" ]]; then
+      warning_print "Passwords do not match. Please try again."
+    else
+      break
+    fi
+  done
+
+  echo "$pass1"
 }
 
 # ======================= Welcome Banner ======================
