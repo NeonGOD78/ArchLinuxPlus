@@ -1213,6 +1213,7 @@ main() {
   until install_base_system; do : ; done
   
   move_log_file
+  configure_package_management
   setup_zram
   setup_system
   setup_users_and_passwords
@@ -1227,7 +1228,7 @@ main() {
   build_uki_chroot
   setup_secureboot
   dotfiles_clone
-  configure_package_management
+  
   enable_system_services
   finish_installation
   show_log_if_needed
