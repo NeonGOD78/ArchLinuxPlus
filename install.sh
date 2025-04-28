@@ -1014,12 +1014,11 @@ create_btrfs_subvolumes() {
   btrfs subvolume create /mnt/@tmp &>> "$LOGFILE"
   btrfs subvolume create /mnt/@portables &>> "$LOGFILE"
   btrfs subvolume create /mnt/@machines &>> "$LOGFILE"
-
   umount /mnt &>> "$LOGFILE"
 
-  # Now handle /home if separate
+  # Create @home on correct device
   if [[ "$SEPARATE_HOME" == true ]]; then
-    info_print "Separate home detected. Creating @home on crypthome."
+    info_print "Separate /home detected. Creating @home on crypthome."
 
     mount /dev/mapper/crypthome /mnt &>> "$LOGFILE"
     btrfs subvolume create /mnt/@home &>> "$LOGFILE"
@@ -1034,6 +1033,7 @@ create_btrfs_subvolumes() {
 
   startup_ok "Btrfs subvolumes created successfully."
 }
+
 # ================== Mount Subvolumes ==================
 
 mount_subvolumes() {
