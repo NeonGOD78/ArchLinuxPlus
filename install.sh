@@ -348,20 +348,19 @@ EOF
 Type = Path
 Operation = Install
 Operation = Upgrade
-Target = boot/initramfs-linux-fallback.img
+Operation = Remove
+Target = vmlinuz-linux
+Target = initramfs-linux-fallback.img
 
 [Action]
-Description = Regenerating fallback Unified Kernel Image (UKI)...
+Description = Regenerating and signing fallback UKI...
 When = PostTransaction
-Exec = /usr/local/bin/update-uki-fallback.sh \
+Exec = /usr/bin/bash -c "ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
-  --cmdline "rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3" \
+  --cmdline /etc/kernel/cmdline \
   --output /efi/EFI/Linux/arch-fallback.efi && \
-  sbsign --key /etc/secureboot/db.key \
-         --cert /etc/secureboot/db.crt \
-         --output /efi/EFI/Linux/arch-fallback.efi \
-         /efi/EFI/Linux/arch-fallback.efi'
+  sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt /efi/EFI/Linux/arch-fallback.efi --output /efi/EFI/Linux/arch-fallback.efi"
 EOF
 
   info_print "Enabling UKI update timer..."
