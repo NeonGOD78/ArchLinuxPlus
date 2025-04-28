@@ -226,7 +226,7 @@ select_disk() {
     DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
 
     echo
-    success_print "You selected: $DISK"
+    startup_ok "You selected: $DISK"
     echo
 
     info_print "Partition layout for $DISK:"
@@ -240,7 +240,7 @@ select_disk() {
     read_from_tty -r confirm
 
     if [[ "${confirm,,}" == "y" ]]; then
-      success_print "Disk $DISK confirmed and ready for partitioning."
+      startup_ok "Disk $DISK confirmed and ready for partitioning."
       break
     else
       warning_print "Disk not confirmed. Returning to selection."
@@ -248,6 +248,7 @@ select_disk() {
     fi
   done
 }
+
 
 # ==================== Password Prompt Helper ====================
 
