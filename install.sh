@@ -65,9 +65,9 @@ move_log_file() {
 }
 
 check_tty() {
-  if [ ! -t 0 ] && [ ! -e /dev/tty ]; then
-    error_print "No terminal detected (TTY missing)."
-    error_print "This script must be run in a real terminal."
+  if { [ ! -e /dev/tty ] || [ ! -r /dev/tty ]; } && { [ ! -e /dev/console ] || [ ! -r /dev/console ]; }; then
+    error_print "No usable terminal device detected."
+    error_print "This script must be run inside a real terminal."
     exit 1
   fi
 }
