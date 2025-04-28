@@ -1180,42 +1180,7 @@ debug_print() {
   fi
 }
 
-verify_mountpoints() {
-  section_header "Verifying Mountpoints"
 
-  local mountpoints=(
-    "/mnt"
-    "/mnt/efi"
-    "/mnt/home"
-    "/mnt/var"
-    "/mnt/var/log"
-    "/mnt/var/cache"
-    "/mnt/var/tmp"
-    "/mnt/var/lib"
-    "/mnt/var/lib/portables"
-    "/mnt/var/lib/machines"
-    "/mnt/srv"
-    "/mnt/.snapshots"
-  )
-
-  local all_ok=true
-
-  for dir in "${mountpoints[@]}"; do
-    if [[ -d "$dir" ]]; then
-      info_print "Found mountpoint: $dir"
-    else
-      warning_print "Missing mountpoint: $dir"
-      all_ok=false
-    fi
-  done
-
-  if [[ "$all_ok" == true ]]; then
-    startup_ok "All critical mountpoints are present."
-  else
-    startup_fail "One or more critical mountpoints are missing. Aborting."
-    exit 1
-  fi
-}
 
 # ==================== Main ====================
 
