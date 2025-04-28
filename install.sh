@@ -12,62 +12,48 @@ YELLOW='\e[93m'
 CYAN='\e[96m'
 PURPLE='\e[95m'
 
-# ==================== Startup Style Print Helpers ====================
-
-startup_print() {
-  printf "${DARKGRAY}[      ]${RESET} ${LIGHTGRAY}%s${RESET}" "$1"
-}
-
-startup_ok() {
-  printf "\r${DARKGRAY}[${GREEN}  OK  ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
-}
-
-startup_fail() {
-  printf "\r${DARKGRAY}[${RED} FAIL ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
-}
-
-startup_warn() {
-  printf "\r${DARKGRAY}[${YELLOW} WARN ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
-}
-
-input_print() {
-  printf "${DARKGRAY}[ ?  ]${RESET} ${LIGHTGRAY}%s: ${RESET}" "$1"
-}
-
-# ==================== Line Drawing Helper ====================
+# ==================== Print Helpers ====================
 
 draw_line() {
-  local char="${1:--}"   # Brug "-" som standard hvis intet angivet
-  local color="${2:-$DARKGRAY}" # Brug mørkegrå hvis ingen farve angivet
+  local char="${1:--}"   # Standard "-" hvis ikke andet angivet
+  local color="${2:-$DARKGRAY}"  # Standard mørkegrå
   local width
 
-  width=$(tput cols 2>/dev/null || echo 80)  # Hvis tput fejler, default til 80
+  width=$(tput cols 2>/dev/null || echo 80)
 
   printf "${color}"
   printf "%${width}s" "" | tr " " "$char"
   printf "${RESET}\n"
 }
 
-# ==================== Section Header Helper ====================
-
-section_header() {
-  local title="$1"
-  local char="${2:--}"   # Standard "-" hvis ikke andet
-  local color="${3:-$DARKGRAY}"  # Standard mørkegrå
-  local width padding
-
-  width=$(tput cols 2>/dev/null || echo 80)  # Terminal bredde
-
-  # Top line
-  printf "${color}"
-  printf "%${width}s" "" | tr " " "$char"
-  printf "${RESET}\n"
-
-  # Centered title
-  padding=$(( (width - ${#title}) / 2 ))
-  printf "${color}%*s%s\n" "$padding" "" "$title"
+banner_archlinuxplus() {
+  clear
+  draw_line "-"
   
-  # Bottom line
-  printf "%${width}s" "" | tr " " "$char"
+  printf "${CYAN}"
+  printf "    _             _     _     _            __  __\n"
+  printf "   / \\   _ __ ___| |__ | |   (_)_ __  _   _\\ \\/ / _\n"
+  printf "  / _ \\ | '__/ __| '_ \\| |   | | '_ \\| | | |\\  /_| |_\n"
+  printf " / ___ \\| | | (__| | | | |___| | | | | |_| |/  \\_   _|\n"
+  printf "/_/   \\_\\_|  \\___|_| |_|_____|_|_| |_|\\__,_/_/\\_\\|_|\n"
   printf "${RESET}\n"
+  
+  draw_line "-"
 }
+
+# ==================== Main ====================
+
+main() {
+  banner_archlinuxplus
+
+  # Here you continue with your script, eg:
+  # check_tty
+  # partition_disks
+  # encrypt_partitions
+  # setup_filesystem
+  # etc...
+}
+
+# ==================== Start Script ====================
+
+main
