@@ -1238,6 +1238,7 @@ EOF
 
 # ======================= Main Installer Flow ==============
 main() {
+  check_tty
   welcome_banner
   select_disk
   prepare_disk
