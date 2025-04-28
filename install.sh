@@ -1037,8 +1037,18 @@ mount_subvolumes() {
   # Mount root subvolume
   mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
 
-  # Opret mapper til mount points
-  mkdir -p /mnt/{efi,home,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines,srv,.snapshots}
+  # Create necessary directories manually
+  mkdir -p /mnt/efi
+  mkdir -p /mnt/home
+  mkdir -p /mnt/var
+  mkdir -p /mnt/var/log
+  mkdir -p /mnt/var/cache
+  mkdir -p /mnt/var/tmp
+  mkdir -p /mnt/var/lib
+  mkdir -p /mnt/var/lib/portables
+  mkdir -p /mnt/var/lib/machines
+  mkdir -p /mnt/srv
+  mkdir -p /mnt/.snapshots
 
   # Mount EFI partition
   mount "$EFI_PARTITION" /mnt/efi
