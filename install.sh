@@ -297,24 +297,66 @@ get_valid_password() {
 
 # ==================== Gather Passwords ====================
 
-gather_passwords() {
-  section_header "Password Configuration"
+# ================== Password Setup ==================
 
-  info_print "You can reuse the same password for both LUKS and system login."
+password_setup() {
+  section_header "Password Setup"
 
-  input_print "Do you want to reuse the same password? [Y/n]"
-  read_from_tty -r reuse_choice
+  # Ask for LUKS password
+  while true; do
+    input_print "Enter LUKS password"
+    stty -echo
+    read -r luks_pass1
+    stty echo
+    echo
+    input_print "Confirm LUKS password"
+    stty -echo
+    read -r luks_pass2
+    stty echo
+    echo
 
-  if [[ "${reuse_choice,,}" =~ ^(n|no)$ ]]; then
-    # Forskellige passwords
-    LUKS_PASSWORD=$(get_valid_password "Enter LUKS encryption password")
-    SYSTEM_PASSWORD=$(get_valid_password "Enter system login password")
-    success_print "Passwords set individually."
+    if [[ "$luks_pass1" != "$luks_pass2" ]]; then
+      warning_print "Passwords do not match. Please try again."
+    elif [[ -z "$luks_pass1" ]]; then
+      warning_print "Password cannot be empty. Please try again."
+    else
+      LUKS_PASSWORD="$luks_pass1"
+      startup_ok "LUKS password set successfully."
+      break
+    fi
+  done
+
+  # Ask if we should reuse for user/root
+  input_print "Reuse LUKS password for user and root accounts? [Y/n]"
+  read -r reuse_choice
+  reuse_choice="${reuse_choice,,}"  # to lowercase
+
+  if [[ "$reuse_choice" =~ ^(n|no)$ ]]; then
+    while true; do
+      input_print "Enter new system password"
+      stty -echo
+      read -r system_pass1
+      stty echo
+      echo
+      input_print "Confirm new system password"
+      stty -echo
+      read -r system_pass2
+      stty echo
+      echo
+
+      if [[ "$system_pass1" != "$system_pass2" ]]; then
+        warning_print "Passwords do not match. Please try again."
+      elif [[ -z "$system_pass1" ]]; then
+        warning_print "Password cannot be empty. Please try again."
+      else
+        SYSTEM_PASSWORD="$system_pass1"
+        startup_ok "System password set successfully."
+        break
+      fi
+    done
   else
-    # Samme password til begge
-    LUKS_PASSWORD=$(get_valid_password "Enter password for both LUKS and system login")
     SYSTEM_PASSWORD="$LUKS_PASSWORD"
-    success_print "Same password will be used for LUKS and system login."
+    info_print "Reusing LUKS password for user and root."
   fi
 }
 
@@ -325,7 +367,7 @@ main() {
   log_start
   setup_keymap
   select_disk
-  gather_passwords
+  password_setup
   
   # move_logfile_to_mnt
   # save_keymap_config
