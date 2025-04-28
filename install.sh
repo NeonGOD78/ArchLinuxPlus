@@ -12,7 +12,7 @@ YELLOW='\e[93m'
 CYAN='\e[96m'
 
 # ==================== Global Variables ====================
-
+SCRIPT_VERSION="v1.0"
 LOGFILE="/var/log/archinstall.log"
 
 # ==================== Basic Helpers ====================
@@ -46,14 +46,13 @@ move_logfile_to_mnt() {
 }
 
 # Printing functions
+
 draw_line() {
   local char="${1:--}"
-  local color="${2:-$DARKGRAY}"
   local width
-
   width=$(tput cols 2>/dev/null || echo 80)
 
-  printf "${color}"
+  printf "${DARKGRAY}"
   printf "%${width}s" "" | tr " " "$char"
   printf "${RESET}\n"
 }
@@ -130,10 +129,11 @@ banner_archlinuxplus() {
   printf " / ___ \\| | | (__| | | | |___| | | | | |_| |/  \\_   _|\n"
   printf "/_/   \\_\\_|  \\___|_| |_|_____|_|_| |_|\\__,_/_/\\_\\|_|\n"
   printf "${RESET}\n"
-  
+
   draw_line "-"
   
-  printf "${LIGHTGRAY}ArchLinux+ an Advanced Arch Installer${RESET}\n\n"   # <-- Her 2 x \n !
+  printf "${LIGHTGRAY}ArchLinux+ an Advanced Arch Installer (${SCRIPT_VERSION})${RESET}\n"
+  printf "${DARKGRAY}github.com/NeonGOD78/ArchLinuxPlus${RESET}\n\n"
 }
 
 # ==================== Keymap Setup ====================
