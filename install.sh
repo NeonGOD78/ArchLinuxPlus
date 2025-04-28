@@ -1060,6 +1060,13 @@ nocow_setup() {
   startup_ok "NoCOW attributes applied where possible."
 }
 
+# ================== Version Display ==================
+
+print_version() {
+  echo -e "ArchLinux+ Installer ${SCRIPT_VERSION}"
+  echo -e "Maintained by: github.com/NeonGOD78/ArchLinuxPlus"
+}
+
 # ==================== Main ====================
 
 main() {
