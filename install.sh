@@ -10,16 +10,15 @@ RED='\e[91m'
 GREEN='\e[92m'
 YELLOW='\e[93m'
 CYAN='\e[96m'
-PURPLE='\e[95m'
 
-# ==================== Input Helper ====================
+# ==================== Basic Helpers ====================
 
+# Safe reading function
 read_from_tty() {
   IFS= read "$@"
 }
 
-# ==================== Print Helpers ====================
-
+# Printing functions
 draw_line() {
   local char="${1:--}"
   local color="${2:-$DARKGRAY}"
@@ -50,6 +49,18 @@ startup_warn() {
 
 input_print() {
   printf "${DARKGRAY}[ ?  ]${RESET} ${LIGHTGRAY}%s: ${RESET}" "$1"
+}
+
+info_print() {
+  printf "${DARKGRAY}[ i  ]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+}
+
+warning_print() {
+  printf "${DARKGRAY}[${YELLOW}!${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+}
+
+error_print() {
+  printf "${DARKGRAY}[${RED}✖${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
 }
 
 section_header() {
@@ -101,7 +112,7 @@ setup_keymap() {
     startup_warn "Could not fetch keymap list. Falling back to manual input."
   else
     info_print "You can search for a keymap (example: us, dk, de-latin1, fr, etc.)"
-    input_print "Enter search term for keymaps or leave empty to see all:"
+    input_print "Enter search term for keymaps or leave empty to see common:"
     read_from_tty -r search_term
     echo
 
@@ -109,8 +120,8 @@ setup_keymap() {
       printf "${LIGHTGRAY}Available keymaps matching '${search_term}':\n${RESET}"
       echo "$available_keymaps" | grep -i --color=never "$search_term" || startup_warn "No matching keymaps found."
     else
-      printf "${LIGHTGRAY}Showing all available keymaps:\n${RESET}"
-      echo "$available_keymaps"
+      printf "${LIGHTGRAY}Common keymaps:\n${RESET}"
+      echo -e "us\ndk\nde-latin1\nfr\nes\nit\nno\nse"
     fi
   fi
 
@@ -132,7 +143,7 @@ setup_keymap() {
   fi
 }
 
-# ==================== Save Keymap ====================
+# ==================== Save Keymap to System ====================
 
 save_keymap_config() {
   section_header "Saving Keyboard Layout"
@@ -145,12 +156,13 @@ save_keymap_config() {
   fi
 }
 
-# ==================== Main ====================
+# ==================== Main Function ====================
 
 main() {
   banner_archlinuxplus
   setup_keymap
 
+  # Future steps:
   # gather_user_input
   # map_kernel_choice
   # map_desktop_choice
@@ -164,6 +176,6 @@ main() {
   # save_keymap_config
 }
 
-# ==================== Start ====================
+# ==================== Start Script ====================
 
 main
