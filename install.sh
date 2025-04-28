@@ -1037,7 +1037,7 @@ mount_subvolumes() {
   mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
 
   # Create needed directories
-  mkdir -p /mnt/{efi,boot,home,var,srv,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines}
+  mkdir -p /mnt/{efi,boot,home,var,srv,.snapshots,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines}
 
   # Mount EFI System Partition
   mount "$EFI_PARTITION" /mnt/efi
@@ -1057,6 +1057,7 @@ mount_subvolumes() {
   mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp
   mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables
   mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines
+  mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots
 
   startup_ok "Filesystems mounted successfully."
 }
