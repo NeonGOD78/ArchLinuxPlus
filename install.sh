@@ -295,7 +295,23 @@ get_valid_password() {
   echo "$pass1"
 }
 
-# ==================== Gather Passwords ====================
+# ================== Partition Layout Choice ==================
+
+partition_layout_choice() {
+  section_header "Partition Layout Setup"
+
+  input_print "Do you want to create a separate encrypted /home partition? [Y/n]"
+  read_from_tty -r separate_home_choice
+  separate_home_choice="${separate_home_choice,,}"  # to lowercase
+
+  if [[ "$separate_home_choice" =~ ^(n|no)$ ]]; then
+    SEPARATE_HOME=false
+    info_print "Will use single encrypted root partition (no separate /home)."
+  else
+    SEPARATE_HOME=true
+    info_print "Will create a separate encrypted /home partition."
+  fi
+}
 
 # ================== Password Setup ==================
 
@@ -367,6 +383,7 @@ main() {
   log_start
   setup_keymap
   select_disk
+  partition_layout_choice
   password_setup
   
   # move_logfile_to_mnt
