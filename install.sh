@@ -201,7 +201,7 @@ install_base_system() {
   if pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers \
       btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac \
       zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl \
-      btop mc git systemd ukify openssl sbsigntools sbctl &>> "$LOGFILE"; then
+      btop mc git systemd ukify openssl sbsigntools sbctl base-devel &>> "$LOGFILE"; then
 
     success_print "Base system installed successfully."
     return 0
@@ -1214,6 +1214,8 @@ EOF
 127.0.1.1   $hostname.localdomain $hostname
 EOF
 }
+
+
 # ======================= Main Installer Flow ==============
 main() {
   welcome_banner
