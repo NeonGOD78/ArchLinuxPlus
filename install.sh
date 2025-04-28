@@ -78,7 +78,7 @@ get_valid_password() {
     echo
 
     if [[ -z "$pass1" ]]; then
-      warning_print "Password cannot be empty."
+      warning_print "Password cannot be empty. Please try again."
       continue
     fi
 
@@ -88,6 +88,11 @@ get_valid_password() {
     read -r pass2
     stty echo
     echo
+
+    if [[ -z "$pass2" ]]; then
+      warning_print "Confirmation password cannot be empty. Please try again."
+      continue
+    fi
 
     if [[ "$pass1" != "$pass2" ]]; then
       warning_print "Passwords do not match. Please try again."
