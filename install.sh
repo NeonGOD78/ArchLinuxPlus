@@ -87,7 +87,7 @@ input_print() {
 }
 
 info_print() {
-  printf "\r${DARKGRAY}[${CYAN}Info${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[${CYAN}INFO${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[INFO] $1"
 }
 
