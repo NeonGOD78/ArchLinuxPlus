@@ -812,7 +812,7 @@ network_selector () {
     }
 
     info_print "Enabling network service..."
-    arch-chroot /mnt $systemctl_cmd || {
+    arch-chroot /mnt bash -c $systemctl_cmd || {
         warning_print "Failed to enable network service."
     }
 
