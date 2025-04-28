@@ -14,6 +14,7 @@ CYAN='\e[96m'
 # ==================== Global Variables ====================
 SCRIPT_VERSION="v1.0"
 LOGFILE="/var/log/archinstall.log"
+DEBUG=false
 
 # ==================== Basic Helpers ====================
 
@@ -1082,10 +1083,24 @@ print_help() {
   echo -e ""
 }
 
+# ================== Debug Print Helper ==================
+
+debug_print() {
+  if [[ "$DEBUG" == true ]]; then
+    printf "${DARKGRAY}[DEBUG]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+    echo "[DEBUG] $1" >> "$LOGFILE"
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
   # Help functions
+  if [[ "$1" == "--debug" ]]; then
+    DEBUG=true
+    info_print "Debug mode enabled."
+  fi
+
   if [[ "$1" == "--version" ]]; then
     print_version
     exit 0
