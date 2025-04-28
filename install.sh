@@ -1003,49 +1003,58 @@ format_btrfs() {
 create_btrfs_subvolumes() {
   section_header "Creating Btrfs Subvolumes"
 
-  # Mount root temporarily
-  mount /dev/mapper/cryptroot /mnt
+  # Mount root volume first
+  mount /dev/mapper/cryptroot /mnt || {
+    startup_fail "Failed to mount /dev/mapper/cryptroot to /mnt"
+    exit 1
+  }
 
-  # Root subvolumes
-  btrfs subvolume create /mnt/@
-  startup_ok "Created subvolume /mnt/@"
-  
-  btrfs subvolume create /mnt/@var
-  startup_ok "Created subvolume /mnt/@var"
-  
-  btrfs subvolume create /mnt/@srv
-  startup_ok "Created subvolume /mnt/@srv"
-  
-  btrfs subvolume create /mnt/@log
-  startup_ok "Created subvolume /mnt/@log"
-  
-  btrfs subvolume create /mnt/@cache
-  startup_ok "Created subvolume /mnt/@cache"
-  
-  btrfs subvolume create /mnt/@tmp
-  startup_ok "Created subvolume /mnt/@tmp"
-  
-  btrfs subvolume create /mnt/@portables
-  startup_ok "Created subvolume /mnt/@portables"
-  
-  btrfs subvolume create /mnt/@machines
-  startup_ok "Created subvolume /mnt/@machines"
-  
-  btrfs subvolume create /mnt/@snapshots
-  startup_ok "Created subvolume /mnt/@snapshots"
+  local subvolumes=(
+    "@"
+    "@var"
+    "@srv"
+    "@log"
+    "@cache"
+    "@tmp"
+    "@portables"
+    "@machines"
+    "@snapshots"
+  )
 
-  # Home
+  for subvol in "${subvolumes[@]}"; do
+    if btrfs subvolume create "/mnt/$subvol" &>/dev/null; then
+      startup_ok "Created subvolume /mnt/$subvol"
+    else
+      warning_print "Failed to create subvolume /mnt/$subvol"
+    fi
+  done
+
+  # If separate home, mount crypthome temporarily and create @home
   if [[ "$SEPARATE_HOME" == true ]]; then
-    mount /dev/mapper/crypthome /mnt/home
-    btrfs subvolume create /mnt/home/@home
-    startup_ok "Created subvolume /mnt/home/@home (separate crypthome)"
+    mkdir -p /mnt/home
+    mount /dev/mapper/crypthome /mnt/home || {
+      startup_fail "Failed to mount /dev/mapper/crypthome to /mnt/home"
+      exit 1
+    }
+
+    if btrfs subvolume create /mnt/home/@home &>/dev/null; then
+      startup_ok "Created subvolume /mnt/home/@home (separate crypthome)"
+    else
+      warning_print "Failed to create subvolume /mnt/home/@home"
+    fi
+
     umount /mnt/home
   else
-    btrfs subvolume create /mnt/@home
-    startup_ok "Created subvolume /mnt/@home (root device)"
+    # Single encrypted root – create @home directly on root
+    if btrfs subvolume create /mnt/@home &>/dev/null; then
+      startup_ok "Created subvolume /mnt/@home"
+    else
+      warning_print "Failed to create subvolume /mnt/@home"
+    fi
   fi
 
   umount /mnt
+
   startup_ok "All Btrfs subvolumes created successfully."
 }
 
