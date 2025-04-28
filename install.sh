@@ -133,44 +133,50 @@ banner_archlinuxplus() {
 }
 
 # ==================== Keymap Setup ====================
-
 setup_keymap() {
   section_header "Keyboard Layout Setup"
 
-  local search_term
-  local available_keymaps
-  available_keymaps=$(localectl list-keymaps 2>/dev/null)
+  local keymap search_choice search_term available_keymaps
 
-  if [[ -z "$available_keymaps" ]]; then
-    startup_warn "Could not fetch keymap list. Falling back to manual input."
-  else
-    info_print "You can search for a keymap (example: us, dk, de-latin1, fr, etc.)"
-    input_print "Enter search term for keymaps or leave empty to see common:"
-    read_from_tty -r search_term
-    echo
+  input_print "Press [S] to search keymaps or [Enter] to input manually"
+  read_from_tty -r search_choice
 
-    if [[ -n "$search_term" ]]; then
-      printf "${LIGHTGRAY}Available keymaps matching '${search_term}':\n${RESET}"
-      echo "$available_keymaps" | grep -i --color=never "$search_term" || startup_warn "No matching keymaps found."
+  if [[ "${search_choice,,}" == "s" ]]; then
+    # Bruger ønsker at søge
+    available_keymaps=$(localectl list-keymaps 2>/dev/null)
+
+    if [[ -z "$available_keymaps" ]]; then
+      startup_warn "Could not fetch keymap list. Falling back to manual input."
     else
-      printf "${LIGHTGRAY}Common keymaps:\n${RESET}"
-      echo -e "us\ndk\nde-latin1\nfr\nes\nit\nno\nse"
+      input_print "Enter search term for keymaps (leave empty to show all)"
+      read_from_tty -r search_term
+
+      if [[ -n "$search_term" ]]; then
+        printf "${LIGHTGRAY}Available keymaps matching '${search_term}':\n${RESET}"
+        echo "$available_keymaps" | grep -i --color=never "$search_term" || startup_warn "No matching keymaps found."
+      else
+        printf "${LIGHTGRAY}Available keymaps:\n${RESET}"
+        echo "$available_keymaps"
+      fi
     fi
+
+    echo
   fi
 
-  echo
+  # Nu spørger vi om selve keymap input
   input_print "Enter your desired keymap [default: dk]"
-  read_from_tty -r KEYMAP
+  read_from_tty -r keymap
 
-  if [[ -z "$KEYMAP" ]]; then
-    KEYMAP="dk"
+  if [[ -z "$keymap" ]]; then
+    keymap="dk"
     info_print "No keymap entered. Defaulting to 'dk'."
   fi
 
-  if loadkeys "$KEYMAP" 2>/dev/null; then
+  if loadkeys "$keymap" 2>/dev/null; then
+    KEYMAP="$keymap"
     startup_ok "Keymap '$KEYMAP' loaded successfully."
   else
-    startup_fail "Failed to load keymap '$KEYMAP'. Falling back to 'dk'."
+    startup_fail "Failed to load keymap '$keymap'. Falling back to 'dk'."
     loadkeys dk
     KEYMAP="dk"
   fi
