@@ -839,9 +839,230 @@ confirm_installation() {
   fi
 }
 
+# ================== Wipe Disk ==================
+
+wipe_disk() {
+  section_header "Disk Wipe"
+
+  if [[ "$SECURE_WIPE" == true ]]; then
+    warning_print "Securely wiping $DISK. This may take a long time..."
+    dd if=/dev/urandom of="$DISK" bs=1M status=progress || {
+      error_print "Secure wipe failed!"
+      exit 1
+    }
+  else
+    info_print "Quickly zapping partition table on $DISK."
+    sgdisk --zap-all "$DISK" || {
+      error_print "Quick wipe failed!"
+      exit 1
+    }
+  fi
+  startup_ok "Disk wipe completed."
+}
+
+# ================== Partition Disk ==================
+
+partition_disk() {
+  section_header "Disk Partitioning"
+
+  info_print "Creating GPT partition layout on $DISK."
+
+  parted --script "$DISK" mklabel gpt
+
+  parted --script "$DISK" \
+    mkpart primary fat32 1MiB 513MiB \
+    set 1 esp on \
+    mkpart primary 513MiB 100%
+
+  partprobe "$DISK"
+  sleep 2
+
+  if [[ "$DISK" == *"nvme"* ]]; then
+    EFI_PARTITION="${DISK}p1"
+    ROOT_PARTITION="${DISK}p2"
+    HOME_PARTITION="${DISK}p3"
+  else
+    EFI_PARTITION="${DISK}1"
+    ROOT_PARTITION="${DISK}2"
+    HOME_PARTITION="${DISK}3"
+  fi
+
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    info_print "Splitting root and home partitions."
+
+    parted --script "$DISK" \
+      rm 2 \
+      mkpart primary 513MiB $((513 + ROOT_SIZE_GB * 1024))MiB \
+      mkpart primary $((513 + ROOT_SIZE_GB * 1024))MiB 100%
+
+    partprobe "$DISK"
+    sleep 2
+
+    if [[ "$DISK" == *"nvme"* ]]; then
+      ROOT_PARTITION="${DISK}p2"
+      HOME_PARTITION="${DISK}p3"
+    else
+      ROOT_PARTITION="${DISK}2"
+      HOME_PARTITION="${DISK}3"
+    fi
+  fi
+
+  startup_ok "Disk partitioning completed."
+}
+
+# ================== Wipe Existing LUKS Headers ==================
+
+wipe_existing_luks_if_any() {
+  section_header "Wiping Existing LUKS Headers (if any)"
+
+  local partitions_to_check=("$ROOT_PARTITION")
+
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    partitions_to_check+=("$HOME_PARTITION")
+  fi
+
+  for part in "${partitions_to_check[@]}"; do
+    if cryptsetup isLuks "$part" &>/dev/null; then
+      warning_print "Found LUKS header on $part. Wiping..."
+      cryptsetup luksErase "$part" || {
+        error_print "Failed to wipe LUKS header on $part."
+        exit 1
+      }
+      success_print "LUKS header wiped from $part."
+    else
+      info_print "No LUKS header on $part. Continuing."
+    fi
+  done
+}
+
+# ================== Encrypt Partitions ==================
+
+encrypt_partitions() {
+  section_header "Encrypting Partitions with LUKS2"
+
+  # Encrypt root
+  info_print "Encrypting root partition: $ROOT_PARTITION"
+  echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$ROOT_PARTITION" -q --type luks2 || {
+    error_print "Failed to format root partition with LUKS."
+    exit 1
+  }
+  echo -n "$LUKS_PASSWORD" | cryptsetup open "$ROOT_PARTITION" cryptroot || {
+    error_print "Failed to open LUKS root partition."
+    exit 1
+  }
+  startup_ok "Root partition encrypted and opened."
+
+  # Encrypt home (if separate home selected)
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    info_print "Encrypting home partition: $HOME_PARTITION"
+    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$HOME_PARTITION" -q --type luks2 || {
+      error_print "Failed to format home partition with LUKS."
+      exit 1
+    }
+    echo -n "$LUKS_PASSWORD" | cryptsetup open "$HOME_PARTITION" crypthome || {
+      error_print "Failed to open LUKS home partition."
+      exit 1
+    }
+    startup_ok "Home partition encrypted and opened."
+  fi
+}
+
+# ================== Format Btrfs ==================
+
+format_btrfs() {
+  section_header "Formatting Partitions with Btrfs"
+
+  mkfs.fat -F32 "$EFI_PARTITION" || {
+    error_print "Failed to format EFI partition."
+    exit 1
+  }
+  startup_ok "Formatted EFI partition as FAT32."
+
+  mkfs.btrfs -f /dev/mapper/cryptroot || {
+    error_print "Failed to format root partition as Btrfs."
+    exit 1
+  }
+  startup_ok "Formatted root partition as Btrfs."
+
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    mkfs.btrfs -f /dev/mapper/crypthome || {
+      error_print "Failed to format home partition as Btrfs."
+      exit 1
+    }
+    startup_ok "Formatted home partition as Btrfs."
+  fi
+}
+
+# ================== Create Btrfs Subvolumes ==================
+
+create_btrfs_subvolumes() {
+  section_header "Creating Btrfs Subvolumes"
+
+  # Mount temporary to create subvolumes
+  mount /dev/mapper/cryptroot /mnt
+
+  btrfs subvolume create /mnt/@
+  btrfs subvolume create /mnt/@home
+  btrfs subvolume create /mnt/@var
+  btrfs subvolume create /mnt/@srv
+  btrfs subvolume create /mnt/@log
+  btrfs subvolume create /mnt/@cache
+  btrfs subvolume create /mnt/@tmp
+  btrfs subvolume create /mnt/@portables
+  btrfs subvolume create /mnt/@machines
+
+  umount /mnt
+  startup_ok "Btrfs subvolumes created successfully."
+}
+
+# ================== Mount Subvolumes ==================
+
+mount_subvolumes() {
+  section_header "Mounting Filesystems"
+
+  mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
+
+  mkdir -p /mnt/{boot/efi,home,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines,srv}
+
+  mount "$EFI_PARTITION" /mnt/boot/efi
+
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home
+  else
+    mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home
+  fi
+
+  mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var
+  mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv
+  mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log
+  mount -o noatime,compress=zstd,subvol=@cache /dev/mapper/cryptroot /mnt/var/cache
+  mount -o noatime,compress=zstd,subvol=@tmp /dev/mapper/cryptroot /mnt/var/tmp
+  mount -o noatime,compress=zstd,subvol=@portables /dev/mapper/cryptroot /mnt/var/lib/portables
+  mount -o noatime,compress=zstd,subvol=@machines /dev/mapper/cryptroot /mnt/var/lib/machines
+
+  startup_ok "Filesystems mounted successfully."
+}
+
+# ================== Setup NoCOW Attributes ==================
+
+nocow_setup() {
+  section_header "Applying NoCOW Attributes"
+
+  for path in /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines; do
+    if [[ -d "$path" ]]; then
+      chattr +C "$path" || warning_print "Failed to set NoCOW on $path"
+    else
+      warning_print "Directory $path not found, skipping NoCOW."
+    fi
+  done
+
+  startup_ok "NoCOW attributes applied where possible."
+}
+
 # ==================== Main ====================
 
 main() {
+  # User Input
   banner_archlinuxplus
   log_start
   setup_keymap_and_locale
@@ -853,7 +1074,16 @@ main() {
   kernel_selector
   editor_selector
   confirm_installation
-  
+
+  # Disk setup
+  wipe_disk
+  partition_disk
+  wipe_existing_luks_if_any
+  encrypt_partitions
+  format_btrfs
+  create_btrfs_subvolumes
+  mount_subvolumes
+  nocow_setup
   
   # move_logfile_to_mnt
   # save_keymap_config
