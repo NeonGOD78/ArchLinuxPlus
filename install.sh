@@ -189,21 +189,132 @@ save_keymap_config() {
   fi
 }
 
+# ==================== Disk Selection ====================
+
+select_disk() {
+  section_header "Disk Selection"
+
+  while true; do
+    # Find alle fysiske diske (ingen loop, rom, boot)
+    mapfile -t disks < <(lsblk -dpno NAME,SIZE,MODEL | grep -Ev "boot|rpmb|loop")
+
+    if [[ "${#disks[@]}" -eq 0 ]]; then
+      error_print "No suitable block devices found. Exiting."
+      exit 1
+    fi
+
+    echo
+    info_print "Detected available disks:"
+    for i in "${!disks[@]}"; do
+      printf "  %d) %s\n" "$((i+1))" "${disks[$i]}"
+    done
+    echo
+
+    input_print "Select the number of the disk to install Arch on (or press Enter to cancel)"
+    read_from_tty -r disk_index
+
+    if [[ -z "$disk_index" ]]; then
+      error_print "Disk selection cancelled by user. Exiting."
+      exit 1
+    fi
+
+    if ! [[ "$disk_index" =~ ^[0-9]+$ ]] || (( disk_index < 1 || disk_index > ${#disks[@]} )); then
+      warning_print "Invalid selection. Please try again."
+      continue
+    fi
+
+    DISK=$(awk '{print $1}' <<< "${disks[$((disk_index-1))]}")
+
+    echo
+    success_print "You selected: $DISK"
+    echo
+
+    info_print "Partition layout for $DISK:"
+    echo
+    lsblk -p -e7 -o NAME,SIZE,FSTYPE,TYPE,MOUNTPOINT,LABEL,UUID "$DISK"
+    echo
+
+    error_print "!! ALL DATA ON $DISK WILL BE IRREVERSIBLY LOST !!"
+    echo
+    input_print "Are you sure you want to proceed with $DISK? [y/N]"
+    read_from_tty -r confirm
+
+    if [[ "${confirm,,}" == "y" ]]; then
+      success_print "Disk $DISK confirmed and ready for partitioning."
+      break
+    else
+      warning_print "Disk not confirmed. Returning to selection."
+      echo
+    fi
+  done
+}
+
+# ==================== Password Prompt Helper ====================
+
+get_valid_password() {
+  local prompt="$1"
+  local pass1 pass2
+
+  while true; do
+    input_print "$prompt"
+    stty -echo
+    read_from_tty -r pass1
+    stty echo
+    echo
+
+    if [[ -z "$pass1" ]]; then
+      warning_print "Password cannot be empty."
+      continue
+    fi
+
+    input_print "Confirm $prompt"
+    stty -echo
+    read_from_tty -r pass2
+    stty echo
+    echo
+
+    if [[ "$pass1" != "$pass2" ]]; then
+      warning_print "Passwords do not match. Please try again."
+    else
+      break
+    fi
+  done
+
+  echo "$pass1"
+}
+
+# ==================== Gather Passwords ====================
+
+gather_passwords() {
+  section_header "Password Configuration"
+
+  info_print "You can reuse the same password for both LUKS and system login."
+
+  input_print "Do you want to reuse the same password? [Y/n]"
+  read_from_tty -r reuse_choice
+
+  if [[ "${reuse_choice,,}" =~ ^(n|no)$ ]]; then
+    # Forskellige passwords
+    LUKS_PASSWORD=$(get_valid_password "Enter LUKS encryption password")
+    SYSTEM_PASSWORD=$(get_valid_password "Enter system login password")
+    success_print "Passwords set individually."
+  else
+    # Samme password til begge
+    LUKS_PASSWORD=$(get_valid_password "Enter password for both LUKS and system login")
+    SYSTEM_PASSWORD="$LUKS_PASSWORD"
+    success_print "Same password will be used for LUKS and system login."
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
   banner_archlinuxplus
   log_start
   setup_keymap
-
-  # Here would come the flow:
-  # gather_user_input
-  # map_kernel_choice
-  # partition_disks
-  # encrypt_partitions
-  # format_filesystems
-  # mount_filesystems
-
+  select_disk
+  gather_passwords
+  
   # move_logfile_to_mnt
   # save_keymap_config
 }
