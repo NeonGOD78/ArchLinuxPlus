@@ -1003,48 +1003,46 @@ format_btrfs() {
 create_btrfs_subvolumes() {
   section_header "Creating Btrfs Subvolumes"
 
-  # Mount root temporarily to create subvolumes
+  # Mount root temporarily
   mount /dev/mapper/cryptroot /mnt
 
-  local subvolumes=(
-    "@"
-    "@var"
-    "@srv"
-    "@log"
-    "@cache"
-    "@tmp"
-    "@portables"
-    "@machines"
-    "@snapshots"
-  )
-
-  for subvol in "${subvolumes[@]}"; do
+  # Create root subvolumes
+  for subvol in @ @var @srv @log @cache @tmp @portables @machines @snapshots; do
     if btrfs subvolume create "/mnt/$subvol" &>/dev/null; then
       startup_ok "Created subvolume /mnt/$subvol"
     else
-      warning_print "Failed to create subvolume /mnt/$subvol"
+      startup_fail "Failed to create subvolume /mnt/$subvol"
+      exit 1
     fi
   done
 
-  # Handle home separately if SEPARATE_HOME is true
+  # If separate home, mount crypthome and create @home
   if [[ "$SEPARATE_HOME" == true ]]; then
-    mount /dev/mapper/crypthome /mnt/home
-    if btrfs subvolume create /mnt/home/@home &>/dev/null; then
-      startup_ok "Created subvolume /mnt/home/@home"
+    mkdir -p /mnt/home
+    if mount /dev/mapper/crypthome /mnt/home; then
+      startup_ok "Mounted /mnt/home (separate crypthome)"
+      if btrfs subvolume create /mnt/home/@home &>/dev/null; then
+        startup_ok "Created subvolume /mnt/home/@home"
+      else
+        startup_fail "Failed to create /mnt/home/@home"
+        exit 1
+      fi
+      umount /mnt/home
     else
-      warning_print "Failed to create subvolume /mnt/home/@home"
+      startup_fail "Failed to mount crypthome for home subvolume"
+      exit 1
     fi
-    umount /mnt/home
   else
+    # No separate home
     if btrfs subvolume create /mnt/@home &>/dev/null; then
       startup_ok "Created subvolume /mnt/@home"
     else
-      warning_print "Failed to create subvolume /mnt/@home"
+      startup_fail "Failed to create /mnt/@home"
+      exit 1
     fi
   fi
 
   umount /mnt
-
   startup_ok "All Btrfs subvolumes created successfully."
 }
 
