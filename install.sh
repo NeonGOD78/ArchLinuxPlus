@@ -58,6 +58,8 @@ draw_line() {
   printf "${RESET}\n"
 }
 
+# ==================== Startup Print Functions ====================
+
 startup_print() {
   printf "${DARKGRAY}[      ]${RESET} ${LIGHTGRAY}%s${RESET}" "$1"
 }
@@ -78,21 +80,21 @@ startup_warn() {
 }
 
 input_print() {
-  printf "${DARKGRAY}[ ${YELLOW}¿?${DARKGRAY} ]${RESET} ${LIGHTGRAY}%s: ${RESET}" "$1"
+  printf "${DARKGRAY}[${YELLOW}¿?${DARKGRAY}]${RESET} ${LIGHTGRAY}%s: ${RESET}" "$1"
 }
 
 info_print() {
-  printf "${DARKGRAY}[${CYAN}Info${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[${CYAN}Info${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[INFO] $1"
 }
 
 warning_print() {
-  printf "${DARKGRAY}[${YELLOW}!!${DARKGRAY} ]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[${YELLOW}!!${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[WARN] $1"
 }
 
 error_print() {
-  printf "${DARKGRAY}[${RED}××${DARKGRAY} ]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[${RED}!!${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[ERR ] $1"
 }
 
@@ -130,8 +132,9 @@ banner_archlinuxplus() {
   printf "${RESET}\n"
   
   draw_line "-"
-}
 
+}
+ printf "Arch Linux Advanced Installer" 
 # ==================== Keymap Setup ====================
 
 setup_keymap() {
