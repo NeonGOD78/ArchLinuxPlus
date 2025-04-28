@@ -90,7 +90,7 @@ get_valid_password() {
   local pass1 pass2
 
   input_print "Show password while typing? [y/N]:"
-  read -r show_password < /dev/tty
+  read_from_tty -r show_password
   echo
 
   while true; do
@@ -100,7 +100,7 @@ get_valid_password() {
     else
       stty -echo
     fi
-    read -r pass1 < /dev/tty
+    read_from_tty -r pass1
     stty echo
     echo
 
@@ -115,7 +115,7 @@ get_valid_password() {
     else
       stty -echo
     fi
-    read -r pass2 < /dev/tty
+    read_from_tty -r pass2
     stty echo
     echo
 
