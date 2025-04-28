@@ -133,6 +133,7 @@ banner_archlinuxplus() {
 }
 
 # ==================== Keymap Setup ====================
+
 setup_keymap() {
   section_header "Keyboard Layout Setup"
 
@@ -163,23 +164,24 @@ setup_keymap() {
     echo
   fi
 
-  # Nu spørger vi om selve keymap input
-  input_print "Enter your desired keymap [default: dk]"
-  read_from_tty -r keymap
+  while true; do
+    input_print "Enter your desired keymap [default: dk]"
+    read_from_tty -r keymap
 
-  if [[ -z "$keymap" ]]; then
-    keymap="dk"
-    info_print "No keymap entered. Defaulting to 'dk'."
-  fi
+    if [[ -z "$keymap" ]]; then
+      keymap="dk"
+      info_print "No keymap entered. Defaulting to 'dk'."
+    fi
 
-  if loadkeys "$keymap" 2>/dev/null; then
-    KEYMAP="$keymap"
-    startup_ok "Keymap '$KEYMAP' loaded successfully."
-  else
-    startup_fail "Failed to load keymap '$keymap'. Falling back to 'dk'."
-    loadkeys dk
-    KEYMAP="dk"
-  fi
+    if loadkeys "$keymap" 2>/dev/null; then
+      KEYMAP="$keymap"
+      startup_ok "Keymap '$KEYMAP' loaded successfully."
+      break
+    else
+      startup_fail "Failed to load keymap '$keymap'. Please try again."
+      echo
+    fi
+  done
 }
 
 # ==================== Save Keymap to System ====================
