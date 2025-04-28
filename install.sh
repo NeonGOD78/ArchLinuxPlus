@@ -253,19 +253,28 @@ install_base_system() {
 
 # ======================= Setup Secure Boot Files ======================
 setup_secureboot() {
-  echo -e "${BBLUE}Setting up Secure Boot${RESET}"
+  print_info "Setting up Secure Boot..."
+
+  # Ensure the cryptroot device is defined
+  cryptroot="/dev/mapper/cryptroot"
+  root_uuid=$(blkid -s UUID -o value "$cryptroot")
+  print_success "Found root UUID: $root_uuid"
 
   # Create Secure Boot directory
+  print_info "Creating Secure Boot directory..."
   arch-chroot /mnt mkdir -p /etc/secureboot
 
   # Generate Secure Boot keys
+  print_info "Generating Secure Boot keys..."
   openssl req -new -x509 -newkey rsa:2048 -keyout /mnt/etc/secureboot/db.key -out /mnt/etc/secureboot/db.crt -nodes -days 36500 -subj "/CN=My Secure Boot Signing Key/"
 
   # Create kernel command line
+  print_info "Creating /etc/kernel/cmdline..."
   arch-chroot /mnt mkdir -p /etc/kernel
-  echo "root=UUID=$(blkid -s UUID -o value $root_partition) rw loglevel=3 quiet splash" | tee /mnt/etc/kernel/cmdline
+  echo "root=UUID=$root_uuid rw loglevel=3 quiet splash" | tee /mnt/etc/kernel/cmdline
 
   # Create update-uki helper script
+  print_info "Creating update-uki script..."
   arch-chroot /mnt bash -c "cat > /usr/local/bin/update-uki << 'EOF'
 #!/bin/bash
 ukify build \
@@ -275,11 +284,10 @@ ukify build \
   --output /efi/EFI/Linux/arch-linux.efi
 sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt /efi/EFI/Linux/arch-linux.efi --output /efi/EFI/Linux/arch-linux.efi
 EOF"
-
-  # Make update-uki executable
   arch-chroot /mnt chmod +x /usr/local/bin/update-uki
 
   # Create UKI Pacman Hook
+  print_info "Creating 95-ukify.hook..."
   arch-chroot /mnt mkdir -p /etc/pacman.d/hooks
   arch-chroot /mnt bash -c "cat > /etc/pacman.d/hooks/95-ukify.hook << 'EOF'
 [Trigger]
@@ -294,7 +302,8 @@ When = PostTransaction
 Exec = /usr/local/bin/update-uki
 EOF"
 
-  # Create UKI Fallback Pacman Hook (fixet ukify syntax)
+  # Create UKI Fallback Pacman Hook
+  print_info "Creating 96-ukify-fallback.hook..."
   arch-chroot /mnt bash -c "cat > /etc/pacman.d/hooks/96-ukify-fallback.hook << 'EOF'
 [Trigger]
 Type = Path
@@ -316,6 +325,7 @@ Exec = /usr/bin/bash -c \"ukify build \
 EOF"
 
   # Create UKI Update Service
+  print_info "Creating update-uki.service..."
   arch-chroot /mnt bash -c "cat > /etc/systemd/system/update-uki.service << 'EOF'
 [Unit]
 Description=Update and sign Unified Kernel Image
@@ -327,6 +337,7 @@ ExecStart=/usr/local/bin/update-uki
 EOF"
 
   # Create UKI Update Timer
+  print_info "Creating update-uki.timer..."
   arch-chroot /mnt bash -c "cat > /etc/systemd/system/update-uki.timer << 'EOF'
 [Unit]
 Description=Run update-uki weekly
@@ -341,6 +352,7 @@ WantedBy=timers.target
 EOF"
 
   # Enable UKI Update Timer
+  print_success "Enabling update-uki.timer..."
   arch-chroot /mnt systemctl enable update-uki.timer
 }
 
