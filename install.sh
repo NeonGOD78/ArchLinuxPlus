@@ -1039,27 +1039,23 @@ create_btrfs_subvolumes() {
 mount_subvolumes() {
   section_header "Mounting Filesystems"
 
+  # Mount root subvolume
   mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
 
-  # Make sure necessary folders exist BEFORE mounting subvolumes
-  mkdir -p /mnt/boot/efi
-  mkdir -p /mnt/home
-  mkdir -p /mnt/var
-  mkdir -p /mnt/var/log
-  mkdir -p /mnt/var/cache
-  mkdir -p /mnt/var/tmp
-  mkdir -p /mnt/var/lib/portables
-  mkdir -p /mnt/var/lib/machines
-  mkdir -p /mnt/srv
+  # Create needed directories
+  mkdir -p /mnt/{efi,boot,home,var,srv,var/log,var/cache,var/tmp,var/lib/portables,var/lib/machines}
 
-  mount "$EFI_PARTITION" /mnt/boot/efi
+  # Mount EFI System Partition
+  mount "$EFI_PARTITION" /mnt/efi
 
+  # Mount /home
   if [[ "$SEPARATE_HOME" == true ]]; then
     mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home
   else
     mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home
   fi
 
+  # Mount other subvolumes
   mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var
   mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv
   mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log
