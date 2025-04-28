@@ -822,12 +822,15 @@ configure_default_shell() {
     curl -sSLo /mnt/etc/skel/.aliases https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.aliases
 }
 
-# =================== Pacman Eye-Candy Setup ===================
-configure_pacman() {
-    info_print "Applying eye-candy and performance tweaks to pacman."
+# =================== Configure package management ===================
+configure_package_management() {
+    section_print "Configuring Pacman, Repositories, Makepkg, and installing Yay"
 
     PACMAN_CONF="/mnt/etc/pacman.conf"
+    MAKEPKG_CONF="/mnt/etc/makepkg.conf"
 
+    # ======================= Pacman.conf Tweaks =======================
+    info_print "Applying eye-candy and performance tweaks to pacman."
     sed -Ei '
         s/^#Color$/Color/
         /Color/ a ILoveCandy
@@ -835,18 +838,11 @@ configure_pacman() {
         s/^#VerbosePkgLists$/VerbosePkgLists/
         s/^#CheckSpace$/CheckSpace/
     ' "$PACMAN_CONF"
-}
 
-# =============== Pacman Repositories & Testing Setup ===============
-configure_pacman_repos() {
+    # ======================= Pacman Repositories =======================
     info_print "Enabling multilib and adding testing repositories with limited usage."
-
-    PACMAN_CONF="/mnt/etc/pacman.conf"
-
-    # Enable multilib repo
     sed -i '/#\[multilib\]/,/^#Include/ s/^#//' "$PACMAN_CONF"
 
-    # Add testing repos with proper Usage flags if not already present
     if ! grep -q "\[core-testing\]" "$PACMAN_CONF"; then
         cat >> "$PACMAN_CONF" <<'EOF'
 
@@ -867,55 +863,15 @@ Usage = Sync Upgrade Search Local
 Include = /etc/pacman.d/mirrorlist
 EOF
     fi
-}
 
-# ======================= makepkg.conf Tweaks ========================
-configure_makepkg() {
+    # ======================= makepkg.conf Tweaks =======================
     info_print "Optimizing makepkg.conf for faster and clearer builds."
-
-    MAKEPKG_CONF="/mnt/etc/makepkg.conf"
-
-    # Use all available CPU threads for compiling
     sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$MAKEPKG_CONF"
-
-    # Enable colored build output
     sed -i 's/^#*\s*BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/' "$MAKEPKG_CONF"
-
-    # Ensure .zst package compression (standard since pacman 6)
     sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$MAKEPKG_CONF"
-}
 
-# =================== System Services Enablement ===================
-enable_system_services() {
-    info_print "Enabling Reflector, automatic snapshots, BTRFS scrubbing, Grub Snapper menu and systemd-oomd."
-
-    services=(
-        reflector.timer
-        snapper-timeline.timer
-        snapper-cleanup.timer
-        btrfs-scrub@-.timer
-        btrfs-scrub@home.timer
-        btrfs-scrub@var-log.timer
-        btrfs-scrub@\\x2esnapshots.timer
-        grub-btrfsd.service
-        systemd-oomd
-    )
-
-    for service in "${services[@]}"; do
-        systemctl enable "$service" --root=/mnt &>/dev/null || warning_print "Could not enable $service"
-    done
-}
-
-# =========================== Final Message ===========================
-finish_installation() {
-  info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
-  info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
-}
-
-# ====================== AUR Helper: yay Installer ======================
-install_yay() {
-    info_print "Installing yay (AUR helper)..."
-
+    # ======================= Install Yay safely =======================
+    info_print "Installing yay (AUR helper) safely..."
     arch-chroot /mnt /bin/bash -e <<'EOF'
 set -e
 
@@ -943,8 +899,35 @@ echo "alias aur='yay'" >> /etc/skel/.bashrc
 echo "alias aur='yay'" >> /etc/skel/.zshrc
 
 EOF
-
     success_print "yay installed successfully with alias 'aur' in .bashrc and .zshrc"
+}
+
+
+# =================== System Services Enablement ===================
+enable_system_services() {
+    info_print "Enabling Reflector, automatic snapshots, BTRFS scrubbing, Grub Snapper menu and systemd-oomd."
+
+    services=(
+        reflector.timer
+        snapper-timeline.timer
+        snapper-cleanup.timer
+        btrfs-scrub@-.timer
+        btrfs-scrub@home.timer
+        btrfs-scrub@var-log.timer
+        btrfs-scrub@\\x2esnapshots.timer
+        grub-btrfsd.service
+        systemd-oomd
+    )
+
+    for service in "${services[@]}"; do
+        systemctl enable "$service" --root=/mnt &>/dev/null || warning_print "Could not enable $service"
+    done
+}
+
+# =========================== Final Message ===========================
+finish_installation() {
+  info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
+  info_print "Tip: If you ever rebuild your kernel manually, run: ${BOLD}update-uki${RESET} to regenerate and sign your UKI images."
 }
 
 # ===================== Dotfiles Setup via stow ======================
@@ -1244,11 +1227,8 @@ main() {
   build_uki_chroot
   setup_secureboot
   dotfiles_clone
-  configure_pacman
-  configure_pacman_repos
-  configure_makepkg
+  configure_package_management
   enable_system_services
-  install_yay
   finish_installation
   show_log_if_needed
 }
