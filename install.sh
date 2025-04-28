@@ -850,13 +850,13 @@ wipe_disk() {
 
   if [[ "$SECURE_WIPE" == true ]]; then
     warning_print "Securely wiping $DISK. This may take a long time..."
-    dd if=/dev/urandom of="$DISK" bs=1M status=progress || {
+    dd if=/dev/urandom of="$DISK" bs=1M status=progress &>> "$LOGFILE" || {
       error_print "Secure wipe failed!"
       exit 1
     }
   else
     info_print "Quickly zapping partition table on $DISK."
-    sgdisk --zap-all "$DISK" || {
+    sgdisk --zap-all "$DISK" &>> "$LOGFILE" || {
       error_print "Quick wipe failed!"
       exit 1
     }
@@ -871,12 +871,12 @@ partition_disk() {
 
   info_print "Creating GPT partition layout on $DISK."
 
-  parted --script "$DISK" mklabel gpt
+  parted --script "$DISK" mklabel gpt &>> "$LOGFILE"
 
   parted --script "$DISK" \
     mkpart primary fat32 1MiB 513MiB \
     set 1 esp on \
-    mkpart primary 513MiB 100%
+    mkpart primary 513MiB 100% &>> "$LOGFILE"
 
   partprobe "$DISK"
   sleep 2
@@ -897,7 +897,7 @@ partition_disk() {
     parted --script "$DISK" \
       rm 2 \
       mkpart primary 513MiB $((513 + ROOT_SIZE_GB * 1024))MiB \
-      mkpart primary $((513 + ROOT_SIZE_GB * 1024))MiB 100%
+      mkpart primary $((513 + ROOT_SIZE_GB * 1024))MiB 100% &>> "$LOGFILE"
 
     partprobe "$DISK"
     sleep 2
@@ -928,7 +928,7 @@ wipe_existing_luks_if_any() {
   for part in "${partitions_to_check[@]}"; do
     if cryptsetup isLuks "$part" &>/dev/null; then
       warning_print "Found LUKS header on $part. Wiping..."
-      cryptsetup luksErase "$part" || {
+      cryptsetup luksErase "$part" &>> "$LOGFILE" || {
         error_print "Failed to wipe LUKS header on $part."
         exit 1
       }
@@ -946,11 +946,11 @@ encrypt_partitions() {
 
   # Encrypt root
   info_print "Encrypting root partition: $ROOT_PARTITION"
-  echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$ROOT_PARTITION" -q --type luks2 || {
+  echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$ROOT_PARTITION" -q --type luks2 &>> "$LOGFILE" || {
     error_print "Failed to format root partition with LUKS."
     exit 1
   }
-  echo -n "$LUKS_PASSWORD" | cryptsetup open "$ROOT_PARTITION" cryptroot || {
+  echo -n "$LUKS_PASSWORD" | cryptsetup open "$ROOT_PARTITION" cryptroot &>> "$LOGFILE" || {
     error_print "Failed to open LUKS root partition."
     exit 1
   }
@@ -959,11 +959,11 @@ encrypt_partitions() {
   # Encrypt home (if separate home selected)
   if [[ "$SEPARATE_HOME" == true ]]; then
     info_print "Encrypting home partition: $HOME_PARTITION"
-    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$HOME_PARTITION" -q --type luks2 || {
+    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$HOME_PARTITION" -q --type luks2 &>> "$LOGFILE" || {
       error_print "Failed to format home partition with LUKS."
       exit 1
     }
-    echo -n "$LUKS_PASSWORD" | cryptsetup open "$HOME_PARTITION" crypthome || {
+    echo -n "$LUKS_PASSWORD" | cryptsetup open "$HOME_PARTITION" crypthome &>> "$LOGFILE" || {
       error_print "Failed to open LUKS home partition."
       exit 1
     }
@@ -976,20 +976,20 @@ encrypt_partitions() {
 format_btrfs() {
   section_header "Formatting Partitions with Btrfs"
 
-  mkfs.fat -F32 "$EFI_PARTITION" || {
+  mkfs.fat -F32 "$EFI_PARTITION" &>> "$LOGFILE" || {
     error_print "Failed to format EFI partition."
     exit 1
   }
   startup_ok "Formatted EFI partition as FAT32."
 
-  mkfs.btrfs -f /dev/mapper/cryptroot || {
+  mkfs.btrfs -f /dev/mapper/cryptroot &>> "$LOGFILE" || {
     error_print "Failed to format root partition as Btrfs."
     exit 1
   }
   startup_ok "Formatted root partition as Btrfs."
 
   if [[ "$SEPARATE_HOME" == true ]]; then
-    mkfs.btrfs -f /dev/mapper/crypthome || {
+    mkfs.btrfs -f /dev/mapper/crypthome &>> "$LOGFILE" || {
       error_print "Failed to format home partition as Btrfs."
       exit 1
     }
