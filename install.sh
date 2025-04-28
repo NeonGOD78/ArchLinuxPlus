@@ -275,6 +275,28 @@ partition_layout_choice() {
   else
     SEPARATE_HOME=true
     info_print "Will create a separate encrypted /home partition."
+
+    # Find total disk size in GB (assumes DISK variable already set!)
+    local total_size_gb
+    total_size_gb=$(lsblk -dnbo SIZE "$DISK" | awk '{print int($1/1024/1024/1024)}')
+    local default_root_size=$(( total_size_gb / 2 ))
+
+    while true; do
+      input_print "Enter size for root partition in GB (default: ${default_root_size}GB)"
+      read_from_tty -r root_size_input
+
+      if [[ -z "$root_size_input" ]]; then
+        ROOT_SIZE_GB="$default_root_size"
+        info_print "Defaulting root partition size to ${ROOT_SIZE_GB}GB."
+        break
+      elif [[ "$root_size_input" =~ ^[0-9]+$ ]] && (( root_size_input >= 10 && root_size_input < total_size_gb )); then
+        ROOT_SIZE_GB="$root_size_input"
+        startup_ok "Root partition size set to ${ROOT_SIZE_GB}GB."
+        break
+      else
+        warning_print "Invalid input. Please enter a number between 10 and $((total_size_gb-1))."
+      fi
+    done
   fi
 }
 
