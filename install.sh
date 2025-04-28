@@ -398,7 +398,7 @@ partition_layout_choice() {
   fi
 }
 
-# ================== Password and User Setup ==================
+# ================== Password, User and Dotfiles Setup ==================
 
 password_and_user_setup() {
   section_header "Password and User Setup"
@@ -502,6 +502,30 @@ password_and_user_setup() {
     fi
     info_print "Reusing LUKS password for all accounts."
   fi
+
+  # Step 5: Ask about dotfiles (only if username is set)
+  if [[ -n "$USERNAME" ]]; then
+    input_print "Do you want to install dotfiles for $USERNAME? [y/N]"
+    read_from_tty -r install_dotfiles_choice
+    install_dotfiles_choice="${install_dotfiles_choice,,}"
+
+    if [[ "$install_dotfiles_choice" =~ ^(y|yes)$ ]]; then
+      input_print "Enter GitHub URL for dotfiles repository (default: none)"
+      read_from_tty -r dotfiles_repo
+
+      if [[ -n "$dotfiles_repo" ]]; then
+        INSTALL_DOTFILES=true
+        DOTFILES_REPO="$dotfiles_repo"
+        startup_ok "Dotfiles will be installed from '$DOTFILES_REPO'."
+      else
+        warning_print "No URL entered. Skipping dotfiles installation."
+        INSTALL_DOTFILES=false
+      fi
+    else
+      INSTALL_DOTFILES=false
+      info_print "Skipping dotfiles installation."
+    fi
+  fi
 }
 
 # ================== Network Selector ==================
@@ -580,6 +604,64 @@ setup_hostname() {
   fi
 }
 
+# ================== Install Dotfiles ==================
+
+install_dotfiles() {
+  if [[ "$INSTALL_DOTFILES" == true && -n "$DOTFILES_REPO" && -n "$USERNAME" ]]; then
+    section_header "Dotfiles Installation"
+
+    info_print "Cloning dotfiles repository for user '$USERNAME'."
+
+    # Clone into /home/username/.dotfiles
+    arch-chroot /mnt /bin/bash -c "
+      git clone '$DOTFILES_REPO' /home/$USERNAME/.dotfiles &&
+      cd /home/$USERNAME/.dotfiles &&
+      stow */
+    " || {
+      warning_print "Failed to clone and install dotfiles for '$USERNAME'."
+      return 1
+    }
+
+    # Ensure correct ownership
+    arch-chroot /mnt /bin/bash -c "
+      chown -R $USERNAME:$USERNAME /home/$USERNAME/.dotfiles
+    "
+
+    success_print "Dotfiles installed successfully for '$USERNAME'."
+  else
+    info_print "Skipping dotfiles installation."
+  fi
+}
+
+# ================== Create Users ==================
+
+create_users() {
+  section_header "User and Root Setup"
+
+  # Set root password
+  info_print "Setting root password."
+  echo "root:$ROOT_PASSWORD" | arch-chroot /mnt chpasswd
+  startup_ok "Root password set."
+
+  # Create user if USERNAME is set
+  if [[ -n "$USERNAME" ]]; then
+    info_print "Creating user '$USERNAME'."
+
+    # Create user and add to wheel group
+    arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$USERNAME" || {
+      error_print "Failed to create user '$USERNAME'."
+      exit 1
+    }
+
+    # Set user password
+    echo "$USERNAME:$USER_PASSWORD" | arch-chroot /mnt chpasswd
+
+    startup_ok "User '$USERNAME' created and password set."
+  else
+    info_print "No user created. Only root account available."
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -596,6 +678,8 @@ main() {
   # move_logfile_to_mnt
   # save_keymap_config
   # save_locale_config
+  # create_users
+  # install_dotfiles
 }
 
 # ==================== Start Script ====================
