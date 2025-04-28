@@ -1138,15 +1138,26 @@ mount_subvolumes() {
 nocow_setup() {
   section_header "Applying NoCOW Attributes"
 
-  for path in /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines; do
+  local nocow_paths=(
+    "/mnt/var/log"
+    "/mnt/var/cache"
+    "/mnt/var/tmp"
+    "/mnt/var/lib/portables"
+    "/mnt/var/lib/machines"
+  )
+
+  for path in "${nocow_paths[@]}"; do
     if [[ -d "$path" ]]; then
-      chattr +C "$path" || warning_print "Failed to set NoCOW on $path"
+      chattr +C "$path" &>/dev/null
+      if [[ $? -eq 0 ]]; then
+        startup_ok "NoCOW attribute applied to $path."
+      else
+        warning_print "Failed to apply NoCOW to $path."
+      fi
     else
-      warning_print "Directory $path not found, skipping NoCOW."
+      warning_print "Directory $path does not exist, skipping NoCOW."
     fi
   done
-
-  startup_ok "NoCOW attributes applied where possible."
 }
 
 # ================== Version Display ==================
