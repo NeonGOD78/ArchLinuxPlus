@@ -25,7 +25,9 @@ read_from_tty() {
 
 # Logging
 log_msg() {
-  printf "%s\n" "$1" >> "$LOGFILE"
+  local timestamp
+  timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+  echo "[$timestamp] $1" >> "$LOGFILE"
 }
 
 log_start() {
