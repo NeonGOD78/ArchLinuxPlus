@@ -253,97 +253,49 @@ install_base_system() {
 
 # ======================= Setup Secure Boot Files ======================
 setup_secureboot() {
-  info_print "Setting up Secure Boot file structure and tools..."
+  echo -e "${BBLUE}Setting up Secure Boot${RESET}"
 
-  mkdir -p /mnt/etc/secureboot
-  if [[ ! -f /mnt/etc/secureboot/db.key || ! -f /mnt/etc/secureboot/db.crt ]]; then
-    info_print "Generating Secure Boot keys..."
-    openssl req -new -x509 -newkey rsa:2048 -sha256 -days 3650 \
-      -nodes -subj "/CN=Secure Boot Signing" \
-      -keyout /mnt/etc/secureboot/db.key \
-      -out /mnt/etc/secureboot/db.crt &>/dev/null
-    chmod 600 /mnt/etc/secureboot/db.key
-  else
-    info_print "Secure Boot keys already exist."
-  fi
+  # Create Secure Boot directory
+  arch-chroot /mnt mkdir -p /etc/secureboot
 
-  info_print "Creating helper script: /usr/local/bin/update-uki"
-  mkdir -p /mnt/usr/local/bin
-  cat > /mnt/usr/local/bin/update-uki <<'EOF'
+  # Generate Secure Boot keys
+  openssl req -new -x509 -newkey rsa:2048 -keyout /mnt/etc/secureboot/db.key -out /mnt/etc/secureboot/db.crt -nodes -days 36500 -subj "/CN=My Secure Boot Signing Key/"
+
+  # Create kernel command line
+  arch-chroot /mnt mkdir -p /etc/kernel
+  echo "root=UUID=$(blkid -s UUID -o value $root_partition) rw loglevel=3 quiet splash" | tee /mnt/etc/kernel/cmdline
+
+  # Create update-uki helper script
+  arch-chroot /mnt bash -c "cat > /usr/local/bin/update-uki << 'EOF'
 #!/bin/bash
-set -e
-UKI_OUTPUT="/efi/EFI/Linux/arch.efi"
-UKI_OUTPUT_FB="/efi/EFI/Linux/arch-fallback.efi"
-KERNEL="/boot/vmlinuz-linux"
-INITRD="/boot/initramfs-linux.img"
-INITRD_FB="/boot/initramfs-linux-fallback.img"
-BACKUP_DIR="/.efibackup"
-CMDLINE="rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ quiet loglevel=3"
-ukify build --linux "$KERNEL" --initrd "$INITRD" --cmdline "$CMDLINE" --output "$UKI_OUTPUT"
-[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT" "$UKI_OUTPUT"
-cp "$UKI_OUTPUT" "$BACKUP_DIR/arch.efi.bak" || echo "Backup failed"
-ukify build --linux "$KERNEL" --initrd "$INITRD_FB" --cmdline "$CMDLINE" --output "$UKI_OUTPUT_FB"
-[[ -f /etc/secureboot/db.key ]] && sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt --output "$UKI_OUTPUT_FB" "$UKI_OUTPUT_FB"
-cp "$UKI_OUTPUT_FB" "$BACKUP_DIR/arch-fallback.efi.bak" || echo "Backup failed"
-EOF
-  chmod +x /mnt/usr/local/bin/update-uki
+ukify build \
+  --linux /boot/vmlinuz-linux \
+  --initrd /boot/initramfs-linux.img \
+  --cmdline /etc/kernel/cmdline \
+  --output /efi/EFI/Linux/arch-linux.efi
+sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt /efi/EFI/Linux/arch-linux.efi --output /efi/EFI/Linux/arch-linux.efi
+EOF"
 
-  info_print "Creating helper script: /usr/local/bin/sign-grub"
-  cat > /mnt/usr/local/bin/sign-grub <<'EOF'
-#!/bin/bash
-set -e
-GRUB_EFI="/boot/EFI/GRUB/grubx64.efi"
-KEY="/etc/secureboot/db.key"
-CERT="/etc/secureboot/db.crt"
-[[ -f $GRUB_EFI && -f $KEY && -f $CERT ]] || { echo "Missing files."; exit 1; }
-sbsign --key "$KEY" --cert "$CERT" --output "$GRUB_EFI" "$GRUB_EFI"
-echo "[✓] GRUB successfully signed."
-EOF
-  chmod +x /mnt/usr/local/bin/sign-grub
+  # Make update-uki executable
+  arch-chroot /mnt chmod +x /usr/local/bin/update-uki
 
-  info_print "Creating /etc/motd message"
-  cat > /mnt/etc/motd <<'EOF'
-Welcome to your freshly installed Arch system 🎉
-Useful commands:
-  update-uki     → Rebuild + sign your Unified Kernel Images
-  sign-grub      → Re-sign GRUB after reinstall/update
-EOF
-
-  info_print "Creating /.efibackup directory"
-  mkdir -p /mnt/.efibackup
-
-  info_print "Creating UKI systemd timer"
-  mkdir -p /mnt/etc/systemd/system
-  cat > /mnt/etc/systemd/system/update-uki.timer <<'EOF'
-[Unit]
-Description=Run update-uki daily
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=1d
-
-[Install]
-WantedBy=timers.target
-EOF
-
-  info_print "Creating pacman hooks for UKI"
-  mkdir -p /mnt/etc/pacman.d/hooks
-  cat > /mnt/etc/pacman.d/hooks/95-ukify.hook <<'EOF'
+  # Create UKI Pacman Hook
+  arch-chroot /mnt mkdir -p /etc/pacman.d/hooks
+  arch-chroot /mnt bash -c "cat > /etc/pacman.d/hooks/95-ukify.hook << 'EOF'
 [Trigger]
-Type = Path
+Type = Package
 Operation = Install
 Operation = Upgrade
-Operation = Remove
-Target = boot/vmlinuz-linux
-Target = boot/initramfs-linux.img
+Target = linux
 
 [Action]
-Description = Regenerating Unified Kernel Image (UKI)...
+Description = Updating and signing UKI...
 When = PostTransaction
 Exec = /usr/local/bin/update-uki
-EOF
+EOF"
 
- cat << 'EOF' > /mnt/etc/pacman.d/hooks/96-ukify-fallback.hook
+  # Create UKI Fallback Pacman Hook (fixet ukify syntax)
+  arch-chroot /mnt bash -c "cat > /etc/pacman.d/hooks/96-ukify-fallback.hook << 'EOF'
 [Trigger]
 Type = Path
 Operation = Install
@@ -355,36 +307,41 @@ Target = initramfs-linux-fallback.img
 [Action]
 Description = Regenerating and signing fallback UKI...
 When = PostTransaction
-Exec = /usr/bin/bash -c "ukify build \
+Exec = /usr/bin/bash -c \"ukify build \
   --linux /boot/vmlinuz-linux \
   --initrd /boot/initramfs-linux-fallback.img \
   --cmdline /etc/kernel/cmdline \
   --output /efi/EFI/Linux/arch-fallback.efi && \
-  sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt /efi/EFI/Linux/arch-fallback.efi --output /efi/EFI/Linux/arch-fallback.efi"
-EOF
+  sbsign --key /etc/secureboot/db.key --cert /etc/secureboot/db.crt /efi/EFI/Linux/arch-fallback.efi --output /efi/EFI/Linux/arch-fallback.efi\"
+EOF"
 
-  info_print "Enabling UKI update timer..."
-  arch-chroot /mnt systemctl enable update-uki.timer &>/dev/null || warning_print "Failed to enable update-uki.timer"
+  # Create UKI Update Service
+  arch-chroot /mnt bash -c "cat > /etc/systemd/system/update-uki.service << 'EOF'
+[Unit]
+Description=Update and sign Unified Kernel Image
+After=network.target
 
-cat > /mnt/usr/local/bin/update-uki-fallback.sh <<'EOF'
-#!/bin/bash
-set -e
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-uki
+EOF"
 
-CMDLINE="rd.luks.name=/dev/mapper/cryptroot=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet loglevel=3"
+  # Create UKI Update Timer
+  arch-chroot /mnt bash -c "cat > /etc/systemd/system/update-uki.timer << 'EOF'
+[Unit]
+Description=Run update-uki weekly
 
-ukify build \
-  --linux /boot/vmlinuz-linux \
-  --initrd /boot/initramfs-linux-fallback.img \
-  --cmdline "$CMDLINE" \
-  --output /efi/EFI/Linux/arch-fallback.efi
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1w
+Unit=update-uki.service
 
-sbsign --key /etc/secureboot/db.key \
-       --cert /etc/secureboot/db.crt \
-       --output /efi/EFI/Linux/arch-fallback.efi \
-       /efi/EFI/Linux/arch-fallback.efi
-EOF
+[Install]
+WantedBy=timers.target
+EOF"
 
-chmod +x /mnt/usr/local/bin/update-uki-fallback.sh
+  # Enable UKI Update Timer
+  arch-chroot /mnt systemctl enable update-uki.timer
 }
 
 # ======================= Mount BTRFS Subvolumes ================
