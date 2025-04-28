@@ -662,6 +662,54 @@ create_users() {
   fi
 }
 
+# ================== Kernel Selection ==================
+
+kernel_selector() {
+  section_header "Kernel Selection"
+
+  info_print "Available Kernels:"
+  echo
+  echo "  1) Stable   - Vanilla Linux kernel with Arch Linux patches (recommended)"
+  echo "  2) Zen      - Optimized for desktop usage (low latency)"
+  echo "  3) Hardened - Security-focused Linux kernel"
+  echo "  4) LTS      - Long-term support Linux kernel"
+  echo
+
+  while true; do
+    input_print "Select your preferred kernel [1-4] (default: 1)"
+    read_from_tty -r kernel_choice
+
+    # Default to 1 if empty
+    kernel_choice="${kernel_choice:-1}"
+
+    case "$kernel_choice" in
+      1)
+        KERNEL_PACKAGE="linux"
+        startup_ok "Selected Stable kernel (linux)."
+        break
+        ;;
+      2)
+        KERNEL_PACKAGE="linux-zen"
+        startup_ok "Selected Zen kernel (linux-zen)."
+        break
+        ;;
+      3)
+        KERNEL_PACKAGE="linux-hardened"
+        startup_ok "Selected Hardened kernel (linux-hardened)."
+        break
+        ;;
+      4)
+        KERNEL_PACKAGE="linux-lts"
+        startup_ok "Selected LTS kernel (linux-lts)."
+        break
+        ;;
+      *)
+        warning_print "Invalid selection. Please choose 1-4."
+        ;;
+    esac
+  done
+}
+
 # ==================== Main ====================
 
 main() {
@@ -673,6 +721,7 @@ main() {
   password_and_user_setup
   network_selector
   setup_hostname
+  kernel_selector
   
   
   # move_logfile_to_mnt
