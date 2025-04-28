@@ -89,12 +89,12 @@ info_print() {
 }
 
 warning_print() {
-  printf "\r${DARKGRAY}[${YELLOW}!! ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[ ${YELLOW}!! ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[WARN] $1"
 }
 
 error_print() {
-  printf "\r${DARKGRAY}[${RED}!! ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
+  printf "\r${DARKGRAY}[ ${RED}!! ${DARKGRAY}]${RESET} ${LIGHTGRAY}%s${RESET}\n" "$1"
   log_msg "[ERR ] $1"
 }
 
@@ -132,9 +132,9 @@ banner_archlinuxplus() {
   printf "${RESET}\n"
   
   draw_line "-"
-
+  printf "ArchLinux+ an Advanced Arch Installer" 
 }
- printf "Arch Linux Advanced Installer" 
+
 # ==================== Keymap Setup ====================
 
 setup_keymap() {
