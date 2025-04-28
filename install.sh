@@ -1222,7 +1222,6 @@ main() {
   format_btrfs
   create_btrfs_subvolumes
   mount_subvolumes
-  verify_mountpoints
   nocow_setup
   
   # move_logfile_to_mnt
