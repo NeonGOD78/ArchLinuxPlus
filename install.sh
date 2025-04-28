@@ -405,6 +405,83 @@ password_and_user_setup() {
     info_print "Reusing LUKS password for all accounts."
   fi
 }
+
+# ================== Network Selector ==================
+
+network_selector() {
+  section_header "Network System Selection"
+
+  info_print "Available Network Options:"
+  echo
+  echo "  1) NetworkManager  - Universal utility (WiFi + Ethernet, recommended for desktop)"
+  echo "  2) IWD              - Simple Wi-Fi only (by Intel, built-in DHCP)"
+  echo "  3) wpa_supplicant   - Wi-Fi only (requires dhcpcd separately)"
+  echo "  4) dhcpcd           - Basic DHCP client (Ethernet or VMs)"
+  echo "  5) None             - (Manual setup later - for advanced users)"
+  echo
+
+  while true; do
+    input_print "Select your networking utility [1-5] (default: 1)"
+    read_from_tty -r network_choice
+
+    # Default to 1 if empty
+    network_choice="${network_choice:-1}"
+
+    case "$network_choice" in
+      1)
+        NETWORK_PKGS="networkmanager"
+        NETWORK_ENABLE="systemctl enable NetworkManager"
+        startup_ok "Selected NetworkManager."
+        break
+        ;;
+      2)
+        NETWORK_PKGS="iwd"
+        NETWORK_ENABLE="systemctl enable iwd"
+        startup_ok "Selected iwd."
+        break
+        ;;
+      3)
+        NETWORK_PKGS="wpa_supplicant dhcpcd"
+        NETWORK_ENABLE="systemctl enable wpa_supplicant dhcpcd"
+        startup_ok "Selected wpa_supplicant + dhcpcd."
+        break
+        ;;
+      4)
+        NETWORK_PKGS="dhcpcd"
+        NETWORK_ENABLE="systemctl enable dhcpcd"
+        startup_ok "Selected dhcpcd."
+        break
+        ;;
+      5)
+        NETWORK_PKGS=""
+        NETWORK_ENABLE=""
+        startup_warn "Skipping network setup as requested."
+        break
+        ;;
+      *)
+        warning_print "Invalid choice. Please select a number between 1 and 5."
+        ;;
+    esac
+  done
+}
+
+# ================== Hostname Setup ==================
+
+setup_hostname() {
+  section_header "Hostname Setup"
+
+  input_print "Enter desired hostname for your system (default: archlinux)"
+  read_from_tty -r hostname_input
+
+  if [[ -z "$hostname_input" ]]; then
+    HOSTNAME="archlinux"
+    info_print "Defaulting hostname to 'archlinux'."
+  else
+    HOSTNAME="$hostname_input"
+    startup_ok "Hostname set to '$HOSTNAME'."
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -414,6 +491,8 @@ main() {
   select_disk
   partition_layout_choice
   password_and_user_setup
+  network_selector
+  
   
   # move_logfile_to_mnt
   # save_keymap_config
