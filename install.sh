@@ -70,7 +70,8 @@ get_valid_password() {
   local pass1 pass2
 
   while true; do
-    input_print "$prompt: "
+    input_print "$prompt"
+    echo "(Password will be hidden. Just type and press Enter)"
     stty -echo
     read -r pass1
     stty echo
@@ -81,7 +82,8 @@ get_valid_password() {
       continue
     fi
 
-    input_print "Confirm $prompt: "
+    input_print "Confirm $prompt"
+    echo "(Password will be hidden. Just type and press Enter)"
     stty -echo
     read -r pass2
     stty echo
@@ -96,7 +98,6 @@ get_valid_password() {
 
   echo "$pass1"
 }
-
 # ======================= Welcome Banner ======================
 welcome_banner() {
   clear
