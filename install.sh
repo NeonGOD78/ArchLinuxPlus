@@ -69,9 +69,11 @@ get_valid_password() {
 
     while true; do
         input_print "Enter password:"
+        sleep 0.1
         read -rsp "" password
         echo
         input_print "Confirm password:"
+        sleep 0.1
         read -rsp "" confirm_password
         echo
 
