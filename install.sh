@@ -64,6 +64,14 @@ move_log_file() {
   fi
 }
 
+check_tty() {
+  if [ ! -t 0 ] && [ ! -e /dev/tty ]; then
+    error_print "No terminal detected (TTY missing)."
+    error_print "This script must be run in a real terminal."
+    exit 1
+  fi
+}
+
 # ======================= Password Prompt Helper ======================
 get_valid_password() {
   local prompt="$1"
