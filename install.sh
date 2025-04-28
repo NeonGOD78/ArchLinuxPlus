@@ -33,8 +33,9 @@ success_print() {
 }
 
 input_print() {
-  printf "${BYELLOW}[?] %s${RESET}\n" "$1"
+  printf "${BYELLOW}[?] %s${RESET} " "$1"
 }
+
 
 print_separator() {
   printf "${BBLUE}------------------------------------------------------------${RESET}\n"
