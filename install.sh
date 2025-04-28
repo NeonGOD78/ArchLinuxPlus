@@ -132,7 +132,7 @@ banner_archlinuxplus() {
   printf "${RESET}\n"
   
   draw_line "-"
-  printf "ArchLinux+ an Advanced Arch Installer" 
+  printf "ArchLinux+ an Advanced Arch Installer\n"
 }
 
 # ==================== Keymap Setup ====================
