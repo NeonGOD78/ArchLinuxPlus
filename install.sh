@@ -1405,9 +1405,11 @@ setup_initramfs() {
 setup_uki_build() {
   section_header "Unified Kernel Image (UKI) Build"
 
-  local kernel_path="/boot/vmlinuz-$kernel"
-  local initramfs_path="/boot/initramfs-$kernel.img"
-  local microcode_path="/boot/$microcode.img"
+  enable_debug
+
+  local kernel_path="/boot/vmlinuz-$KERNEL_PACKAGE"
+  local initramfs_path="/boot/initramfs-$KERNEL_PACKAGE.img"
+  local microcode_path="/boot/$MICROCODE_PACKAGE.img"
   local cmdline_path="/etc/kernel/cmdline"
   local output_path="/efi/EFI/Linux/arch.efi"
 
@@ -1416,6 +1418,7 @@ setup_uki_build() {
   for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
     if [[ ! -f "/mnt$file" ]]; then
       error_print "Missing required file: $file"
+      disable_debug
       exit 1
     fi
   done
@@ -1440,6 +1443,7 @@ setup_uki_build() {
     startup_ok "UKI built and placed at $output_path"
   else
     error_print "Failed to build UKI."
+    disable_debug
     exit 1
   fi
 
@@ -1455,8 +1459,11 @@ setup_uki_build() {
     startup_ok "UKI signed successfully."
   else
     error_print "Failed to sign UKI."
+    disable_debug
     exit 1
   fi
+
+  disable_debug
 }
 
 # ======================= Setup Secureboot Structure ========================
