@@ -1279,7 +1279,7 @@ install_base_system() {
   info_print "Checking kernel/microcode/network package values..."
   echo "  KERNEL_PACKAGE='$KERNEL_PACKAGE'"
   echo "  MICROCODE_PACKAGE='$MICROCODE_PACKAGE'"
-  echo "  NETWORK_PACKAGE='$NETWORK_PACKAGE'"
+  echo "  NETWORK_PKGS='$NETWORK_PKGS'"
   echo
 
   if [[ -z "$KERNEL_PACKAGE" || -z "$MICROCODE_PACKAGE" ]]; then
@@ -1294,7 +1294,7 @@ install_base_system() {
     btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
     zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl
     btop mc git systemd ukify openssl sbsigntools sbctl base-devel
-    "$NETWORK_PACKAGE"
+    "$NETWORK_PKGS"
   )
 
   enable_debug
