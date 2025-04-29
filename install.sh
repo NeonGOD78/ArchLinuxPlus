@@ -1475,6 +1475,61 @@ setup_cmdline_file() {
   startup_ok "Kernel command line written to $cmdline_path."
 }
 
+# ==================== Setup GRUB Bootloader ====================
+
+setup_grub_bootloader() {
+  section_header "GRUB Bootloader Setup"
+
+  info_print "Installing GRUB to EFI system..."
+
+  arch-chroot /mnt grub-install \
+    --target=x86_64-efi \
+    --efi-directory=/efi \
+    --bootloader-id=GRUB \
+    --recheck \
+    --no-nvram >> "$LOGFILE" 2>&1
+
+  if [[ $? -eq 0 ]]; then
+    startup_ok "GRUB installed to EFI system partition."
+  else
+    startup_error "GRUB installation failed."
+    exit 1
+  fi
+
+  # Set up grub-btrfs if installed
+  if arch-chroot /mnt command -v grub-btrfsd &>/dev/null; then
+    info_print "Setting up grub-btrfs snapshot integration..."
+    arch-chroot /mnt systemctl enable grub-btrfs.path >> "$LOGFILE" 2>&1
+    startup_ok "grub-btrfs enabled."
+  fi
+
+  # Create custom UKI GRUB entry
+  local grub_custom="/mnt/etc/grub.d/40_custom"
+
+  info_print "Creating GRUB entry for signed UKI..."
+
+  cat <<EOF > "$grub_custom"
+menuentry 'Arch Linux (UKI)' {
+    search --no-floppy --file --set=root /EFI/Linux/arch.efi
+    chainloader /EFI/Linux/arch.efi
+}
+EOF
+
+  chmod +x "$grub_custom"
+  startup_ok "Custom GRUB UKI entry written to 40_custom."
+
+  # Generate grub.cfg
+  info_print "Generating GRUB config..."
+  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1
+
+  if [[ $? -eq 0 ]]; then
+    startup_ok "GRUB configuration generated."
+  else
+    startup_error "Failed to generate grub.cfg."
+    exit 1
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1532,6 +1587,7 @@ main() {
   setup_cmdline_file
   setup_initramfs
   setup_uki_build
+  setup_grub_bootloader
 
 
   
