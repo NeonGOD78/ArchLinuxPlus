@@ -1717,6 +1717,7 @@ main() {
   setup_grub_bootloader
   setup_uki_pacman_hook
   setup_grub_pacman_hook
+  setup_snapper
 
 
   
