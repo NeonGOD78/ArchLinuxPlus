@@ -1263,22 +1263,22 @@ debug_print() {
 # =================== Base System Installation ===================
 
 install_base_system() {
-    info_print "Installing base system with pacstrap..."
+  info_print "Installing base system with pacstrap..."
 
-    local base_packages=(
-        base "$kernel" "$microcode" linux-firmware "$kernel"-headers
-        btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
-        zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl
-        btop mc git systemd ukify openssl sbsigntools sbctl base-devel
-        "$network_package"
-    )
+  local base_packages=(
+    base "$kernel" "$microcode" linux-firmware "$kernel"-headers
+    btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
+    zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl
+    btop mc git systemd ukify openssl sbsigntools sbctl base-devel
+    "$network_package"
+  )
 
-    if pacstrap -K /mnt "${base_packages[@]}"; then
-        success_print "Base system installed successfully."
-    else
-        error_print "Base system installation failed!"
-        exit 1
-    fi
+  if pacstrap -K /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1; then
+    success_print "Base system installed successfully."
+  else
+    error_print "Base system installation failed!"
+    exit 1
+  fi
 }
 
 # ======================= Generate fstab ========================
