@@ -1313,13 +1313,14 @@ main() {
   mount_subvolumes
   nocow_setup
 
-  # Base system
+  # Base System
   install_base_system
   move_logfile_to_mnt
   gen_fstab
   save_keymap_config
+  save_locale_config
 
-  # save_locale_config
+  
   # create_users
   # install_dotfiles
 }
