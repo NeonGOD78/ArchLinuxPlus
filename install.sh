@@ -563,6 +563,7 @@ if [[ -n "$USERNAME" ]]; then
     info_print "Skipping dotfiles restore."
   fi
 fi
+}
 
 # ================== Network Selector ==================
 
