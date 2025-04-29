@@ -321,7 +321,7 @@ save_locale_config() {
     if [[ $? -eq 0 ]]; then
       startup_ok "Locale generated successfully in chroot."
     else
-      startup_error "Failed to generate locale inside chroot."
+      error_print "Failed to generate locale inside chroot."
       exit 1
     fi
   else
@@ -692,7 +692,7 @@ create_users() {
     arch-chroot /mnt chown -R root:root /root/
     startup_ok "Root environment configured."
   else
-    startup_error "ROOT_PASSWORD is empty. Skipping root setup."
+    error_print "ROOT_PASSWORD is empty. Skipping root setup."
   fi
 
   # === Create user ===
@@ -985,7 +985,7 @@ wipe_existing_luks_if_any() {
         error_print "Failed to wipe LUKS header on $part."
         exit 1
       }
-      success_print "LUKS header wiped from $part."
+      startup_ok "LUKS header wiped from $part."
     else
       info_print "No LUKS header on $part. Continuing."
     fi
@@ -1307,7 +1307,7 @@ install_base_system() {
   disable_debug
 
   if [[ $pacstrap_exit -eq 0 ]]; then
-    success_print "Base system installed successfully."
+    startup_ok "Base system installed successfully."
   else
     error_print "Base system installation failed!"
     exit 1
@@ -1330,7 +1330,7 @@ gen_fstab() {
     disable_debug
 
     if [[ -s /mnt/etc/fstab ]]; then
-        success_print "/etc/fstab generated successfully."
+        startup_ok "/etc/fstab generated successfully."
     else
         error_print "fstab file is empty. Something went wrong."
         exit 1
@@ -1354,7 +1354,7 @@ EOF
 
     startup_ok "/etc/hosts configured with hostname '$HOSTNAME'."
   else
-    startup_error "Hostname variable is empty. Cannot configure hostname."
+    error_print "Hostname variable is empty. Cannot configure hostname."
     exit 1
   fi
 }
@@ -1368,7 +1368,7 @@ set_timezone() {
   ZONE=$(curl -s http://ip-api.com/line?fields=timezone)
 
   if [[ -z "$ZONE" ]]; then
-    startup_error "Failed to detect timezone. Defaulting to UTC."
+    error_print "Failed to detect timezone. Defaulting to UTC."
     ZONE="UTC"
   else
     startup_ok "Detected timezone: $ZONE"
@@ -1378,7 +1378,7 @@ set_timezone() {
   if [[ $? -eq 0 ]]; then
     startup_ok "Timezone set to $ZONE."
   else
-    startup_error "Failed to set timezone. See log for details."
+    error_print "Failed to set timezone. See log for details."
     exit 1
   fi
 
@@ -1386,7 +1386,7 @@ set_timezone() {
   if [[ $? -eq 0 ]]; then
     startup_ok "Hardware clock synchronized."
   else
-    startup_error "Failed to synchronize hardware clock. See log."
+    error_print "Failed to synchronize hardware clock. See log."
     exit 1
   fi
 }
@@ -1407,7 +1407,7 @@ setup_initramfs() {
   if [[ $? -eq 0 ]]; then
     startup_ok "Initramfs generated successfully."
   else
-    startup_error "Initramfs generation failed. Check log."
+    error_print "Initramfs generation failed. Check log."
     exit 1
   fi
 }
@@ -1427,7 +1427,7 @@ setup_uki_build() {
   info_print "Checking for necessary files..."
   for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
     if [[ ! -f "/mnt$file" ]]; then
-      startup_error "Missing required file: $file"
+      error_print "Missing required file: $file"
       exit 1
     fi
   done
@@ -1451,7 +1451,7 @@ setup_uki_build() {
   if [[ $? -eq 0 ]]; then
     startup_ok "UKI built and placed at $output_path"
   else
-    startup_error "Failed to build UKI."
+    error_print "Failed to build UKI."
     exit 1
   fi
 
@@ -1466,7 +1466,7 @@ setup_uki_build() {
   if [[ $? -eq 0 ]]; then
     startup_ok "UKI signed successfully."
   else
-    startup_error "Failed to sign UKI."
+    error_print "Failed to sign UKI."
     exit 1
   fi
 }
@@ -1513,7 +1513,7 @@ setup_cmdline_file() {
   # Find UUID for root partition
   root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
   if [[ -z "$root_uuid" ]]; then
-    startup_error "Unable to determine UUID for root partition."
+    error_print "Unable to determine UUID for root partition."
     exit 1
   fi
 
@@ -1587,7 +1587,7 @@ setup_grub_bootloader() {
   info_print "Installing GRUB bootloader..."
   arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck --no-nvram >> "$LOGFILE" 2>&1
   if [[ $? -ne 0 ]]; then
-    startup_error "GRUB installation failed."
+    error_print "GRUB installation failed."
     exit 1
   fi
 
@@ -1595,7 +1595,7 @@ setup_grub_bootloader() {
   info_print "Generating grub.cfg..."
   arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1
   if [[ $? -ne 0 ]]; then
-    startup_error "Failed to generate grub.cfg."
+    error_print "Failed to generate grub.cfg."
     exit 1
   fi
 
@@ -1936,7 +1936,7 @@ final_message() {
   section_header "Installation Complete"
 
   echo
-  success_print "Installation completed successfully."
+  startup_ok "Installation completed successfully."
   echo
 
   info_print "Summary of important details:"
@@ -1978,7 +1978,7 @@ final_message() {
   fi
 
   echo
-  success_print "Installation is complete. You may now reboot your system."
+  startup_ok "Installation is complete. You may now reboot your system."
   echo
   info_print "Next Steps:"
   echo -e "  - Reboot into your new system."
