@@ -640,35 +640,6 @@ setup_hostname() {
   fi
 }
 
-# ================== Install Dotfiles ==================
-
-install_dotfiles() {
-  if [[ "$INSTALL_DOTFILES" == true && -n "$DOTFILES_REPO" && -n "$USERNAME" ]]; then
-    section_header "Dotfiles Installation"
-
-    info_print "Cloning dotfiles repository for user '$USERNAME'."
-
-    # Clone into /home/username/.dotfiles
-    arch-chroot /mnt /bin/bash -c "
-      git clone '$DOTFILES_REPO' /home/$USERNAME/.dotfiles &&
-      cd /home/$USERNAME/.dotfiles &&
-      stow */
-    " || {
-      warning_print "Failed to clone and install dotfiles for '$USERNAME'."
-      return 1
-    }
-
-    # Ensure correct ownership
-    arch-chroot /mnt /bin/bash -c "
-      chown -R $USERNAME:$USERNAME /home/$USERNAME/.dotfiles
-    "
-
-    success_print "Dotfiles installed successfully for '$USERNAME'."
-  else
-    info_print "Skipping dotfiles installation."
-  fi
-}
-
 # ================== Create Users ==================
 
 create_users() {
