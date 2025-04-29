@@ -1271,6 +1271,26 @@ gen_fstab() {
     fi
 }
 
+save_hostname_config() {
+  section_header "Writing hostname and hosts file"
+
+  if [[ -n "$HOSTNAME" ]]; then
+    echo "$HOSTNAME" > /mnt/etc/hostname
+    startup_ok "Saved hostname '$HOSTNAME' to /mnt/etc/hostname."
+
+    cat > /mnt/etc/hosts <<EOF
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   $HOSTNAME.localdomain $HOSTNAME
+EOF
+
+    startup_ok "/etc/hosts configured with hostname '$HOSTNAME'."
+  else
+    startup_error "Hostname variable is empty. Cannot configure hostname."
+    exit 1
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1319,6 +1339,8 @@ main() {
   gen_fstab
   save_keymap_config
   save_locale_config
+  save_hostname_config
+  
 
   
   # create_users
