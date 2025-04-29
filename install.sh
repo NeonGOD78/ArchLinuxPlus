@@ -1263,6 +1263,18 @@ debug_print() {
 # =================== Base System Installation ===================
 
 install_base_system() {
+  section_header "Base System Installation"
+
+  info_print "Checking kernel/microcode/network package values..."
+  echo "  KERNEL_PACKAGE='$KERNEL_PACKAGE'"
+  echo "  MICROCODE_PACKAGE='$MICROCODE_PACKAGE'"
+  echo "  NETWORK_PACKAGE='$NETWORK_PACKAGE'"
+  echo
+
+  if [[ -z "$KERNEL_PACKAGE" || -z "$MICROCODE_PACKAGE" ]]; then
+    error_print "Kernel or microcode not set! Aborting."
+    exit 1
+  fi
   info_print "Installing base system with pacstrap..."
 
   local base_packages=(
@@ -1272,8 +1284,10 @@ install_base_system() {
     btop mc git systemd ukify openssl sbsigntools sbctl base-devel
     "$network_package"
   )
-
+  
+  set -x
   if pacstrap -K /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1; then
+    set +x
     success_print "Base system installed successfully."
   else
     error_print "Base system installation failed!"
