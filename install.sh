@@ -18,7 +18,7 @@ LOGFILE="/var/log/archinstall.log"
 
 # ======================= Debug Control =======================
 
-DEBUG=false
+DEBUG=true
 
 enable_debug() {
   [[ "$DEBUG" == true ]] && set -x
