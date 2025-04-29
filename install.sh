@@ -298,8 +298,23 @@ save_locale_config() {
   if [[ -n "$LOCALE" ]]; then
     echo "LANG=$LOCALE" > /mnt/etc/locale.conf
     startup_ok "Saved locale '$LOCALE' to /mnt/etc/locale.conf."
+
+    if grep -q "^#${LOCALE}" /mnt/etc/locale.gen; then
+      sed -i "s/^#${LOCALE}/${LOCALE}/" /mnt/etc/locale.gen
+      startup_ok "Uncommented $LOCALE in /mnt/etc/locale.gen."
+    else
+      startup_warn "$LOCALE not found in /mnt/etc/locale.gen. Skipping sed."
+    fi
+
+    arch-chroot /mnt locale-gen >> "$LOGFILE" 2>&1
+    if [[ $? -eq 0 ]]; then
+      startup_ok "Locale generated successfully in chroot."
+    else
+      startup_error "Failed to generate locale inside chroot."
+      exit 1
+    fi
   else
-    startup_warn "No locale to save. Skipping locale.conf setup."
+    startup_warn "No locale to save. Skipping locale.conf and generation."
   fi
 }
 
