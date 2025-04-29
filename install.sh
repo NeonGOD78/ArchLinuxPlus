@@ -1289,6 +1289,8 @@ gen_fstab() {
     fi
 }
 
+# ======================= Save Hostname ========================
+
 save_hostname_config() {
   section_header "Writing hostname and hosts file"
 
@@ -1308,6 +1310,8 @@ EOF
     exit 1
   fi
 }
+
+# ======================= Set Timezone ========================
 
 set_timezone() {
   section_header "Timezone & Clock Configuration"
@@ -1339,6 +1343,8 @@ set_timezone() {
   fi
 }
 
+# ======================= Setup Initramfs ========================
+
 setup_initramfs() {
   section_header "Initramfs & Systemd Hooks Setup"
 
@@ -1356,6 +1362,117 @@ setup_initramfs() {
     startup_error "Initramfs generation failed. Check log."
     exit 1
   fi
+}
+
+# ======================= Setup UKI Build ========================
+
+setup_uki_build() {
+  section_header "Unified Kernel Image (UKI) Build"
+
+  local kernel_path="/boot/vmlinuz-$kernel"
+  local initramfs_path="/boot/initramfs-$kernel.img"
+  local microcode_path="/boot/$microcode.img"
+  local cmdline_path="/etc/kernel/cmdline"
+  local output_path="/efi/EFI/Linux/arch.efi"
+
+  # Check if all necessary components exist
+  info_print "Checking for necessary files..."
+  for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
+    if [[ ! -f "/mnt$file" ]]; then
+      startup_error "Missing required file: $file"
+      exit 1
+    fi
+  done
+  startup_ok "All required files found."
+
+  # Create /efi/EFI/Linux if missing
+  arch-chroot /mnt mkdir -p /efi/EFI/Linux
+
+  # Generate UKI
+  info_print "Building UKI with ukify..."
+  arch-chroot /mnt ukify \
+    build \
+    --kernel "$kernel_path" \
+    --initrd "$microcode_path" \
+    --initrd "$initramfs_path" \
+    --cmdline-file "$cmdline_path" \
+    --output "$output_path" \
+    --os-release /usr/lib/os-release \
+    --splash /usr/share/systemd/bootctl/splash-arch.bmp >> "$LOGFILE" 2>&1
+
+  if [[ $? -eq 0 ]]; then
+    startup_ok "UKI built and placed at $output_path"
+  else
+    startup_error "Failed to build UKI."
+    exit 1
+  fi
+
+  # Sign the UKI
+  info_print "Signing UKI with Secure Boot keys..."
+  arch-chroot /mnt sbsign \
+    --key /etc/secureboot/keys/db.key \
+    --cert /etc/secureboot/keys/db.crt \
+    --output "$output_path" \
+    "$output_path" >> "$LOGFILE" 2>&1
+
+  if [[ $? -eq 0 ]]; then
+    startup_ok "UKI signed successfully."
+  else
+    startup_error "Failed to sign UKI."
+    exit 1
+  fi
+}
+
+# ======================= Setup Secureboot Structure ========================
+
+setup_secureboot_structure() {
+  section_header "Secure Boot Key Generation"
+
+  local keydir="/mnt/etc/secureboot/keys"
+  arch-chroot /mnt mkdir -p "$keydir"
+
+  info_print "Generating Secure Boot keys (PK, KEK, db)..."
+
+  # Generate Platform Key (PK)
+  arch-chroot /mnt openssl req -new -x509 -newkey rsa:4096 \
+    -subj "/CN=Platform Key/" \
+    -keyout "$keydir/PK.key" -out "$keydir/PK.crt" \
+    -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
+
+  # Generate Key Exchange Key (KEK)
+  arch-chroot /mnt openssl req -new -x509 -newkey rsa:4096 \
+    -subj "/CN=Key Exchange Key/" \
+    -keyout "$keydir/KEK.key" -out "$keydir/KEK.crt" \
+    -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
+
+  # Generate Signature Database Key (db)
+  arch-chroot /mnt openssl req -new -x509 -newkey rsa:4096 \
+    -subj "/CN=Signature Database/" \
+    -keyout "$keydir/db.key" -out "$keydir/db.crt" \
+    -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
+
+  startup_ok "Secure Boot keys generated and stored in $keydir."
+}
+
+# ==================== Setup cmdline file ====================
+
+setup_cmdline_file() {
+  section_header "Generating Kernel Command Line"
+
+  local cmdline_path="/mnt/etc/kernel/cmdline"
+  local root_uuid
+
+  # Find UUID for root partition
+  root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
+  if [[ -z "$root_uuid" ]]; then
+    startup_error "Unable to determine UUID for root partition."
+    exit 1
+  fi
+
+  # Create cmdline file
+  echo "root=UUID=$root_uuid rw quiet splash loglevel=3" > "$cmdline_path"
+
+  startup_ok "Kernel command line written to $cmdline_path."
 }
 
 # ==================== Main ====================
@@ -1409,7 +1526,14 @@ main() {
   save_hostname_config
   set_timezone
   create_users
+
+  # Secureboot
+  setup_secureboot_structure
+  setup_cmdline_file
   setup_initramfs
+  setup_uki_build
+
+
   
 }
 
