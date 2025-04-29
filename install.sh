@@ -1914,6 +1914,28 @@ final_message() {
   echo
   success_print "Installation is complete. You may now reboot your system."
   echo
+  info_print "Next Steps:"
+  echo -e "  - Reboot into your new system."
+  echo -e "  - Enroll your Secure Boot keys in BIOS (located at /efi/secureboot/keys)."
+  echo -e "  - Snapper will automatically manage Btrfs snapshots."
+  echo -e "  - If needed, review installation details in the logfile: $LOGFILE"
+  echo
+  input_print "Would you like to reboot now? [y/N]"
+  read_from_tty -r reboot_choice
+  reboot_choice="${reboot_choice,,}"
+
+  if [[ "$reboot_choice" =~ ^(y|yes)$ ]]; then
+    info_print "Preparing for reboot..."
+
+    # Try to unmount /mnt cleanly
+    info_print "Unmounting /mnt..."
+    umount -R /mnt >> "$LOGFILE" 2>&1 || warning_print "Some /mnt submounts could not be unmounted cleanly."
+
+    info_print "Rebooting system now."
+    reboot
+  else
+    info_print "Reboot manually when ready. Remember to unmount /mnt if needed."
+  fi
 }
 
 # ==================== Main ====================
