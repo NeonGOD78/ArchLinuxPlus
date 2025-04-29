@@ -1500,7 +1500,7 @@ setup_grub_bootloader() {
   # Set up grub-btrfs if installed
   if arch-chroot /mnt command -v grub-btrfsd &>/dev/null; then
     info_print "Setting up grub-btrfs snapshot integration..."
-    arch-chroot /mnt systemctl enable grub-btrfs.path >> "$LOGFILE" 2>&1
+    arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1
     startup_ok "grub-btrfs enabled."
   fi
 
