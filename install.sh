@@ -1773,6 +1773,7 @@ main() {
   setup_hostname
   kernel_selector
   editor_selector
+  select_grub_theme
   confirm_installation
 
   # Disk setup
