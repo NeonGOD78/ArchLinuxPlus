@@ -15,7 +15,18 @@ CYAN='\e[96m'
 
 SCRIPT_VERSION="v1.0"
 LOGFILE="/var/log/archinstall.log"
+
+# ======================= Debug Control =======================
+
 DEBUG=false
+
+enable_debug() {
+  [[ "$DEBUG" == true ]] && set -x
+}
+
+disable_debug() {
+  [[ "$DEBUG" == true ]] && set +x
+}
 
 # ==================== Basic Helpers ====================
 
@@ -1275,19 +1286,27 @@ install_base_system() {
     error_print "Kernel or microcode not set! Aborting."
     exit 1
   fi
+
   info_print "Installing base system with pacstrap..."
 
   local base_packages=(
-    base "$kernel" "$microcode" linux-firmware "$kernel"-headers
+    base "$KERNEL_PACKAGE" "$MICROCODE_PACKAGE" linux-firmware "$KERNEL_PACKAGE"-headers
     btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
     zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl
     btop mc git systemd ukify openssl sbsigntools sbctl base-devel
-    "$network_package"
+    "$NETWORK_PACKAGE"
   )
-  
-  set -x
-  if pacstrap -K /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1; then
-    set +x
+
+  enable_debug
+  if [[ "$DEBUG" == true ]]; then
+    pacstrap -K /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
+  else
+    pacstrap -K /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
+  fi
+  pacstrap_exit=$?
+  disable_debug
+
+  if [[ $pacstrap_exit -eq 0 ]]; then
     success_print "Base system installed successfully."
   else
     error_print "Base system installation failed!"
