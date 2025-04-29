@@ -1239,6 +1239,23 @@ install_base_system() {
     fi
 }
 
+# ======================= Generate fstab ========================
+gen_fstab() {
+    info_print "Generating /etc/fstab..."
+
+    if genfstab -U /mnt >> /mnt/etc/fstab 2>> "$LOGFILE"; then
+        if [[ -s /mnt/etc/fstab ]]; then
+            success_print "/etc/fstab generated successfully."
+        else
+            error_print "fstab file is empty. Something went wrong."
+            exit 1
+        fi
+    else
+        error_print "Failed to generate /etc/fstab. See logfile for details."
+        exit 1
+    fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1284,6 +1301,7 @@ main() {
   # Base system
   install_base_system
   move_logfile_to_mnt
+  gen_fstab
 
   
   # save_keymap_config
