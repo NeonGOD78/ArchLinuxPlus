@@ -1632,6 +1632,31 @@ EOF
   startup_ok "GRUB pacman hook and re-sign script installed."
 }
 
+# ==================== Setup Snapper ====================
+
+setup_snapper() {
+  section_header "Snapper Setup for Root Filesystem"
+
+  info_print "Creating snapper config for root..."
+  arch-chroot /mnt snapper --config root create-config /
+  startup_ok "Snapper configuration for root created."
+
+  info_print "Adjusting snapper config..."
+  arch-chroot /mnt sed -i 's|ALLOW_USERS="|"ALLOW_USERS='"$USERNAME"'"|' /etc/snapper/configs/root
+  arch-chroot /mnt sed -i 's|TIMELINE_CREATE="no"|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
+  arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
+  startup_ok "Snapper config adjusted."
+
+  info_print "Creating initial snapshot..."
+  arch-chroot /mnt snapper --config root create --description "Initial install snapshot"
+  startup_ok "Initial snapshot created."
+
+  info_print "Setting permissions on /.snapshots..."
+  arch-chroot /mnt chmod 750 /.snapshots
+  arch-chroot /mnt chown :wheel /.snapshots
+  startup_ok "Permissions set: Group 'wheel' can access /.snapshots."
+}
+
 # ==================== Main ====================
 
 main() {
