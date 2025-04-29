@@ -1479,56 +1479,80 @@ setup_cmdline_file() {
 # ==================== Setup GRUB Bootloader ====================
 
 setup_grub_bootloader() {
-  section_header "GRUB Bootloader Setup"
+  section_header "GRUB Bootloader Installation and Theme Setup"
 
-  info_print "Installing GRUB to EFI system..."
+  local theme_dir="$GRUB_THEME_DIR"
+  local gfx_mode="$GRUB_GFXMODE"
+  local theme_url="$GRUB_THEME_URL"
 
-  arch-chroot /mnt grub-install \
-    --target=x86_64-efi \
-    --efi-directory=/efi \
-    --bootloader-id=GRUB \
-    --recheck \
-    --no-nvram >> "$LOGFILE" 2>&1
-
-  if [[ $? -eq 0 ]]; then
-    startup_ok "GRUB installed to EFI system partition."
+  # Download and extract theme
+  info_print "Downloading and installing GRUB theme: $theme_dir"
+  mkdir -p "/mnt/boot/grub/themes/$theme_dir"
+  if ! curl -L "$theme_url" -o /tmp/theme.zip; then
+      warning_print "Failed to download GRUB theme. Skipping theme installation."
   else
+      bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir"
+  fi
+
+  # Configure /etc/default/grub
+  info_print "Configuring /etc/default/grub..."
+  local grub_cfg_file="/mnt/etc/default/grub"
+  declare -A grub_vars=(
+    ["GRUB_ENABLE_CRYPTODISK"]="y"
+    ["GRUB_GFXMODE"]="$gfx_mode"
+    ["GRUB_GFXPAYLOAD_LINUX"]="keep"
+    ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
+    ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
+  )
+
+  for key in "${!grub_vars[@]}"; do
+    local value="${grub_vars[$key]}"
+    if grep -q "^$key=" "$grub_cfg_file"; then
+      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file"
+    elif grep -q "^#\s*$key=" "$grub_cfg_file"; then
+      sed -i "s|^#\s*$key=.*|$key=$value|" "$grub_cfg_file"
+    else
+      echo "$key=$value" >> "$grub_cfg_file"
+    fi
+  done
+
+  # Enable Plymouth splash
+  info_print "Enabling Plymouth splash in GRUB..."
+  if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
+    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file"
+  else
+    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
+  fi
+
+  # Add/modify GRUB_CMDLINE_LINUX
+  info_print "Adding 'quiet splash' to GRUB_CMDLINE_LINUX..."
+  if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
+    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file"
+  else
+    echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
+  fi
+
+  # Save theme and resolution choices
+  echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
+  echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
+
+  # Install GRUB
+  info_print "Installing GRUB bootloader..."
+  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck --no-nvram >> "$LOGFILE" 2>&1
+  if [[ $? -ne 0 ]]; then
     startup_error "GRUB installation failed."
     exit 1
   fi
 
-  # Set up grub-btrfs if installed
-  if arch-chroot /mnt command -v grub-btrfsd &>/dev/null; then
-    info_print "Setting up grub-btrfs snapshot integration..."
-    arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1
-    startup_ok "grub-btrfs enabled."
-  fi
-
-  # Create custom UKI GRUB entry
-  local grub_custom="/mnt/etc/grub.d/40_custom"
-
-  info_print "Creating GRUB entry for signed UKI..."
-
-  cat <<EOF > "$grub_custom"
-menuentry 'Arch Linux (UKI)' {
-    search --no-floppy --file --set=root /EFI/Linux/arch.efi
-    chainloader /EFI/Linux/arch.efi
-}
-EOF
-
-  chmod +x "$grub_custom"
-  startup_ok "Custom GRUB UKI entry written to 40_custom."
-
   # Generate grub.cfg
-  info_print "Generating GRUB config..."
+  info_print "Generating grub.cfg..."
   arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1
-
-  if [[ $? -eq 0 ]]; then
-    startup_ok "GRUB configuration generated."
-  else
+  if [[ $? -ne 0 ]]; then
     startup_error "Failed to generate grub.cfg."
     exit 1
   fi
+
+  startup_ok "GRUB bootloader installed and configured successfully."
 }
 
 # ==================== Setup UKI pacman hook ====================
@@ -1673,6 +1697,43 @@ setup_snapper() {
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
+}
+
+# ==================== Select GRUB THEME ====================
+
+select_grub_theme() {
+  section_header "GRUB Theme Selection"
+
+  local theme_url_base="https://github.com/NeonGOD78/ArchLinuxPlus/raw/main/configs/boot/grub/themes"
+
+  info_print "Select GRUB theme resolution:"
+  info_print "1) 2K (2560x1440) [default]"
+  info_print "2) 1080p (1920x1080)"
+  input_print "Enter choice (1 or 2) [default: 1]: "
+  read_from_tty -r theme_choice
+  theme_choice=${theme_choice:-1}
+
+  case "$theme_choice" in
+      1)
+          GRUB_THEME_FILE="arch-2K.zip"
+          GRUB_THEME_DIR="arch-2K"
+          GRUB_GFXMODE="2560x1440"
+          ;;
+      2)
+          GRUB_THEME_FILE="arch-1080p.zip"
+          GRUB_THEME_DIR="arch-1080p"
+          GRUB_GFXMODE="1920x1080"
+          ;;
+      *)
+          warning_print "Invalid choice, defaulting to 2K."
+          GRUB_THEME_FILE="arch-2K.zip"
+          GRUB_THEME_DIR="arch-2K"
+          GRUB_GFXMODE="2560x1440"
+          ;;
+  esac
+
+  GRUB_THEME_URL="$theme_url_base/$GRUB_THEME_FILE"
+  startup_ok "GRUB theme and resolution selected: $GRUB_GFXMODE ($GRUB_THEME_DIR)"
 }
 
 # ==================== Main ====================
