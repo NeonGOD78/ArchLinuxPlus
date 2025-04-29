@@ -1302,9 +1302,8 @@ main() {
   install_base_system
   move_logfile_to_mnt
   gen_fstab
+  save_keymap_config
 
-  
-  # save_keymap_config
   # save_locale_config
   # create_users
   # install_dotfiles
