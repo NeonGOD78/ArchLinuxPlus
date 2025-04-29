@@ -1743,6 +1743,22 @@ select_grub_theme() {
   startup_ok "GRUB theme and resolution selected: $GRUB_GFXMODE ($GRUB_THEME_DIR)"
 }
 
+# ======================= ZRAM Setup =======================
+setup_zram() {
+  section_header "ZRAM Setup"
+
+  info_print "Creating zram-generator configuration..."
+  mkdir -p /mnt/etc/systemd
+
+  cat > /mnt/etc/systemd/zram-generator.conf <<EOF
+[zram0]
+zram-size = min(ram, 8192)
+compression-algorithm = zstd
+EOF
+
+  startup_ok "ZRAM configured: dynamic size (up to 8 GB), compression: zstd"
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1790,6 +1806,7 @@ main() {
   install_base_system
   move_logfile_to_mnt
   gen_fstab
+  setup_zram
   save_keymap_config
   save_locale_config
   save_hostname_config
