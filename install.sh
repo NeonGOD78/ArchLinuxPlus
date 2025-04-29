@@ -1926,15 +1926,21 @@ final_message() {
 
   if [[ "$reboot_choice" =~ ^(y|yes)$ ]]; then
     info_print "Preparing for reboot..."
-
-    # Try to unmount /mnt cleanly
-    info_print "Unmounting /mnt..."
-    umount -R /mnt >> "$LOGFILE" 2>&1 || warning_print "Some /mnt submounts could not be unmounted cleanly."
-
+    safe_unmount_mnt
     info_print "Rebooting system now."
     reboot
   else
     info_print "Reboot manually when ready. Remember to unmount /mnt if needed."
+  fi
+}
+
+# ======================= Safe Unmount =======================
+safe_unmount_mnt() {
+  info_print "Attempting to unmount /mnt cleanly..."
+  if umount -R /mnt >> "$LOGFILE" 2>&1; then
+    startup_ok "/mnt unmounted successfully."
+  else
+    warning_print "Some /mnt submounts could not be unmounted cleanly. Continuing anyway."
   fi
 }
 
