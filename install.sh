@@ -1946,6 +1946,26 @@ safe_unmount_mnt() {
   fi
 }
 
+# ======================= Microcode Detection =======================
+microcode_detector() {
+  section_header "Microcode Detection"
+
+  CPU_VENDOR=$(grep vendor_id /proc/cpuinfo)
+
+  if [[ "$CPU_VENDOR" == *"AuthenticAMD"* ]]; then
+    info_print "An AMD CPU has been detected. Using amd-ucode."
+    MICROCODE_PACKAGE="amd-ucode"
+  elif [[ "$CPU_VENDOR" == *"GenuineIntel"* ]]; then
+    info_print "An Intel CPU has been detected. Using intel-ucode."
+    MICROCODE_PACKAGE="intel-ucode"
+  else
+    warning_print "Unknown CPU vendor detected. Defaulting to AMD microcode."
+    MICROCODE_PACKAGE="amd-ucode"
+  fi
+
+  startup_ok "Microcode set to: $MICROCODE_PACKAGE"
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1990,6 +2010,7 @@ main() {
   nocow_setup
 
   # Base System
+  microcode_detector
   install_base_system
   move_logfile_to_mnt
   gen_fstab
