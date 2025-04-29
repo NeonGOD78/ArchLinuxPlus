@@ -1261,6 +1261,7 @@ debug_print() {
 }
 
 # =================== Base System Installation ===================
+
 install_base_system() {
     info_print "Installing base system with pacstrap..."
 
@@ -1281,6 +1282,7 @@ install_base_system() {
 }
 
 # ======================= Generate fstab ========================
+
 gen_fstab() {
     info_print "Generating /etc/fstab..."
 
