@@ -1291,6 +1291,36 @@ EOF
   fi
 }
 
+set_timezone() {
+  section_header "Timezone & Clock Configuration"
+
+  info_print "Detecting timezone via ip-api.com..."
+  ZONE=$(curl -s http://ip-api.com/line?fields=timezone)
+
+  if [[ -z "$ZONE" ]]; then
+    startup_error "Failed to detect timezone. Defaulting to UTC."
+    ZONE="UTC"
+  else
+    startup_ok "Detected timezone: $ZONE"
+  fi
+
+  ln -sf "/usr/share/zoneinfo/$ZONE" /mnt/etc/localtime 2>> "$LOGFILE"
+  if [[ $? -eq 0 ]]; then
+    startup_ok "Timezone set to $ZONE."
+  else
+    startup_error "Failed to set timezone. See log for details."
+    exit 1
+  fi
+
+  arch-chroot /mnt hwclock --systohc >> "$LOGFILE" 2>&1
+  if [[ $? -eq 0 ]]; then
+    startup_ok "Hardware clock synchronized."
+  else
+    startup_error "Failed to synchronize hardware clock. See log."
+    exit 1
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1340,6 +1370,7 @@ main() {
   save_keymap_config
   save_locale_config
   save_hostname_config
+  set_timezone
   
 
   
