@@ -1319,15 +1319,20 @@ install_base_system() {
 gen_fstab() {
     info_print "Generating /etc/fstab..."
 
-    if genfstab -U /mnt >> /mnt/etc/fstab 2>> "$LOGFILE"; then
-        if [[ -s /mnt/etc/fstab ]]; then
-            success_print "/etc/fstab generated successfully."
-        else
-            error_print "fstab file is empty. Something went wrong."
-            exit 1
-        fi
+    enable_debug
+
+    if [[ "$DEBUG" == true ]]; then
+        genfstab -U /mnt 2>&1 | tee -a "$LOGFILE" >> /mnt/etc/fstab
     else
-        error_print "Failed to generate /etc/fstab. See logfile for details."
+        genfstab -U /mnt >> /mnt/etc/fstab 2>> "$LOGFILE"
+    fi
+
+    disable_debug
+
+    if [[ -s /mnt/etc/fstab ]]; then
+        success_print "/etc/fstab generated successfully."
+    else
+        error_print "fstab file is empty. Something went wrong."
         exit 1
     fi
 }
