@@ -1847,6 +1847,75 @@ EOF
   fi
 }
 
+# ======================= Final Cleanup =======================
+final_cleanup() {
+  section_header "Final Cleanup"
+
+  info_print "Cleaning up temporary files..."
+  arch-chroot /mnt rm -rf /tmp/* >> "$LOGFILE" 2>&1
+
+  info_print "Checking for leftover sudoers overrides..."
+  arch-chroot /mnt rm -f /etc/sudoers.d/aurbuilder >> "$LOGFILE" 2>&1
+
+  info_print "Reloading mount table (in case of lingering binds)..."
+  mount --make-private /mnt || true
+  mount --make-rprivate /mnt || true
+
+  startup_ok "Final cleanup completed."
+}
+
+# ======================= Final Message =======================
+
+final_message() {
+  section_header "Installation Complete"
+
+  echo
+  success_print "Installation completed successfully."
+  echo
+
+  info_print "Summary of important details:"
+  echo -e "  ${BOLD}Disk:${RESET} $DISK"
+  echo -e "  ${BOLD}Username:${RESET} ${USERNAME:-root only}"
+  echo -e "  ${BOLD}Kernel:${RESET} $KERNEL_PACKAGE"
+  echo -e "  ${BOLD}Editor:${RESET} $EDITOR_PACKAGE"
+  echo -e "  ${BOLD}GRUB Theme:${RESET} ${GRUB_THEME_DIR:-default} (${GRUB_GFXMODE:-default})"
+  echo -e "  ${BOLD}Secure Boot Keys:${RESET} /efi/secureboot/keys (after reboot)"
+  echo -e "  ${BOLD}Snapper Config:${RESET} /etc/snapper/configs/root"
+  echo -e "  ${BOLD}Logfile:${RESET} $LOGFILE"
+  echo
+
+  # Check Snapper systemd timers
+  if ! arch-chroot /mnt systemctl is-enabled snapper-timeline.timer &>/dev/null; then
+    warning_print "snapper-timeline.timer is not enabled."
+  fi
+  if ! arch-chroot /mnt systemctl is-enabled snapper-cleanup.timer &>/dev/null; then
+    warning_print "snapper-cleanup.timer is not enabled."
+  fi
+
+  # Check for Secure Boot keys presence now
+  if [[ ! -d /mnt/secureboot/keys || -z "$(ls -A /mnt/secureboot/keys 2>/dev/null)" ]]; then
+    warning_print "Secure Boot keys not found in /mnt/secureboot/keys (temporary install path)."
+  fi
+
+  echo
+  info_print "Note: After reboot, Secure Boot keys will be located at /efi/secureboot/keys."
+  echo
+
+  input_print "Would you like to view the install log now? [y/N]"
+  read_from_tty -r view_log_choice
+  view_log_choice="${view_log_choice,,}"
+
+  if [[ "$view_log_choice" =~ ^(y|yes)$ ]]; then
+    less "$LOGFILE"
+  else
+    info_print "You can view the full log anytime with: less $LOGFILE"
+  fi
+
+  echo
+  success_print "Installation is complete. You may now reboot your system."
+  echo
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1911,9 +1980,8 @@ main() {
   setup_uki_pacman_hook
   setup_grub_pacman_hook
   setup_snapper
-
-
-  
+  final_cleanup
+  final_message
 }
 
 # ==================== Start Script ====================
