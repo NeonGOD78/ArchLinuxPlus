@@ -1430,14 +1430,13 @@ setup_uki_build() {
   # Generate UKI
   info_print "Building UKI with ukify..."
   arch-chroot /mnt ukify \
-    build \
-    --kernel "$kernel_path" \
-    --initrd "$microcode_path" \
-    --initrd "$initramfs_path" \
-    --cmdline-file "$cmdline_path" \
-    --output "$output_path" \
-    --os-release /usr/lib/os-release \
-    --splash /usr/share/systemd/bootctl/splash-arch.bmp >> "$LOGFILE" 2>&1
+  --kernel "$kernel_path" \
+  --initrd "$microcode_path" \
+  --initrd "$initramfs_path" \
+  --cmdline-file "$cmdline_path" \
+  --output "$output_path" \
+  --os-release /usr/lib/os-release \
+  --splash /usr/share/systemd/bootctl/splash-arch.bmp >> "$LOGFILE" 2>&1
 
   if [[ $? -eq 0 ]]; then
     startup_ok "UKI built and placed at $output_path"
