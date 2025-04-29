@@ -1637,8 +1637,13 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
+  info_print "Cleaning up old .snapshots state..."
+  arch-chroot /mnt umount /.snapshots &>/dev/null || true
+  arch-chroot /mnt btrfs subvolume delete /.snapshots &>> "$LOGFILE" || true
+  arch-chroot /mnt rm -rf /.snapshots
+
   info_print "Creating snapper config for root..."
-  arch-chroot /mnt snapper --config root create-config /
+  arch-chroot /mnt snapper --no-dbus --config root create-config /
   startup_ok "Snapper configuration for root created."
 
   info_print "Adjusting snapper config..."
@@ -1647,14 +1652,16 @@ setup_snapper() {
   arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
   startup_ok "Snapper config adjusted."
 
+  info_print "Re-mounting .snapshots and setting permissions..."
+  arch-chroot /mnt mkdir /.snapshots
+  arch-chroot /mnt mount -a
+  arch-chroot /mnt chmod 750 /.snapshots
+  arch-chroot /mnt chown :wheel /.snapshots
+  startup_ok ".snapshots mounted and permission set."
+
   info_print "Creating initial snapshot..."
   arch-chroot /mnt snapper --config root create --description "Initial install snapshot"
   startup_ok "Initial snapshot created."
-
-  info_print "Setting permissions on /.snapshots..."
-  arch-chroot /mnt chmod 750 /.snapshots
-  arch-chroot /mnt chown :wheel /.snapshots
-  startup_ok "Permissions set: Group 'wheel' can access /.snapshots."
 
   info_print "Enabling Snapper systemd timers..."
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
