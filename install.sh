@@ -674,27 +674,74 @@ install_dotfiles() {
 create_users() {
   section_header "User and Root Setup"
 
-  # Set root password
-  info_print "Setting root password."
-  echo "root:$ROOT_PASSWORD" | arch-chroot /mnt chpasswd
-  startup_ok "Root password set."
+  # === Default shell system-wide ===
+  info_print "Setting default shell to zsh system-wide..."
+  sed -i 's|^SHELL=/bin/bash|SHELL=/bin/zsh|' /mnt/etc/default/useradd
+  startup_ok "Default shell changed to zsh for new users."
 
-  # Create user if USERNAME is set
+  # === Populate /etc/skel before creating users ===
+  info_print "Downloading default user files to /etc/skel..."
+
+  curl -sSLo /mnt/etc/skel/.zshrc https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.zshrc
+  curl -sSLo /mnt/etc/skel/.bashrc https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.bashrc
+  curl -sSLo /mnt/etc/skel/.aliases https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.aliases
+
+  mkdir -p /mnt/etc/skel/.local/bin
+  curl -sSLo /mnt/etc/skel/.local/bin/setup-default-zsh https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.local/bin/setup-default-zsh
+  chmod +x /mnt/etc/skel/.local/bin/setup-default-zsh
+
+  mkdir -p /mnt/etc/skel/.cache/oh-my-posh/themes
+  curl -sSLo /mnt/etc/skel/.cache/oh-my-posh/themes/zen.toml https://raw.githubusercontent.com/NeonGOD78/ArchLinuxPlus/refs/heads/main/configs/etc/skel/.cache/oh-my-posh/themes/zen.toml
+
+  startup_ok "Default user config files downloaded to /etc/skel."
+
+  # === Root password ===
+  if [[ -n "$ROOT_PASSWORD" ]]; then
+    info_print "Setting root password."
+    echo "root:$ROOT_PASSWORD" | arch-chroot /mnt chpasswd >> "$LOGFILE" 2>&1
+    startup_ok "Root password set."
+
+    info_print "Setting root shell to zsh..."
+    arch-chroot /mnt chsh -s /bin/zsh root >> "$LOGFILE" 2>&1
+
+    info_print "Copying skel files to root..."
+    arch-chroot /mnt cp -a /etc/skel/. /root/
+    arch-chroot /mnt chown -R root:root /root/
+    startup_ok "Root environment configured."
+  else
+    startup_error "ROOT_PASSWORD is empty. Skipping root setup."
+  fi
+
+  # === Create user ===
   if [[ -n "$USERNAME" ]]; then
-    info_print "Creating user '$USERNAME'."
-
-    # Create user and add to wheel group
-    arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$USERNAME" || {
+    info_print "Creating user '$USERNAME'..."
+    arch-chroot /mnt useradd -m -G wheel -s /bin/zsh "$USERNAME" >> "$LOGFILE" 2>&1 || {
       error_print "Failed to create user '$USERNAME'."
       exit 1
     }
 
-    # Set user password
-    echo "$USERNAME:$USER_PASSWORD" | arch-chroot /mnt chpasswd
-
-    startup_ok "User '$USERNAME' created and password set."
+    if [[ -n "$USER_PASSWORD" ]]; then
+      echo "$USERNAME:$USER_PASSWORD" | arch-chroot /mnt chpasswd >> "$LOGFILE" 2>&1
+      startup_ok "User '$USERNAME' created and password set."
+    else
+      startup_warn "USER_PASSWORD is empty. User created without password."
+    fi
   else
     info_print "No user created. Only root account available."
+  fi
+
+  # === Optional: Restore dotfiles ===
+  if [[ "$RESTORE_DOTFILES" == "yes" && -n "$DOTFILES_REPO" ]]; then
+    info_print "Cloning dotfiles and applying with stow..."
+
+    arch-chroot /mnt /bin/bash -c "
+      sudo -u $USERNAME git clone --depth=1 '$DOTFILES_REPO' /home/$USERNAME/.dotfiles &&
+      cd /home/$USERNAME/.dotfiles &&
+      sudo -u $USERNAME stow */"
+      
+    startup_ok "Dotfiles restored using stow."
+  else
+    info_print "Dotfile restore skipped."
   fi
 }
 
@@ -1371,10 +1418,8 @@ main() {
   save_locale_config
   save_hostname_config
   set_timezone
+  create_users
   
-
-  
-  # create_users
   # install_dotfiles
 }
 
