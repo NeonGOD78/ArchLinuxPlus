@@ -539,30 +539,30 @@ password_and_user_setup() {
     info_print "Reusing LUKS password for all accounts."
   fi
 
-  # Step 5: Ask about dotfiles (only if username is set)
-  if [[ -n "$USERNAME" ]]; then
-    input_print "Do you want to install dotfiles for $USERNAME? [y/N]"
-    read_from_tty -r install_dotfiles_choice
-    install_dotfiles_choice="${install_dotfiles_choice,,}"
+# Step 5: Ask about dotfiles (only if username is set)
+if [[ -n "$USERNAME" ]]; then
+  RESTORE_DOTFILES="no"
 
-    if [[ "$install_dotfiles_choice" =~ ^(y|yes)$ ]]; then
-      input_print "Enter GitHub URL for dotfiles repository (default: none)"
-      read_from_tty -r dotfiles_repo
+  input_print "Do you want to restore dotfiles for $USERNAME? [y/N]"
+  read_from_tty -r install_dotfiles_choice
+  install_dotfiles_choice="${install_dotfiles_choice,,}"
 
-      if [[ -n "$dotfiles_repo" ]]; then
-        INSTALL_DOTFILES=true
-        DOTFILES_REPO="$dotfiles_repo"
-        startup_ok "Dotfiles will be installed from '$DOTFILES_REPO'."
-      else
-        warning_print "No URL entered. Skipping dotfiles installation."
-        INSTALL_DOTFILES=false
-      fi
+  if [[ "$install_dotfiles_choice" =~ ^(y|yes)$ ]]; then
+    input_print "Enter Git URL for dotfiles repository (e.g. https://github.com/user/dotfiles)"
+    read_from_tty -r dotfiles_repo
+
+    if [[ -n "$dotfiles_repo" ]]; then
+      RESTORE_DOTFILES="yes"
+      DOTFILES_REPO="$dotfiles_repo"
+      startup_ok "Dotfiles will be restored from '$DOTFILES_REPO'."
     else
-      INSTALL_DOTFILES=false
-      info_print "Skipping dotfiles installation."
+      warning_print "No URL entered. Skipping dotfiles restore."
+      RESTORE_DOTFILES="no"
     fi
+  else
+    info_print "Skipping dotfiles restore."
   fi
-}
+fi
 
 # ================== Network Selector ==================
 
