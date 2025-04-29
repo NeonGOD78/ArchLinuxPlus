@@ -1637,32 +1637,38 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
+  # Clean up potential existing .snapshots state
   info_print "Cleaning up old .snapshots state..."
   arch-chroot /mnt umount /.snapshots &>/dev/null || true
   arch-chroot /mnt btrfs subvolume delete /.snapshots &>> "$LOGFILE" || true
   arch-chroot /mnt rm -rf /.snapshots
 
+  # Create Snapper config
   info_print "Creating snapper config for root..."
   arch-chroot /mnt snapper --no-dbus --config root create-config /
   startup_ok "Snapper configuration for root created."
 
+  # Adjust Snapper config
   info_print "Adjusting snapper config..."
   arch-chroot /mnt sed -i 's|ALLOW_USERS="|"ALLOW_USERS='"$USERNAME"'"|' /etc/snapper/configs/root
   arch-chroot /mnt sed -i 's|TIMELINE_CREATE="no"|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
   arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
   startup_ok "Snapper config adjusted."
 
-  info_print "Re-mounting .snapshots and setting permissions..."
+  # Recreate and mount .snapshots
+  info_print "Recreating .snapshots directory and remounting..."
   arch-chroot /mnt mkdir /.snapshots
   arch-chroot /mnt mount -a
   arch-chroot /mnt chmod 750 /.snapshots
   arch-chroot /mnt chown :wheel /.snapshots
   startup_ok ".snapshots mounted and permission set."
 
+  # Create initial snapshot
   info_print "Creating initial snapshot..."
   arch-chroot /mnt snapper --config root create --description "Initial install snapshot"
   startup_ok "Initial snapshot created."
 
+  # Enable Snapper timers
   info_print "Enabling Snapper systemd timers..."
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
