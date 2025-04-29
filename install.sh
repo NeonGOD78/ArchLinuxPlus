@@ -1275,24 +1275,12 @@ debug_print() {
 
 install_base_system() {
   section_header "Base System Installation"
-
-  info_print "Checking kernel/microcode/network package values..."
-  echo "  KERNEL_PACKAGE='$KERNEL_PACKAGE'"
-  echo "  MICROCODE_PACKAGE='$MICROCODE_PACKAGE'"
-  echo "  NETWORK_PKGS='$NETWORK_PKGS'"
-  echo
-
-  if [[ -z "$KERNEL_PACKAGE" || -z "$MICROCODE_PACKAGE" ]]; then
-    error_print "Kernel or microcode not set! Aborting."
-    exit 1
-  fi
-
   info_print "Installing base system with pacstrap..."
 
   local base_packages=(
     base "$KERNEL_PACKAGE" "$MICROCODE_PACKAGE" linux-firmware "$KERNEL_PACKAGE"-headers
     btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
-    zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl
+    zram-generator sudo bash-completion inotify-tools zsh unzip fzf zoxide colordiff curl
     btop mc git systemd ukify openssl sbsigntools sbctl base-devel
     "$NETWORK_PKGS"
   )
