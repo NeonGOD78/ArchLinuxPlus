@@ -1744,6 +1744,7 @@ select_grub_theme() {
 }
 
 # ======================= ZRAM Setup =======================
+
 setup_zram() {
   section_header "ZRAM Setup"
 
@@ -1757,6 +1758,13 @@ compression-algorithm = zstd
 EOF
 
   startup_ok "ZRAM configured: dynamic size (up to 8 GB), compression: zstd"
+
+  info_print "Verifying ZRAM systemd unit configuration..."
+  if arch-chroot /mnt systemctl cat systemd-zram-setup@zram0.service >> "$LOGFILE" 2>&1; then
+    startup_ok "ZRAM unit found and logged to $LOGFILE."
+  else
+    warning_print "Could not inspect ZRAM systemd unit (may be enabled after reboot)."
+  fi
 }
 
 # ==================== Main ====================
