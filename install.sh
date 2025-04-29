@@ -2025,6 +2025,52 @@ microcode_detector() {
   startup_ok "Microcode set to: $MICROCODE_PACKAGE"
 }
 
+# ==================== Enable Services ====================
+
+enable_services() {
+  section_header "Enabling Systemd Services"
+
+  enable_debug
+
+  # Netværk
+  case "$NETWORK_PACKAGE" in
+    networkmanager)
+      info_print "Enabling NetworkManager service..."
+      arch-chroot /mnt systemctl enable NetworkManager.service >> "$LOGFILE" 2>&1
+      ;;
+    iwd)
+      info_print "Enabling iwd and dhcpcd services..."
+      arch-chroot /mnt systemctl enable iwd.service dhcpcd.service >> "$LOGFILE" 2>&1
+      ;;
+    systemd-networkd)
+      info_print "Enabling systemd-networkd and resolved..."
+      arch-chroot /mnt systemctl enable systemd-networkd.service systemd-resolved.service >> "$LOGFILE" 2>&1
+      ;;
+    wpa_supplicant)
+      info_print "Enabling wpa_supplicant and dhcpcd..."
+      arch-chroot /mnt systemctl enable wpa_supplicant@.service dhcpcd.service >> "$LOGFILE" 2>&1
+      ;;
+    *)
+      warning_print "No known services for $NETWORK_PACKAGE – skipping service enablement."
+      ;;
+  esac
+
+  # ZRAM
+  if [[ -f /mnt/etc/systemd/zram-generator.conf ]]; then
+    info_print "Enabling ZRAM swap service..."
+    arch-chroot /mnt systemctl enable systemd-zram-setup@zram0.service >> "$LOGFILE" 2>&1
+  fi
+
+  # Snapper cleanup (optional, hvis ønsket)
+  if [[ -d /mnt/.snapshots ]]; then
+    info_print "Enabling snapper-cleanup.timer..."
+    arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
+  fi
+
+  startup_ok "Relevant services enabled."
+  disable_debug
+}
+
 # ==================== Main ====================
 
 main() {
@@ -2090,6 +2136,7 @@ main() {
   setup_uki_pacman_hook
   setup_grub_pacman_hook
   setup_snapper
+  enable_services
   final_cleanup
   final_message
 }
