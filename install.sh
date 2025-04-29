@@ -1815,6 +1815,8 @@ configure_package_management() {
   local pacman_conf="/mnt/etc/pacman.conf"
   local makepkg_conf="/mnt/etc/makepkg.conf"
 
+  enable_debug
+
   # Pacman.conf tweaks
   info_print "Applying visual and performance tweaks to pacman.conf..."
   sed -Ei '
@@ -1831,7 +1833,26 @@ configure_package_management() {
   sed -i '/#\[multilib\]/,/^#Include/ s/^#//' "$pacman_conf" >> "$LOGFILE" 2>&1
 
   if ! grep -q "\[core-testing\]" "$pacman_conf"; then
-    cat >> "$pacman_conf" <<'EOF'
+    if [[ "$DEBUG" == true ]]; then
+      tee -a "$LOGFILE" <<'EOF' >> "$pacman_conf"
+[core-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+
+[extra-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+
+[community-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+
+[multilib-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+EOF
+    else
+      cat >> "$pacman_conf" <<'EOF'
 
 [core-testing]
 Usage = Sync Upgrade Search Local
@@ -1849,6 +1870,7 @@ Include = /etc/pacman.d/mirrorlist
 Usage = Sync Upgrade Search Local
 Include = /etc/pacman.d/mirrorlist
 EOF
+    fi
     startup_ok "Testing repositories added."
   else
     info_print "Testing repositories already present. Skipping addition."
@@ -1857,12 +1879,15 @@ EOF
   # makepkg.conf tweaks
   info_print "Optimizing makepkg.conf for parallel build and better output..."
   sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf" >> "$LOGFILE" 2>&1
-  sed -i 's/^#*\s*BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/' "$makepkg_conf" >> "$LOGFILE" 2>&1
-  sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  sed -i 's/^#*\\s*BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  sed -i 's/^PKGEXT=.*/PKGEXT=\".pkg.tar.zst\"/' "$makepkg_conf" >> "$LOGFILE" 2>&1
   startup_ok "makepkg.conf optimized."
+
+  disable_debug
 
   # Install Yay safely
   info_print "Installing yay AUR helper safely..."
+  enable_debug
   arch-chroot /mnt /bin/bash -e <<'EOF'
 set -euo pipefail
 
@@ -1879,6 +1904,7 @@ sudo -u aurbuilder bash -c '
 userdel -r aurbuilder
 rm -f /etc/sudoers.d/aurbuilder
 EOF
+  disable_debug
 
   if arch-chroot /mnt command -v yay &>/dev/null; then
     startup_ok "yay installed successfully."
