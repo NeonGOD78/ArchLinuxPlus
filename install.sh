@@ -862,6 +862,13 @@ confirm_installation() {
     info_print "Dotfiles:      No"
   fi
 
+  # --- GRUB theme and resolution ---
+  if [[ -n "$GRUB_THEME_DIR" && -n "$GRUB_GFXMODE" ]]; then
+    info_print "GRUB Theme:    $GRUB_THEME_DIR ($GRUB_GFXMODE)"
+  else
+    info_print "GRUB Theme:    (default settings)"
+  fi
+
   echo
   warning_print "WARNING: This will ERASE all data on $DISK!"
 
