@@ -1767,6 +1767,86 @@ EOF
   fi
 }
 
+# ======================= Configure Package Management =======================
+
+configure_package_management() {
+  section_header "Package Manager Tweaks and Yay Installation"
+
+  local pacman_conf="/mnt/etc/pacman.conf"
+  local makepkg_conf="/mnt/etc/makepkg.conf"
+
+  # Pacman.conf tweaks
+  info_print "Applying visual and performance tweaks to pacman.conf..."
+  sed -Ei '
+    s/^#Color$/Color/
+    /Color/ a ILoveCandy
+    s/^#ParallelDownloads.*/ParallelDownloads = 10/
+    s/^#VerbosePkgLists$/VerbosePkgLists/
+    s/^#CheckSpace$/CheckSpace/
+  ' "$pacman_conf" >> "$LOGFILE" 2>&1
+  startup_ok "Pacman.conf tweaked."
+
+  # Enable multilib and testing repositories
+  info_print "Enabling multilib and limited testing repositories..."
+  sed -i '/#\[multilib\]/,/^#Include/ s/^#//' "$pacman_conf" >> "$LOGFILE" 2>&1
+
+  if ! grep -q "\[core-testing\]" "$pacman_conf"; then
+    cat >> "$pacman_conf" <<'EOF'
+
+[core-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+
+[extra-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+
+[community-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+
+[multilib-testing]
+Usage = Sync Upgrade Search Local
+Include = /etc/pacman.d/mirrorlist
+EOF
+    startup_ok "Testing repositories added."
+  else
+    info_print "Testing repositories already present. Skipping addition."
+  fi
+
+  # makepkg.conf tweaks
+  info_print "Optimizing makepkg.conf for parallel build and better output..."
+  sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf" >> "$LOGFILE" 2>&1
+  sed -i 's/^#*\s*BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  startup_ok "makepkg.conf optimized."
+
+  # Install Yay safely
+  info_print "Installing yay AUR helper safely..."
+  arch-chroot /mnt /bin/bash -e <<'EOF'
+set -euo pipefail
+
+useradd -m aurbuilder
+echo "aurbuilder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/aurbuilder
+
+sudo -u aurbuilder bash -c '
+  cd /home/aurbuilder
+  git clone https://aur.archlinux.org/yay.git
+  cd yay
+  makepkg -si --noconfirm
+'
+
+userdel -r aurbuilder
+rm -f /etc/sudoers.d/aurbuilder
+EOF
+
+  if arch-chroot /mnt command -v yay &>/dev/null; then
+    startup_ok "yay installed successfully."
+  else
+    warning_print "yay installation failed or not found in PATH."
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1815,6 +1895,7 @@ main() {
   move_logfile_to_mnt
   gen_fstab
   setup_zram
+  configure_package_management
   save_keymap_config
   save_locale_config
   save_hostname_config
