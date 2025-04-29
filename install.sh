@@ -1339,6 +1339,25 @@ set_timezone() {
   fi
 }
 
+setup_initramfs() {
+  section_header "Initramfs & Systemd Hooks Setup"
+
+  info_print "Configuring mkinitcpio for systemd boot hooks..."
+
+  sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect keyboard sd-vconsole sd-encrypt modconf block filesystems fsck)/' /mnt/etc/mkinitcpio.conf
+  startup_ok "Updated mkinitcpio hooks to systemd style."
+
+  info_print "Generating initramfs for all kernels..."
+  arch-chroot /mnt mkinitcpio -P >> "$LOGFILE" 2>&1
+
+  if [[ $? -eq 0 ]]; then
+    startup_ok "Initramfs generated successfully."
+  else
+    startup_error "Initramfs generation failed. Check log."
+    exit 1
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1390,8 +1409,8 @@ main() {
   save_hostname_config
   set_timezone
   create_users
+  setup_initramfs
   
-  # install_dotfiles
 }
 
 # ==================== Start Script ====================
