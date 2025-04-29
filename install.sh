@@ -1655,6 +1655,11 @@ setup_snapper() {
   arch-chroot /mnt chmod 750 /.snapshots
   arch-chroot /mnt chown :wheel /.snapshots
   startup_ok "Permissions set: Group 'wheel' can access /.snapshots."
+
+  info_print "Enabling Snapper systemd timers..."
+  arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
+  arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
+  startup_ok "Snapper timers enabled."
 }
 
 # ==================== Main ====================
