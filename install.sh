@@ -1586,6 +1586,51 @@ EOF
   startup_ok "UKI pacman hook and rebuild script installed."
 }
 
+# ==================== Setup GRUB pacman hook ====================
+
+setup_grub_pacman_hook() {
+  section_header "GRUB Secure Boot Pacman Hook Setup"
+
+  local hook_dir="/mnt/etc/pacman.d/hooks"
+  local hook_file="$hook_dir/99-grub-sign.hook"
+  local script_file="/mnt/usr/local/bin/resign-grub"
+
+  info_print "Installing GRUB re-sign pacman hook..."
+
+  # Create directories if missing
+  arch-chroot /mnt mkdir -p "$hook_dir"
+  arch-chroot /mnt mkdir -p "$(dirname "$script_file")"
+
+  # Write resign script
+  cat <<'EOS' > "$script_file"
+#!/bin/bash
+set -euo pipefail
+
+sbsign --key /etc/secureboot/keys/db.key \
+       --cert /etc/secureboot/keys/db.crt \
+       --output /efi/EFI/GRUB/grubx64.efi \
+       /efi/EFI/GRUB/grubx64.efi
+EOS
+
+  arch-chroot /mnt chmod +x "$script_file"
+
+  # Create pacman hook
+  cat <<EOF > "$hook_file"
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = grub
+
+[Action]
+Description = Re-signing GRUB EFI binary for Secure Boot...
+When = PostTransaction
+Exec = /usr/local/bin/resign-grub
+EOF
+
+  startup_ok "GRUB pacman hook and re-sign script installed."
+}
+
 # ==================== Main ====================
 
 main() {
@@ -1645,6 +1690,7 @@ main() {
   setup_uki_build
   setup_grub_bootloader
   setup_uki_pacman_hook
+  setup_grub_pacman_hook
 
 
   
