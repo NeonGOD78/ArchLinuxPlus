@@ -1219,7 +1219,25 @@ debug_print() {
   fi
 }
 
+# =================== Base System Installation ===================
+install_base_system() {
+    info_print "Installing base system with pacstrap..."
 
+    local base_packages=(
+        base "$kernel" "$microcode" linux-firmware "$kernel"-headers
+        btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
+        zram-generator sudo inotify-tools zsh unzip fzf zoxide colordiff curl
+        btop mc git systemd ukify openssl sbsigntools sbctl base-devel
+        "$network_package"
+    )
+
+    if pacstrap -K /mnt "${base_packages[@]}"; then
+        success_print "Base system installed successfully."
+    else
+        error_print "Base system installation failed!"
+        exit 1
+    fi
+}
 
 # ==================== Main ====================
 
@@ -1262,8 +1280,12 @@ main() {
   create_btrfs_subvolumes
   mount_subvolumes
   nocow_setup
+
+  # Base system
+  install_base_system
+  move_logfile_to_mnt
+
   
-  # move_logfile_to_mnt
   # save_keymap_config
   # save_locale_config
   # create_users
