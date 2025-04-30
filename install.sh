@@ -2077,19 +2077,17 @@ enable_services() {
   disable_debug
 }
 
-# ==================== Setup UKI timer ====================
+# ==================== Setup Secureboot timers ====================
 
-setup_uki_timer() {
-  section_header "Systemd Timer for UKI Auto-Rebuild"
+setup_secureboot_timers() {
+  section_header "Systemd Timers for Secure Boot UKI & GRUB Re-sign"
 
   local timer_dir="/mnt/etc/systemd/system"
-  local service_file="$timer_dir/uki-update.service"
-  local timer_file="$timer_dir/uki-update.timer"
 
-  info_print "Installing UKI update systemd service and timer..."
+  # --------- UKI Timer ---------
+  info_print "Installing UKI auto-rebuild timer..."
 
-  # Create service
-  cat <<EOF > "$service_file"
+  cat <<EOF > "$timer_dir/uki-update.service"
 [Unit]
 Description=Rebuild and sign Unified Kernel Image (UKI)
 Wants=network-online.target
@@ -2100,8 +2098,7 @@ Type=oneshot
 ExecStart=/usr/local/bin/rebuild-uki
 EOF
 
-  # Create timer
-  cat <<EOF > "$timer_file"
+  cat <<EOF > "$timer_dir/uki-update.timer"
 [Unit]
 Description=Daily UKI rebuild and sign
 
@@ -2116,7 +2113,36 @@ EOF
 
   arch-chroot /mnt systemctl enable uki-update.timer >> "$LOGFILE" 2>&1
 
-  startup_ok "UKI systemd timer installed and enabled."
+  # --------- GRUB Timer ---------
+  info_print "Installing GRUB re-sign timer..."
+
+  cat <<EOF > "$timer_dir/grub-resign.service"
+[Unit]
+Description=Re-sign GRUB EFI binary for Secure Boot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/resign-grub
+EOF
+
+  cat <<EOF > "$timer_dir/grub-resign.timer"
+[Unit]
+Description=Daily GRUB EFI re-signing
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1d
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  arch-chroot /mnt systemctl enable grub-resign.timer >> "$LOGFILE" 2>&1
+
+  startup_ok "Secure Boot timers installed and enabled (UKI + GRUB)."
 }
 
 # ==================== Main ====================
@@ -2183,7 +2209,7 @@ main() {
   setup_grub_bootloader
   setup_uki_pacman_hook
   setup_grub_pacman_hook
-  setup_uki_timer
+  setup_secureboot_timers
   setup_snapper
   enable_services
   final_cleanup
