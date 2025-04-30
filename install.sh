@@ -1463,32 +1463,38 @@ setup_uki_build() {
 setup_secureboot_structure() {
   section_header "Secure Boot Key Generation"
 
-  local keydir="/etc/secureboot/keys"
-  arch-chroot /mnt mkdir -p "$keydir"
-
   info_print "Generating Secure Boot keys (PK, KEK, db)..."
 
-  # Generate Platform Key (PK)
-  arch-chroot /mnt openssl req -new -x509 -newkey rsa:4096 \
-    -subj "/CN=Platform Key/" \
-    -keyout "$keydir/PK.key" -out "$keydir/PK.crt" \
-    -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
+  # Run everything *inside* chroot
+  arch-chroot /mnt /bin/bash -e <<'EOF'
+set -euo pipefail
 
-  # Generate Key Exchange Key (KEK)
-  arch-chroot /mnt openssl req -new -x509 -newkey rsa:4096 \
-    -subj "/CN=Key Exchange Key/" \
-    -keyout "$keydir/KEK.key" -out "$keydir/KEK.crt" \
-    -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
+keydir="/etc/secureboot/keys"
+mkdir -p "$keydir"
 
-  # Generate Signature Database Key (db)
-  arch-chroot /mnt openssl req -new -x509 -newkey rsa:4096 \
-    -subj "/CN=Signature Database/" \
-    -keyout "$keydir/db.key" -out "$keydir/db.crt" \
-    -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
+# Platform Key (PK)
+openssl req -new -x509 -newkey rsa:4096 \
+  -subj "/CN=Platform Key/" \
+  -keyout "$keydir/PK.key" -out "$keydir/PK.crt" \
+  -days 3650 -nodes -sha256
 
-  startup_ok "Secure Boot keys generated and stored in /mnt$keydir."
+# Key Exchange Key (KEK)
+openssl req -new -x509 -newkey rsa:4096 \
+  -subj "/CN=Key Exchange Key/" \
+  -keyout "$keydir/KEK.key" -out "$keydir/KEK.crt" \
+  -days 3650 -nodes -sha256
+
+# Signature Database Key (db)
+openssl req -new -x509 -newkey rsa:4096 \
+  -subj "/CN=Signature Database/" \
+  -keyout "$keydir/db.key" -out "$keydir/db.crt" \
+  -days 3650 -nodes -sha256
+
+chmod 600 "$keydir/"*.key
+EOF
+
+  startup_ok "Secure Boot keys generated and stored in /etc/secureboot/keys."
 }
-
 # ==================== Setup cmdline file ====================
 
 setup_cmdline_file() {
