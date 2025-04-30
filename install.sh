@@ -1601,9 +1601,9 @@ setup_grub_bootloader() {
 setup_uki_pacman_hook() {
   section_header "UKI Auto-Update Pacman Hook Setup"
 
-  local hook_dir="/mnt/etc/pacman.d/hooks"
+  local hook_dir="/etc/pacman.d/hooks"
   local hook_file="$hook_dir/99-ukify.hook"
-  local script_file="/mnt/usr/local/bin/rebuild-uki"
+  local script_file="/usr/local/bin/rebuild-uki"
 
   info_print "Installing UKI auto-update pacman hook..."
 
