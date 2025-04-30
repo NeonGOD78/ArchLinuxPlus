@@ -1405,48 +1405,44 @@ setup_initramfs() {
 setup_uki_build() {
   section_header "Unified Kernel Image (UKI) Build"
 
-  enable_debug
-
   local kernel_path="/boot/vmlinuz-$KERNEL_PACKAGE"
   local initramfs_path="/boot/initramfs-$KERNEL_PACKAGE.img"
   local microcode_path="/boot/$MICROCODE_PACKAGE.img"
   local cmdline_path="/etc/kernel/cmdline"
   local output_path="/efi/EFI/Linux/arch.efi"
 
-  # Check if all necessary components exist
+  # Check for required files
   info_print "Checking for necessary files..."
   for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
     if [[ ! -f "/mnt$file" ]]; then
       error_print "Missing required file: $file"
-      disable_debug
       exit 1
     fi
   done
   startup_ok "All required files found."
 
-  # Create /efi/EFI/Linux if missing
+  # Ensure output dir exists
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
   # Generate UKI
   info_print "Building UKI with ukify..."
   arch-chroot /mnt ukify \
-  --kernel "$kernel_path" \
-  --initrd "$microcode_path" \
-  --initrd "$initramfs_path" \
-  --cmdline-file "$cmdline_path" \
-  --output "$output_path" \
-  --os-release /usr/lib/os-release \
-  --splash /usr/share/systemd/bootctl/splash-arch.bmp >> "$LOGFILE" 2>&1
+    kernel="$kernel_path" \
+    initrd="$microcode_path" \
+    initrd="$initramfs_path" \
+    cmdline="$cmdline_path" \
+    output="$output_path" \
+    os-release=/usr/lib/os-release \
+    splash=/usr/share/systemd/bootctl/splash-arch.bmp >> "$LOGFILE" 2>&1
 
   if [[ $? -eq 0 ]]; then
     startup_ok "UKI built and placed at $output_path"
   else
     error_print "Failed to build UKI."
-    disable_debug
     exit 1
   fi
 
-  # Sign the UKI
+  # Sign it
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
@@ -1458,11 +1454,8 @@ setup_uki_build() {
     startup_ok "UKI signed successfully."
   else
     error_print "Failed to sign UKI."
-    disable_debug
     exit 1
   fi
-
-  disable_debug
 }
 
 # ======================= Setup Secureboot Structure ========================
