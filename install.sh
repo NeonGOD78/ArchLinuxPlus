@@ -1405,9 +1405,9 @@ setup_initramfs() {
 setup_uki_build() {
   section_header "Unified Kernel Image (UKI) Build"
 
-  local kernel_path="/boot/vmlinuz-$KERNEL_PACKAGE"
-  local initramfs_path="/boot/initramfs-$KERNEL_PACKAGE.img"
-  local microcode_path="/boot/$MICROCODE_PACKAGE.img"
+  local kernel_path="/boot/vmlinuz-${KERNEL_PACKAGE}"
+  local initramfs_path="/boot/initramfs-${KERNEL_PACKAGE}.img"
+  local microcode_path="/boot/${MICROCODE_PACKAGE}.img"
   local cmdline_path="/etc/kernel/cmdline"
   local output_path="/efi/EFI/Linux/arch.efi"
 
@@ -1424,16 +1424,19 @@ setup_uki_build() {
   # Ensure output dir exists
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-  # Generate UKI
+  # Build the UKI with ukify (requires 'build' verb!)
   info_print "Building UKI with ukify..."
-  arch-chroot /mnt ukify \
-    kernel="$kernel_path" \
-    initrd="$microcode_path" \
-    initrd="$initramfs_path" \
-    cmdline="$cmdline_path" \
-    output="$output_path" \
-    os-release=/usr/lib/os-release \
-    splash=/usr/share/systemd/bootctl/splash-arch.bmp >> "$LOGFILE" 2>&1
+  arch-chroot /mnt /bin/bash -c "
+    set -e
+    ukify build \
+      kernel='$kernel_path' \
+      initrd='$microcode_path' \
+      initrd='$initramfs_path' \
+      cmdline='$cmdline_path' \
+      output='$output_path' \
+      os-release=/usr/lib/os-release \
+      splash=/usr/share/systemd/bootctl/splash-arch.bmp
+  " >> "$LOGFILE" 2>&1
 
   if [[ $? -eq 0 ]]; then
     startup_ok "UKI built and placed at $output_path"
@@ -1442,7 +1445,7 @@ setup_uki_build() {
     exit 1
   fi
 
-  # Sign it
+  # Sign the UKI
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
