@@ -1601,47 +1601,47 @@ setup_grub_bootloader() {
 setup_uki_pacman_hook() {
   section_header "UKI Auto-Update Pacman Hook Setup"
 
-  local hook_dir="/etc/pacman.d/hooks"
+  local hook_dir="/mnt/etc/pacman.d/hooks"
   local hook_file="$hook_dir/99-ukify.hook"
-  local script_file="/usr/local/bin/rebuild-uki"
+  local script_file="/mnt/usr/local/bin/rebuild-uki"
 
   info_print "Installing UKI auto-update pacman hook..."
 
-  # Create hook directory if missing
-  arch-chroot /mnt mkdir -p "$hook_dir"
-  arch-chroot /mnt mkdir -p "$(dirname "$script_file")"
+  # Create necessary directories
+  mkdir -p "$hook_dir"
+  mkdir -p "$(dirname "$script_file")"
 
-  # Write wrapper script
-  cat <<'EOS' > "$script_file"
+  # Write rebuild-uki script (uses expanded variables)
+  cat <<EOS > "$script_file"
 #!/bin/bash
 set -euo pipefail
 
-ukify build \
-  --kernel /boot/vmlinuz-linux \
-  --initrd /boot/amd-ucode.img \
-  --initrd /boot/initramfs-linux.img \
-  --cmdline-file /etc/kernel/cmdline \
-  --output /efi/EFI/Linux/arch.efi \
-  --os-release /usr/lib/os-release \
+ukify \\
+  --kernel /boot/vmlinuz-${KERNEL_PACKAGE} \\
+  --initrd /boot/${MICROCODE_PACKAGE}.img \\
+  --initrd /boot/initramfs-${KERNEL_PACKAGE}.img \\
+  --cmdline-file /etc/kernel/cmdline \\
+  --output /efi/EFI/Linux/arch.efi \\
+  --os-release /usr/lib/os-release \\
   --splash /usr/share/systemd/bootctl/splash-arch.bmp
 
-sbsign --key /etc/secureboot/keys/db.key \
-       --cert /etc/secureboot/keys/db.crt \
-       --output /efi/EFI/Linux/arch.efi \
+sbsign --key /etc/secureboot/keys/db.key \\
+       --cert /etc/secureboot/keys/db.crt \\
+       --output /efi/EFI/Linux/arch.efi \\
        /efi/EFI/Linux/arch.efi
 EOS
 
-  arch-chroot /mnt chmod +x "$script_file"
+  chmod +x "$script_file"
 
-  # Create pacman hook
+  # Write pacman hook
   cat <<EOF > "$hook_file"
 [Trigger]
-Type = Path
+Type = Package
 Operation = Install
 Operation = Upgrade
-Target = linux
+Target = ${KERNEL_PACKAGE}
 Target = linux-firmware
-Target = amd-ucode
+Target = ${MICROCODE_PACKAGE}
 
 [Action]
 Description = Rebuilding and signing Unified Kernel Image (UKI)...
@@ -1649,7 +1649,7 @@ When = PostTransaction
 Exec = /usr/local/bin/rebuild-uki
 EOF
 
-  startup_ok "UKI pacman hook and rebuild script installed."
+  startup_ok "UKI pacman hook and rebuild script installed successfully."
 }
 
 # ==================== Setup GRUB pacman hook ====================
