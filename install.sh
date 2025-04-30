@@ -1604,19 +1604,19 @@ setup_uki_pacman_hook() {
   mkdir -p "$hook_dir"
   mkdir -p "$(dirname "$script_file")"
 
-  # Write rebuild-uki script (uses expanded variables)
+ # Write rebuild-uki script
   cat <<EOS > "$script_file"
 #!/bin/bash
 set -euo pipefail
 
 ukify \\
-  --kernel /boot/vmlinuz-${KERNEL_PACKAGE} \\
-  --initrd /boot/${MICROCODE_PACKAGE}.img \\
-  --initrd /boot/initramfs-${KERNEL_PACKAGE}.img \\
-  --cmdline-file /etc/kernel/cmdline \\
-  --output /efi/EFI/Linux/arch.efi \\
-  --os-release /usr/lib/os-release \\
-  --splash /usr/share/systemd/bootctl/splash-arch.bmp
+  kernel=/boot/vmlinuz-${KERNEL_PACKAGE} \\
+  initrd=/boot/${MICROCODE_PACKAGE}.img \\
+  initrd=/boot/initramfs-${KERNEL_PACKAGE}.img \\
+  cmdline=/etc/kernel/cmdline \\
+  output=/efi/EFI/Linux/arch.efi \\
+  os-release=/usr/lib/os-release \\
+  splash=/usr/share/systemd/bootctl/splash-arch.bmp
 
 sbsign --key /etc/secureboot/keys/db.key \\
        --cert /etc/secureboot/keys/db.crt \\
