@@ -1663,24 +1663,24 @@ setup_grub_pacman_hook() {
 
   info_print "Installing GRUB re-sign pacman hook..."
 
-  # Create directories if missing
-  arch-chroot /mnt mkdir -p "$hook_dir"
-  arch-chroot /mnt mkdir -p "$(dirname "$script_file")"
+  # Create directories on host (not in chroot)
+  mkdir -p "$hook_dir"
+  mkdir -p "$(dirname "$script_file")"
 
-  # Write resign script
-  cat <<'EOS' > "$script_file"
+  # Write the resign script (no quoting)
+  cat <<EOS > "$script_file"
 #!/bin/bash
 set -euo pipefail
 
-sbsign --key /etc/secureboot/keys/db.key \
-       --cert /etc/secureboot/keys/db.crt \
-       --output /efi/EFI/GRUB/grubx64.efi \
+sbsign --key /etc/secureboot/keys/db.key \\
+       --cert /etc/secureboot/keys/db.crt \\
+       --output /efi/EFI/GRUB/grubx64.efi \\
        /efi/EFI/GRUB/grubx64.efi
 EOS
 
-  arch-chroot /mnt chmod +x "$script_file"
+  chmod +x "$script_file"
 
-  # Create pacman hook
+  # Write the pacman hook
   cat <<EOF > "$hook_file"
 [Trigger]
 Type = Package
@@ -1694,7 +1694,7 @@ When = PostTransaction
 Exec = /usr/local/bin/resign-grub
 EOF
 
-  startup_ok "GRUB pacman hook and re-sign script installed."
+  startup_ok "GRUB pacman hook and re-sign script installed successfully."
 }
 
 # ==================== Setup Snapper ====================
