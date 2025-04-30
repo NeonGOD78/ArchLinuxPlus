@@ -2077,6 +2077,48 @@ enable_services() {
   disable_debug
 }
 
+# ==================== Setup UKI timer ====================
+
+setup_uki_timer() {
+  section_header "Systemd Timer for UKI Auto-Rebuild"
+
+  local timer_dir="/mnt/etc/systemd/system"
+  local service_file="$timer_dir/uki-update.service"
+  local timer_file="$timer_dir/uki-update.timer"
+
+  info_print "Installing UKI update systemd service and timer..."
+
+  # Create service
+  cat <<EOF > "$service_file"
+[Unit]
+Description=Rebuild and sign Unified Kernel Image (UKI)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rebuild-uki
+EOF
+
+  # Create timer
+  cat <<EOF > "$timer_file"
+[Unit]
+Description=Daily UKI rebuild and sign
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1d
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  arch-chroot /mnt systemctl enable uki-update.timer >> "$LOGFILE" 2>&1
+
+  startup_ok "UKI systemd timer installed and enabled."
+}
+
 # ==================== Main ====================
 
 main() {
@@ -2141,6 +2183,7 @@ main() {
   setup_grub_bootloader
   setup_uki_pacman_hook
   setup_grub_pacman_hook
+  setup_uki_timer
   setup_snapper
   enable_services
   final_cleanup
