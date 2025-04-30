@@ -1470,7 +1470,7 @@ setup_uki_build() {
 setup_secureboot_structure() {
   section_header "Secure Boot Key Generation"
 
-  local keydir="/mnt/etc/secureboot/keys"
+  local keydir="/etc/secureboot/keys"
   arch-chroot /mnt mkdir -p "$keydir"
 
   info_print "Generating Secure Boot keys (PK, KEK, db)..."
@@ -1493,7 +1493,7 @@ setup_secureboot_structure() {
     -keyout "$keydir/db.key" -out "$keydir/db.crt" \
     -days 3650 -nodes -sha256 >> "$LOGFILE" 2>&1
 
-  startup_ok "Secure Boot keys generated and stored in $keydir."
+  startup_ok "Secure Boot keys generated and stored in /mnt$keydir."
 }
 
 # ==================== Setup cmdline file ====================
