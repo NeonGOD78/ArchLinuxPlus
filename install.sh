@@ -2014,60 +2014,39 @@ enable_services() {
   disable_debug
 }
 
-# ==================== Setup Secureboot timers ====================
+# ==================== Setup GRUB resign timer ====================
 
-setup_secureboot_timers() {
-  section_header "Systemd Timers for Secure Boot UKI & GRUB Re-sign"
+setup_grub_resign_timer() {
+  section_header "Installing GRUB Secure Boot Re-sign Timer"
 
   local timer_dir="/mnt/etc/systemd/system"
+  local script_path="/mnt/usr/local/bin/resign-grub"
+  local grub_efi="/efi/EFI/GRUB/grubx64.efi"
 
-  # Check that the scripts exist
-  if [[ ! -f "/mnt/usr/local/bin/rebuild-uki" ]]; then
-    error_print "Missing /usr/local/bin/rebuild-uki, timer cannot be created."
-    exit 1
-  fi
+  # Create necessary dirs
+  mkdir -p "$timer_dir"
+  mkdir -p "$(dirname "$script_path")"
 
-  if [[ ! -f "/mnt/usr/local/bin/resign-grub" ]]; then
-    error_print "Missing /usr/local/bin/resign-grub, timer cannot be created."
-    exit 1
-  fi
+  # Write GRUB re-sign script
+  cat <<EOF > "$script_path"
+#!/bin/bash
+set -euo pipefail
 
-  # --------- UKI Timer ---------
-  info_print "Installing UKI auto-rebuild timer..."
+GRUB_EFI="$grub_efi"
 
-  cat <<EOF > "$timer_dir/uki-update.service"
-[Unit]
-Description=Rebuild and sign Unified Kernel Image (UKI)
-Wants=network-online.target
-After=network-online.target
+if [[ ! -f "\$GRUB_EFI" ]]; then
+  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI"
+  exit 1
+fi
 
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/rebuild-uki
-StandardOutput=journal
+sbsign --key /etc/secureboot/keys/db.key \\
+       --cert /etc/secureboot/keys/db.crt \\
+       --output "\$GRUB_EFI" "\$GRUB_EFI"
 EOF
 
-  cat <<EOF > "$timer_dir/uki-update.timer"
-[Unit]
-Description=Daily UKI rebuild and sign
+  chmod +x "$script_path"
 
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=1d
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-  arch-chroot /mnt systemctl enable uki-update.timer >> "$LOGFILE" 2>&1 || {
-    error_print "Failed to enable uki-update.timer"
-    exit 1
-  }
-
-  # --------- GRUB Timer ---------
-  info_print "Installing GRUB re-sign timer..."
-
+  # Write systemd service
   cat <<EOF > "$timer_dir/grub-resign.service"
 [Unit]
 Description=Re-sign GRUB EFI binary for Secure Boot
@@ -2077,12 +2056,12 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/resign-grub
-StandardOutput=journal
 EOF
 
+  # Write systemd timer
   cat <<EOF > "$timer_dir/grub-resign.timer"
 [Unit]
-Description=Daily GRUB EFI re-signing
+Description=Daily GRUB re-signing for Secure Boot
 
 [Timer]
 OnBootSec=10min
@@ -2093,12 +2072,10 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-  arch-chroot /mnt systemctl enable grub-resign.timer >> "$LOGFILE" 2>&1 || {
-    error_print "Failed to enable grub-resign.timer"
-    exit 1
-  }
+  # Enable timer
+  arch-chroot /mnt systemctl enable grub-resign.timer >> "$LOGFILE" 2>&1
 
-  startup_ok "Secure Boot timers installed and enabled (UKI + GRUB)."
+  startup_ok "GRUB re-sign timer installed and enabled."
 }
 
 # ==================== Verify Boot integrity ====================
@@ -2304,9 +2281,8 @@ main() {
   setup_boot_targets
   
   setup_grub_bootloader
-  setup_uki_pacman_hook
   setup_grub_pacman_hook
-  setup_secureboot_timers
+  setup_grub_resign_timer
   setup_snapper
   enable_services
   final_cleanup
