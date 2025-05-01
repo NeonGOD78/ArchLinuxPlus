@@ -1840,7 +1840,7 @@ configure_package_management() {
 
   enable_debug
 
-  # ----------------- Pacman.conf tweaks -----------------
+  # Pacman tweaks
   info_print "Applying visual and performance tweaks to pacman.conf..."
   sed -Ei '
     s/^#Color$/Color/
@@ -1851,55 +1851,28 @@ configure_package_management() {
   ' "$pacman_conf" >> "$LOGFILE" 2>&1
   startup_ok "Pacman.conf tweaked."
 
-  # ----------------- Enable repos -----------------
+  # Repos
   info_print "Enabling multilib and limited testing repositories..."
   sed -i '/#\[multilib\]/,/^#Include/ s/^#//' "$pacman_conf" >> "$LOGFILE" 2>&1
 
   if ! grep -q "\[core-testing\]" "$pacman_conf"; then
-    if [[ "$DEBUG" == true ]]; then
-      tee -a "$LOGFILE" <<'EOF' >> "$pacman_conf"
-[core-testing]
-Usage = Sync Upgrade Search Local
-Include = /etc/pacman.d/mirrorlist
-
-[extra-testing]
-Usage = Sync Upgrade Search Local
-Include = /etc/pacman.d/mirrorlist
-
-[community-testing]
-Usage = Sync Upgrade Search Local
-Include = /etc/pacman.d/mirrorlist
-
-[multilib-testing]
-Usage = Sync Upgrade Search Local
-Include = /etc/pacman.d/mirrorlist
-EOF
-    else
-      cat >> "$pacman_conf" <<'EOF'
+    cat >> "$pacman_conf" <<'EOF'
 
 [core-testing]
-Usage = Sync Upgrade Search Local
 Include = /etc/pacman.d/mirrorlist
-
 [extra-testing]
-Usage = Sync Upgrade Search Local
 Include = /etc/pacman.d/mirrorlist
-
 [community-testing]
-Usage = Sync Upgrade Search Local
 Include = /etc/pacman.d/mirrorlist
-
 [multilib-testing]
-Usage = Sync Upgrade Search Local
 Include = /etc/pacman.d/mirrorlist
 EOF
-    fi
     startup_ok "Testing repositories added."
   else
     info_print "Testing repositories already present. Skipping addition."
   fi
 
-  # ----------------- makepkg.conf tweaks -----------------
+  # makepkg tweaks
   info_print "Optimizing makepkg.conf for parallel build and better output..."
   sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf" >> "$LOGFILE" 2>&1
   sed -i 's|^#\?\s*BUILDENV=.*|BUILDENV=(!distcc color !ccache !check !sign)|' "$makepkg_conf" >> "$LOGFILE" 2>&1
@@ -1908,22 +1881,17 @@ EOF
 
   disable_debug
 
- # ----------------- Yay installation via chroot-script -----------------
+  # Yay installation
   info_print "Installing yay AUR helper safely..."
+  mkdir -p /mnt/root/scripts
 
-  # Sikrer at /mnt/tmp eksisterer
-  mkdir -p /mnt/tmp
-
-  # Skriv installationsscript til /mnt/tmp/
-  cat <<'EOF' > /mnt/tmp/yay-install.sh
+  cat <<'EOF' > /mnt/root/scripts/yay-install.sh
 #!/bin/bash
 set -euo pipefail
 
-# Midlertidig AUR-bygger
 useradd -m aurbuilder
 echo "aurbuilder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/aurbuilder
 
-# Clone og byg yay
 sudo -u aurbuilder bash -c '
   cd /home/aurbuilder
   git clone https://aur.archlinux.org/yay.git
@@ -1931,25 +1899,20 @@ sudo -u aurbuilder bash -c '
   makepkg -si --noconfirm
 '
 
-# Ryd op
 userdel -r aurbuilder
 rm -f /etc/sudoers.d/aurbuilder
 EOF
 
-  chmod +x /mnt/tmp/yay-install.sh
+  chmod +x /mnt/root/scripts/yay-install.sh
 
-  # Kør scriptet tavst og log til logfil
-  arch-chroot /mnt /tmp/yay-install.sh >> /mnt/tmp/yay.log 2>&1 || {
+  arch-chroot /mnt /root/scripts/yay-install.sh >> "$LOGFILE" 2>&1 || {
     error_print "Yay installation failed."
-    cat /mnt/tmp/yay.log >> "$LOGFILE"
-    rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
+    rm -f /mnt/root/scripts/yay-install.sh
     return 1
   }
 
-  cat /mnt/tmp/yay.log >> "$LOGFILE"
-  rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
+  rm -f /mnt/root/scripts/yay-install.sh
 
-  # Verificér at yay findes
   if arch-chroot /mnt command -v yay &>/dev/null; then
     startup_ok "yay installed successfully."
   else
