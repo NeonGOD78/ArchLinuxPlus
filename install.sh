@@ -1287,9 +1287,9 @@ install_base_system() {
 
   enable_debug
   if [[ "$DEBUG" == true ]]; then
-    pacstrap -K --ignore=mkinitcpio,mkinitcpio-busybox /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
+    pacstrap -K --ignore=mkinitcpio --ignore=mkinitcpio-busybox /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
   else
-    pacstrap -K --ignore=mkinitcpio,mkinitcpio-busybox /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
+    pacstrap -K --ignore=mkinitcpio --ignore=mkinitcpio-busybox /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
   fi
   pacstrap_exit=$?
   disable_debug
