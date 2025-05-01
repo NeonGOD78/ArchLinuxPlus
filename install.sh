@@ -1426,7 +1426,7 @@ setup_uki_build() {
   # ================== Create Output Directory ==================
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-  # ===================== UKI Build Script ======================
+# UKI Build Script
   info_print "Building UKI with ukify..."
   cat << 'EOF' > /mnt/tmp/ukify-build.sh
 #!/bin/bash
@@ -1442,14 +1442,16 @@ ukify build \
 EOF
 
   chmod +x /mnt/tmp/ukify-build.sh
-  arch-chroot /mnt /tmp/ukify-build.sh >> "$LOGFILE" 2>&1 || {
+  arch-chroot /mnt /tmp/ukify-build.sh >> /mnt/tmp/ukify.log 2>&1 || {
     error_print "Failed to build UKI."
-    rm -f /mnt/tmp/ukify-build.sh
+    cat /mnt/tmp/ukify.log >> "$LOGFILE"
+    rm -f /mnt/tmp/ukify.log /mnt/tmp/ukify-build.sh
     exit 1
   }
-  rm -f /mnt/tmp/ukify-build.sh
-  startup_ok "UKI built and placed at $output_path"
 
+  cat /mnt/tmp/ukify.log >> "$LOGFILE"
+  rm -f /mnt/tmp/ukify.log /mnt/tmp/ukify-build.sh
+  startup_ok "UKI built and placed at $output_path"
   # ======================== UKI Signing ========================
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
