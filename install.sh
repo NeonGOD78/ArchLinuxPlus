@@ -2364,7 +2364,6 @@ main() {
   partition_disk
   wipe_existing_luks_if_any
   encrypt_partitions
-  setup_crypttab
   format_btrfs
   create_btrfs_subvolumes
   mount_subvolumes
@@ -2375,6 +2374,7 @@ main() {
   install_base_system
   move_logfile_to_mnt
   gen_fstab
+  setup_crypttab
   setup_zram
   configure_package_management
   save_keymap_config
