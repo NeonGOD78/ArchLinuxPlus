@@ -1413,63 +1413,45 @@ setup_uki_build() {
   # ======================= File Checks ========================
   info_print "Checking for necessary files in target system..."
 
-  for file in "$kernel_path" "$initramfs_path" "$microcode_path"; do
-    if [[ ! -f "/mnt$file" ]]; then
+  for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
+    if [[ ! -f "/mnt${file}" ]]; then
       error_print "Missing required file in target system: $file"
       exit 1
     fi
   done
 
-  if [[ ! -f "/mnt$cmdline_path" ]]; then
-    error_print "Missing kernel cmdline file in target system: $cmdline_path"
-    exit 1
-  fi
-
   startup_ok "All required files found."
 
-  # ================== Prepare Output Directory ==================
-  arch-chroot /mnt mkdir -p /efi/EFI/Linux
-
-  # ================== Export Vars for chroot ===================
+  # ================== Prepare tmp directory ==================
   info_print "Preparing environment for ukify..."
+  mkdir -p /mnt/tmp
 
-  cat <<EOF > /mnt/tmp/uki-env.sh
-export KERNEL_PACKAGE="${KERNEL_PACKAGE}"
-export MICROCODE_PACKAGE="${MICROCODE_PACKAGE}"
-EOF
+  # ===================== UKI Build Script ======================
+  info_print "Building UKI with ukify..."
 
-  chmod +x /mnt/tmp/uki-env.sh
-
-  # ================== Build UKI Script ===================
-  cat <<'EOF' > /mnt/tmp/ukify-build.sh
-#!/bin/bash
+  echo "#!/bin/bash
 set -euo pipefail
-source /tmp/uki-env.sh
 
-ukify build \
-  kernel="/boot/vmlinuz-${KERNEL_PACKAGE}" \
-  initrd="/boot/${MICROCODE_PACKAGE}.img" \
-  initrd="/boot/initramfs-${KERNEL_PACKAGE}.img" \
-  cmdline="/etc/kernel/cmdline" \
-  output="/efi/EFI/Linux/arch.efi" \
-  os-release="/usr/lib/os-release" \
-  splash="/usr/share/systemd/bootctl/splash-arch.bmp"
-EOF
+ukify build \\
+  kernel='/boot/vmlinuz-${KERNEL_PACKAGE}' \\
+  initrd='/boot/${MICROCODE_PACKAGE}.img' \\
+  initrd='/boot/initramfs-${KERNEL_PACKAGE}.img' \\
+  cmdline='/etc/kernel/cmdline' \\
+  output='/efi/EFI/Linux/arch.efi' \\
+  os-release='/usr/lib/os-release' \\
+  splash='/usr/share/systemd/bootctl/splash-arch.bmp'
+" > /mnt/tmp/ukify-build.sh
 
   chmod +x /mnt/tmp/ukify-build.sh
 
-  # =============== Run Script in Chroot and Capture Log ===============
-  info_print "Building UKI with ukify..."
-  arch-chroot /mnt /tmp/ukify-build.sh >> /mnt/tmp/ukify.log 2>&1 || {
+  arch-chroot /mnt /tmp/ukify-build.sh >> "$LOGFILE" 2>&1 || {
     error_print "Failed to build UKI."
-    cat /mnt/tmp/ukify.log >> "$LOGFILE"
-    rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/uki-env.sh /mnt/tmp/ukify.log
+    cat /mnt/tmp/ukify-build.sh >> "$LOGFILE"
+    rm -f /mnt/tmp/ukify-build.sh
     exit 1
   }
 
-  cat /mnt/tmp/ukify.log >> "$LOGFILE"
-  rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/uki-env.sh /mnt/tmp/ukify.log
-
+  rm -f /mnt/tmp/ukify-build.sh
   startup_ok "UKI built and placed at $output_path"
 
   # ======================== UKI Signing ========================
