@@ -1379,27 +1379,6 @@ set_timezone() {
   fi
 }
 
-# ======================= Setup Initramfs ========================
-
-setup_initramfs() {
-  section_header "Initramfs & Systemd Hooks Setup"
-
-  info_print "Configuring mkinitcpio for systemd boot hooks..."
-
-  sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect keyboard sd-vconsole sd-encrypt modconf block filesystems fsck)/' /mnt/etc/mkinitcpio.conf
-  startup_ok "Updated mkinitcpio hooks to systemd style."
-
-  info_print "Generating initramfs for all kernels..."
-  arch-chroot /mnt mkinitcpio -P >> "$LOGFILE" 2>&1
-
-  if [[ $? -eq 0 ]]; then
-    startup_ok "Initramfs generated successfully."
-  else
-    error_print "Initramfs generation failed. Check log."
-    exit 1
-  fi
-}
-
 # ======================= Setup UKI Build ========================
 
 setup_uki_build() {
@@ -2402,7 +2381,6 @@ main() {
   # Secureboot
   setup_secureboot_structure
   setup_cmdline_file
-  setup_initramfs
   setup_uki_build
   setup_boot_targets
   
