@@ -1282,14 +1282,14 @@ install_base_system() {
     base "$KERNEL_PACKAGE" "$MICROCODE_PACKAGE" linux-firmware "$KERNEL_PACKAGE"-headers
     "$NETWORK_PKGS" btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
     zram-generator sudo bash-completion inotify-tools zsh unzip unrar fzf zoxide colordiff curl
-    btop mc git systemd ukify openssl sbsigntools sbctl base-devel go dracut --ignore mkinitcpio --ignore mkinitcpio-busybox 
+    btop mc git systemd ukify openssl sbsigntools sbctl base-devel go dracut
   )
 
   enable_debug
   if [[ "$DEBUG" == true ]]; then
-    pacstrap -K /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
+    pacstrap -K --ignore=mkinitcpio --ignore=mkinitcpio-busybox /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
   else
-    pacstrap -K /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
+    pacstrap -K --ignore=mkinitcpio --ignore=mkinitcpio-busybox /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
   fi
   pacstrap_exit=$?
   disable_debug
