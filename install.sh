@@ -1411,7 +1411,7 @@ setup_uki_build() {
   local cmdline_path="/etc/kernel/cmdline"
   local output_path="/efi/EFI/Linux/arch.efi"
 
-  # ======================= File Checks ========================
+  # =============== File Checks ===============
   info_print "Checking for necessary files in target system..."
 
   for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
@@ -1423,18 +1423,15 @@ setup_uki_build() {
 
   startup_ok "All required files found."
 
-  # ================== Create Output Directory ==================
+  # =============== Create Output Directory ===============
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-  # ===================== UKI Build Script ======================
+  # =============== UKI Build Script ===============
   info_print "Building UKI with ukify..."
 
-  # Ensure /tmp exists both in host and chroot
-  mkdir -p /mnt/tmp
-  arch-chroot /mnt mkdir -p /tmp
+  mkdir -p /mnt/root/scripts
 
-  # Write the ukify build script into target system
-  cat <<'EOF' > /mnt/tmp/ukify-build.sh
+  cat <<'EOF' > /mnt/root/scripts/ukify-build.sh
 #!/bin/bash
 set -euo pipefail
 
@@ -1448,22 +1445,17 @@ ukify build \
   splash="/usr/share/systemd/bootctl/splash-arch.bmp"
 EOF
 
-  chmod +x /mnt/tmp/ukify-build.sh
+  chmod +x /mnt/root/scripts/ukify-build.sh
 
-  # Run script inside chroot and capture output to temporary log
-  arch-chroot /mnt /tmp/ukify-build.sh >> /mnt/tmp/ukify.log 2>&1 || {
+  arch-chroot /mnt /root/scripts/ukify-build.sh >> "$LOGFILE" 2>&1 || {
     error_print "Failed to build UKI."
-    cat /mnt/tmp/ukify.log >> "$LOGFILE"
-    rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/ukify.log
     exit 1
   }
 
-  cat /mnt/tmp/ukify.log >> "$LOGFILE"
-  rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/ukify.log
-
+  rm -f /mnt/root/scripts/ukify-build.sh
   startup_ok "UKI built and placed at $output_path"
 
-  # ======================== UKI Signing ========================
+  # =============== UKI Signing ===============
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
