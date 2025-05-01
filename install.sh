@@ -2316,9 +2316,9 @@ setup_crypttab() {
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Hent luksUUID’er
-  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION")
-  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION")
+  # Get luks UUIDs directly from encrypted block devices
+  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
+  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
 
   if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
     error_print "Unable to retrieve luksUUIDs for root or home partitions."
@@ -2332,19 +2332,8 @@ cryptroot UUID=$root_uuid none luks,discard
 crypthome UUID=$home_uuid none luks
 EOF
 
-  # Validering
   if [[ ! -s "$crypttab_path" ]]; then
     error_print "/etc/crypttab was not created properly."
-    exit 1
-  fi
-
-  if ! grep -q "$root_uuid" "$crypttab_path"; then
-    error_print "cryptroot UUID not found in /etc/crypttab"
-    exit 1
-  fi
-
-  if ! grep -q "$home_uuid" "$crypttab_path"; then
-    error_print "crypthome UUID not found in /etc/crypttab"
     exit 1
   fi
 
