@@ -1409,54 +1409,53 @@ setup_uki_build() {
   local microcode_path="/boot/${MICROCODE_PACKAGE}.img"
   local cmdline_path="/etc/kernel/cmdline"
   local output_path="/efi/EFI/Linux/arch.efi"
-  local ukify_script_path="/mnt/tmp/ukify-build.sh"
-  local ukify_log_path="/mnt/tmp/ukify.log"
 
-  # ==================== Verify Required Files ====================
-  info_print "Checking for required files in target system..."
+  # =============== File Checks ===============
+  info_print "Checking for necessary files in target system..."
 
   for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
     if [[ ! -f "/mnt$file" ]]; then
-      error_print "Missing required file in /mnt: $file"
+      error_print "Missing required file in target system: $file"
       exit 1
     fi
   done
 
   startup_ok "All required files found."
 
-  # ================ Write UKI Build Script =================
-  info_print "Preparing environment for ukify..."
-  mkdir -p /mnt/tmp
+  # =============== Create Output Directory ===============
+  arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-  echo "#!/bin/bash
+  # =============== UKI Build Script ===============
+  info_print "Building UKI with ukify..."
+
+  mkdir -p /mnt/root/scripts
+
+  cat <<EOF > /mnt/root/scripts/ukify-build.sh
+#!/bin/bash
 set -euo pipefail
 
-ukify build \\
-  kernel='${kernel_path}' \\
-  initrd='${microcode_path}' \\
-  initrd='${initramfs_path}' \\
-  cmdline='${cmdline_path}' \\
-  output='${output_path}' \\
-  os-release='/usr/lib/os-release' \\
-  splash='/usr/share/systemd/bootctl/splash-arch.bmp'" > "$ukify_script_path"
+ukify build \
+  --linux=/boot/vmlinuz-${KERNEL_PACKAGE} \
+  --initrd=/boot/${MICROCODE_PACKAGE}.img \
+  --initrd=/boot/initramfs-${KERNEL_PACKAGE}.img \
+  --cmdline=/etc/kernel/cmdline \
+  --output=/efi/EFI/Linux/arch.efi \
+  --os-release=/usr/lib/os-release \
+  --splash=/usr/share/systemd/bootctl/splash-arch.bmp
+EOF
 
-  chmod +x "$ukify_script_path"
+  chmod +x /mnt/root/scripts/ukify-build.sh
 
-  # =================== Run UKI Build ====================
-  info_print "Building UKI with ukify..."
-  arch-chroot /mnt /tmp/ukify-build.sh >> "$ukify_log_path" 2>&1 || {
+  arch-chroot /mnt /root/scripts/ukify-build.sh >> "$LOGFILE" 2>&1 || {
     error_print "Failed to build UKI."
-    cat "$ukify_log_path" >> "$LOGFILE"
-    rm -f "$ukify_script_path" "$ukify_log_path"
+    rm -f /mnt/root/scripts/ukify-build.sh
     exit 1
   }
 
-  cat "$ukify_log_path" >> "$LOGFILE"
-  rm -f "$ukify_script_path" "$ukify_log_path"
-
+  rm -f /mnt/root/scripts/ukify-build.sh
   startup_ok "UKI built and placed at $output_path"
 
-  # =================== Sign UKI =====================
+  # =============== UKI Signing ===============
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
@@ -1468,48 +1467,6 @@ ukify build \\
   }
 
   startup_ok "UKI signed successfully."
-}
-
-# ======================= Setup Secureboot Structure ========================
-
-setup_secureboot_structure() {
-  section_header "Secure Boot Key Generation"
-
-  info_print "Generating Secure Boot keys (PK, KEK, db)..."
-
-  # Run everything *inside* chroot and redirect output to log
-  arch-chroot /mnt /bin/bash -e <<'EOF' >> /mnt/tmp/secureboot.log 2>&1
-set -euo pipefail
-
-keydir="/etc/secureboot/keys"
-mkdir -p "$keydir"
-
-# Platform Key (PK)
-openssl req -new -x509 -newkey rsa:4096 \
-  -subj "/CN=Platform Key/" \
-  -keyout "$keydir/PK.key" -out "$keydir/PK.crt" \
-  -days 3650 -nodes -sha256
-
-# Key Exchange Key (KEK)
-openssl req -new -x509 -newkey rsa:4096 \
-  -subj "/CN=Key Exchange Key/" \
-  -keyout "$keydir/KEK.key" -out "$keydir/KEK.crt" \
-  -days 3650 -nodes -sha256
-
-# Signature Database Key (db)
-openssl req -new -x509 -newkey rsa:4096 \
-  -subj "/CN=Signature Database/" \
-  -keyout "$keydir/db.key" -out "$keydir/db.crt" \
-  -days 3650 -nodes -sha256
-
-chmod 600 "$keydir/"*.key
-EOF
-
-  # Append chroot log to master log file and delete temp log
-  cat /mnt/tmp/secureboot.log >> "$LOGFILE"
-  rm -f /mnt/tmp/secureboot.log
-
-  startup_ok "Secure Boot keys generated and stored in /etc/secureboot/keys."
 }
 
 # ==================== Setup cmdline file ====================
