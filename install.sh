@@ -1287,9 +1287,9 @@ install_base_system() {
 
   enable_debug
   if [[ "$DEBUG" == true ]]; then
-    pacstrap -K --ignore=mkinitcpio --ignore=mkinitcpio-busybox /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
+    pacstrap -K /mnt "${base_packages[@]}" 2>&1 | tee -a "$LOGFILE"
   else
-    pacstrap -K --ignore=mkinitcpio --ignore=mkinitcpio-busybox /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
+    pacstrap -K /mnt "${base_packages[@]}" >> "$LOGFILE" 2>&1
   fi
   pacstrap_exit=$?
   disable_debug
@@ -1300,6 +1300,10 @@ install_base_system() {
     error_print "Base system installation failed!"
     exit 1
   fi
+
+  # Remove mkinitcpio and mkinitcpio-busybox if present
+  info_print "Removing mkinitcpio and mkinitcpio-busybox from target system..."
+  arch-chroot /mnt pacman -Rdd --noconfirm mkinitcpio mkinitcpio-busybox >> "$LOGFILE" 2>&1 || true
 }
 
 # ======================= Generate fstab ========================
