@@ -1614,15 +1614,17 @@ setup_uki_pacman_hook() {
   local hook_dir="/mnt/etc/pacman.d/hooks"
   local hook_file="$hook_dir/99-ukify.hook"
   local script_file="/mnt/usr/local/bin/rebuild-uki"
+  local dracut_conf="/mnt/etc/dracut.conf.d/remote-unlock.conf"
 
   info_print "Installing UKI auto-update pacman hook..."
 
   # Create necessary directories
   mkdir -p "$hook_dir"
   mkdir -p "$(dirname "$script_file")"
+  mkdir -p "$(dirname "$dracut_conf")"
 
- # Write rebuild-uki script
-  cat <<EOS > "$script_file"
+  # Write rebuild-uki script
+  cat <<EOF > "$script_file"
 #!/bin/bash
 set -euo pipefail
 
@@ -1639,7 +1641,7 @@ sbsign --key /etc/secureboot/keys/db.key \\
        --cert /etc/secureboot/keys/db.crt \\
        --output /efi/EFI/Linux/arch.efi \\
        /efi/EFI/Linux/arch.efi
-EOS
+EOF
 
   chmod +x "$script_file"
 
@@ -1652,6 +1654,8 @@ Operation = Upgrade
 Target = ${KERNEL_PACKAGE}
 Target = linux-firmware
 Target = ${MICROCODE_PACKAGE}
+Target = dracut
+Target = mkinitcpio
 
 [Action]
 Description = Rebuilding and signing Unified Kernel Image (UKI)...
@@ -1659,7 +1663,10 @@ When = PostTransaction
 Exec = /usr/local/bin/rebuild-uki
 EOF
 
-  startup_ok "UKI pacman hook and rebuild script installed successfully."
+  # Create dracut unlock config placeholder
+  echo "# Remote LUKS unlock config placeholder" > "$dracut_conf"
+
+  startup_ok "UKI pacman hook, rebuild script, and dracut config placeholder installed successfully."
 }
 
 # ==================== Setup GRUB pacman hook ====================
