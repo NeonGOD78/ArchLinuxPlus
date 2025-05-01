@@ -1388,51 +1388,42 @@ set_timezone() {
 setup_uki_build() {
   section_header "Unified Kernel Image (UKI) Build with dracut"
 
-  local kernel_version
   local output_path="/efi/EFI/Linux/arch.efi"
-  local cmdline_file="/etc/kernel/cmdline"
 
-  # Find kernel version from installed system
-  kernel_version=$(ls /mnt/lib/modules | grep -E '^[0-9]' | sort -V | tail -n 1)
+  # Find kernel version automatically
+  local kernel_version
+  kernel_version=$(ls /mnt/lib/modules | head -n1)
 
   if [[ -z "$kernel_version" ]]; then
-    error_print "Unable to determine kernel version for dracut."
+    error_print "Unable to detect kernel version in /mnt/lib/modules"
     exit 1
   fi
 
-  info_print "Kernel version detected: $kernel_version"
+  info_print "Detected kernel version: $kernel_version"
+  info_print "Generating UKI using dracut..."
 
-  # Ensure target directory exists
+  # Ensure output directory exists
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-  # Build UKI with dracut
-  info_print "Building UKI with dracut..."
-  arch-chroot /mnt dracut \
-    --uefi \
-    --kver "$kernel_version" \
-    --kernel-cmdline "$(cat /etc/kernel/cmdline)" \
-    --force \
-    "$output_path" >> "$LOGFILE" 2>&1
-
-  if [[ $? -ne 0 ]]; then
-    error_print "Failed to build UKI with dracut."
+  # Generate UKI
+  if arch-chroot /mnt dracut --uefi -f /efi/EFI/Linux/arch.efi "$kernel_version" >> "$LOGFILE" 2>&1; then
+    startup_ok "UKI built successfully at $output_path"
+  else
+    error_print "UKI build failed"
     exit 1
   fi
 
-  startup_ok "UKI built successfully at $output_path"
-
-  # Sign UKI for Secure Boot
-  info_print "Signing UKI with Secure Boot keys..."
-  arch-chroot /mnt sbsign \
+  # Sign the UKI with sbctl if available
+  info_print "Signing UKI with Secure Boot key..."
+  if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
-    --output "$output_path" \
-    "$output_path" >> "$LOGFILE" 2>&1 || {
-      error_print "Failed to sign UKI."
-      exit 1
-  }
-
-  startup_ok "UKI signed successfully."
+    --output "$output_path" "$output_path" >> "$LOGFILE" 2>&1; then
+    startup_ok "UKI signed successfully."
+  else
+    error_print "Failed to sign UKI."
+    exit 1
+  fi
 }
 
 # ======================= Setup Secureboot Structure ========================
