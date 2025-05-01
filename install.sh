@@ -1533,12 +1533,13 @@ setup_cmdline_file() {
 rd.luks.name=$root_uuid=cryptroot rd.luks.name=$home_uuid=crypthome root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3
 EOF
 
-  # Validate file
+  # Validate file exists and has content
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
   fi
 
+  # Validate against /etc/crypttab
   if [[ ! -f "$crypttab_path" ]]; then
     error_print "Missing /etc/crypttab — must exist before cmdline can be verified."
     exit 1
@@ -1554,7 +1555,12 @@ EOF
     exit 1
   fi
 
-  startup_ok "Kernel command line written to $cmdline_path and validated successfully"
+  # Log to installation log
+  echo "--- /etc/kernel/cmdline content ---" >> "$LOGFILE"
+  cat "$cmdline_path" >> "$LOGFILE"
+  echo "-----------------------------------" >> "$LOGFILE"
+
+  startup_ok "Kernel command line written to $cmdline_path and validated"
 }
 
 # ==================== Setup GRUB Bootloader ====================
