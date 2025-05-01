@@ -1677,7 +1677,7 @@ setup_grub_pacman_hook() {
   local hook_dir="/mnt/etc/pacman.d/hooks"
   local hook_file="$hook_dir/99-grub-sign.hook"
   local script_file="/mnt/usr/local/bin/resign-grub"
-  local grub_efi="/efi/EFI/GRUB/grubx64.efi"  # Kan ændres til fx shimx64.efi hvis nødvendigt
+  local grub_efi="/efi/EFI/GRUB/grubx64.efi"
 
   info_print "Installing GRUB re-sign pacman hook..."
 
@@ -1686,21 +1686,21 @@ setup_grub_pacman_hook() {
   mkdir -p "$(dirname "$script_file")"
 
   # Write the resign script
-  cat <<EOS > "$script_file"
+  cat <<EOF > "$script_file"
 #!/bin/bash
 set -euo pipefail
 
 GRUB_EFI="$grub_efi"
 
 if [[ ! -f "\$GRUB_EFI" ]]; then
-  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI"
+  >&2 echo -e "\e[91m[ERROR]\e[0m GRUB EFI binary not found at \$GRUB_EFI"
   exit 1
 fi
 
 sbsign --key /etc/secureboot/keys/db.key \\
        --cert /etc/secureboot/keys/db.crt \\
        --output "\$GRUB_EFI" "\$GRUB_EFI"
-EOS
+EOF
 
   chmod +x "$script_file"
 
