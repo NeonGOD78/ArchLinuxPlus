@@ -1430,17 +1430,17 @@ setup_uki_build() {
 
   mkdir -p /mnt/root/scripts
 
-  cat <<'EOF' > /mnt/root/scripts/ukify-build.sh
+  cat <<EOF > /mnt/root/scripts/ukify-build.sh
 #!/bin/bash
 set -euo pipefail
 
-ukify build \
-  kernel="/boot/vmlinuz-${KERNEL_PACKAGE}" \
-  initrd="/boot/${MICROCODE_PACKAGE}.img" \
-  initrd="/boot/initramfs-${KERNEL_PACKAGE}.img" \
-  cmdline="/etc/kernel/cmdline" \
-  output="/efi/EFI/Linux/arch.efi" \
-  os-release="/usr/lib/os-release" \
+ukify build \\
+  kernel="/boot/vmlinuz-${KERNEL_PACKAGE}" \\
+  initrd="/boot/${MICROCODE_PACKAGE}.img" \\
+  initrd="/boot/initramfs-${KERNEL_PACKAGE}.img" \\
+  cmdline="/etc/kernel/cmdline" \\
+  output="/efi/EFI/Linux/arch.efi" \\
+  os-release="/usr/lib/os-release" \\
   splash="/usr/share/systemd/bootctl/splash-arch.bmp"
 EOF
 
@@ -1448,6 +1448,7 @@ EOF
 
   arch-chroot /mnt /root/scripts/ukify-build.sh >> "$LOGFILE" 2>&1 || {
     error_print "Failed to build UKI."
+    rm -f /mnt/root/scripts/ukify-build.sh
     exit 1
   }
 
