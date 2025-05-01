@@ -1519,15 +1519,15 @@ setup_cmdline_file() {
   local cmdline_path="/mnt/etc/kernel/cmdline"
   local root_uuid
 
-  # Find UUID for root partition
+  # Find UUID for root partition (not luks header!)
   root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
   if [[ -z "$root_uuid" ]]; then
     error_print "Unable to determine UUID for root partition."
     exit 1
   fi
 
-  # Create cmdline file
-  echo "root=UUID=$root_uuid rw quiet splash loglevel=3" > "$cmdline_path"
+  # Write cmdline for systemd-based initramfs + UKI
+  echo "rd.luks.uuid=$root_uuid root=UUID=$root_uuid rw quiet splash loglevel=3" > "$cmdline_path"
 
   startup_ok "Kernel command line written to $cmdline_path."
 }
