@@ -2239,6 +2239,43 @@ verify_boot_integrity() {
   fi
 }
 
+# ==================== Setup Boot Targets ====================
+
+setup_boot_targets() {
+  section_header "Final Bootloader Targets (Fallback + UEFI Boot Entry)"
+
+  local uki_source="/mnt/efi/EFI/Linux/arch.efi"
+  local fallback_dir="/mnt/efi/EFI/Boot"
+  local fallback_target="$fallback_dir/BOOTX64.EFI"
+  local loader_path="\\EFI\\GRUB\\grubx64.efi"
+  local disk="/dev/$(lsblk -no pkname "$ROOT_PARTITION")"
+  local partnum
+  partnum=$(lsblk -no PARTNUM "$EFI_PARTITION")
+
+  # --- Step 1: Fallback bootloader ---
+  if [[ -f "$uki_source" ]]; then
+    mkdir -p "$fallback_dir"
+    cp "$uki_source" "$fallback_target"
+    if [[ -f "$fallback_target" ]]; then
+      startup_ok "Fallback BOOTX64.EFI created at $fallback_target"
+    else
+      error_print "Failed to create fallback BOOTX64.EFI."
+      exit 1
+    fi
+  else
+    error_print "Missing UKI source file: $uki_source"
+    exit 1
+  fi
+
+  # --- Step 2: Register UEFI boot entry ---
+  if arch-chroot /mnt efibootmgr --disk "$disk" --part "$partnum" \
+    --create --label "ArchLinuxPlus" --loader "$loader_path" >> "$LOGFILE" 2>&1; then
+    startup_ok "UEFI boot entry 'ArchLinuxPlus' registered successfully."
+  else
+    warning_print "Failed to register UEFI boot entry. Fallback boot will still work."
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -2300,6 +2337,8 @@ main() {
   setup_cmdline_file
   setup_initramfs
   setup_uki_build
+  setup_boot_targets
+  
   setup_grub_bootloader
   setup_uki_pacman_hook
   setup_grub_pacman_hook
