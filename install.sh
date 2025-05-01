@@ -1932,12 +1932,15 @@ EOF
 
   chmod +x /mnt/tmp/yay-install.sh
 
-  arch-chroot /mnt /tmp/yay-install.sh >> "$LOGFILE" 2>&1 || {
-    error_print "Yay installation failed."
-    rm -f /mnt/tmp/yay-install.sh
-    return 1
-  }
+arch-chroot /mnt /tmp/yay-install.sh >> /mnt/tmp/yay.log 2>&1 || {
+  error_print "Yay installation failed."
+  cat /mnt/tmp/yay.log >> "$LOGFILE"
+  rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
+  return 1
+}
 
+cat /mnt/tmp/yay.log >> "$LOGFILE"
+rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
   rm -f /mnt/tmp/yay-install.sh
   disable_debug
 
