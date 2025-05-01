@@ -1411,54 +1411,62 @@ setup_uki_build() {
   local cmdline_path="/etc/kernel/cmdline"
   local output_path="/efi/EFI/Linux/arch.efi"
 
-  # Check for required files
+  # ======================= File Checks ========================
   info_print "Checking for necessary files..."
-  for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
+
+  for file in "$kernel_path" "$initramfs_path" "$microcode_path"; do
     if [[ ! -f "/mnt$file" ]]; then
-      error_print "Missing required file: $file"
+      error_print "Missing required file in target system: $file"
       exit 1
     fi
   done
-  startup_ok "All required files found."
 
-  # Ensure output dir exists
-  arch-chroot /mnt mkdir -p /efi/EFI/Linux
-
-  # Build the UKI with ukify (requires 'build' verb!)
-  info_print "Building UKI with ukify..."
-  arch-chroot /mnt /bin/bash -c "
-    set -e
-    ukify build \
-      kernel='$kernel_path' \
-      initrd='$microcode_path' \
-      initrd='$initramfs_path' \
-      cmdline='$cmdline_path' \
-      output='$output_path' \
-      os-release=/usr/lib/os-release \
-      splash=/usr/share/systemd/bootctl/splash-arch.bmp
-  " >> "$LOGFILE" 2>&1
-
-  if [[ $? -eq 0 ]]; then
-    startup_ok "UKI built and placed at $output_path"
-  else
-    error_print "Failed to build UKI."
+  if [[ ! -f "$cmdline_path" ]]; then
+    error_print "Missing required file on host system: $cmdline_path"
     exit 1
   fi
 
-  # Sign the UKI
+  startup_ok "All required files found."
+
+  # ================== Create Output Directory ==================
+  arch-chroot /mnt mkdir -p /efi/EFI/Linux
+
+  # ===================== UKI Build Script ======================
+  info_print "Building UKI with ukify..."
+  cat << 'EOF' > /mnt/tmp/ukify-build.sh
+#!/bin/bash
+set -e
+ukify build \
+  kernel='/boot/vmlinuz-${KERNEL_PACKAGE}' \
+  initrd='/boot/${MICROCODE_PACKAGE}.img' \
+  initrd='/boot/initramfs-${KERNEL_PACKAGE}.img' \
+  cmdline='/etc/kernel/cmdline' \
+  output='/efi/EFI/Linux/arch.efi' \
+  os-release='/usr/lib/os-release' \
+  splash='/usr/share/systemd/bootctl/splash-arch.bmp'
+EOF
+
+  chmod +x /mnt/tmp/ukify-build.sh
+  arch-chroot /mnt /tmp/ukify-build.sh >> "$LOGFILE" 2>&1 || {
+    error_print "Failed to build UKI."
+    rm -f /mnt/tmp/ukify-build.sh
+    exit 1
+  }
+  rm -f /mnt/tmp/ukify-build.sh
+  startup_ok "UKI built and placed at $output_path"
+
+  # ======================== UKI Signing ========================
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
     --output "$output_path" \
-    "$output_path" >> "$LOGFILE" 2>&1
-
-  if [[ $? -eq 0 ]]; then
-    startup_ok "UKI signed successfully."
-  else
+    "$output_path" >> "$LOGFILE" 2>&1 || {
     error_print "Failed to sign UKI."
     exit 1
-  fi
+  }
+
+  startup_ok "UKI signed successfully."
 }
 
 # ======================= Setup Secureboot Structure ========================
