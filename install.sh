@@ -1516,19 +1516,46 @@ setup_cmdline_file() {
   section_header "Generating Kernel Command Line"
 
   local cmdline_path="/mnt/etc/kernel/cmdline"
-  local root_uuid
+  local crypttab_path="/mnt/etc/crypttab"
+  local root_uuid home_uuid
 
-  # Find UUID for root partition (not luks header!)
+  # Hent UUID’er for root og home luks-enheder
   root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-  if [[ -z "$root_uuid" ]]; then
-    error_print "Unable to determine UUID for root partition."
+  home_uuid=$(blkid -s UUID -o value "$HOMEPARTITION")
+
+  if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
+    error_print "Unable to determine UUIDs for encrypted partitions."
     exit 1
   fi
 
-  # Write cmdline for systemd-based initramfs + UKI
-  echo "rd.luks.uuid=$root_uuid root=UUID=$root_uuid rw quiet splash loglevel=3" > "$cmdline_path"
+  # Skriv kernel cmdline
+  cat <<EOF > "$cmdline_path"
+rd.luks.name=$root_uuid=cryptroot rd.luks.name=$home_uuid=crypthome root=/dev/mapper/cryptroot rw quiet splash loglevel=3
+EOF
 
-  startup_ok "Kernel command line written to $cmdline_path."
+  # Valider at filen eksisterer og ikke er tom
+  if [[ ! -s "$cmdline_path" ]]; then
+    error_print "Failed to write kernel command line to $cmdline_path"
+    exit 1
+  fi
+
+  # Valider at crypttab eksisterer
+  if [[ ! -f "$crypttab_path" ]]; then
+    error_print "Missing /etc/crypttab. It must exist before generating kernel cmdline."
+    exit 1
+  fi
+
+  # Valider at UUID’er findes i /etc/crypttab
+  if ! grep -q "$root_uuid" "$crypttab_path"; then
+    error_print "cryptroot UUID ($root_uuid) not found in /etc/crypttab."
+    exit 1
+  fi
+  if ! grep -q "$home_uuid" "$crypttab_path"; then
+    error_print "crypthome UUID ($home_uuid) not found in /etc/crypttab."
+    exit 1
+  fi
+
+  startup_ok "Kernel command line written and verified against /etc/crypttab"
 }
 
 # ==================== Setup GRUB Bootloader ====================
