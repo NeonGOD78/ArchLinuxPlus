@@ -2296,18 +2296,24 @@ setup_boot_targets() {
 # ==================== Setup Crypttab ====================
 
 setup_crypttab() {
-  section_header "Writing /etc/crypttab for systemd-encrypt hook"
+  section_header "Creating /etc/crypttab for systemd-encrypt"
 
   local root_uuid
   root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
 
   if [[ -z "$root_uuid" ]]; then
-    error_print "Failed to get root UUID for crypttab"
+    error_print "Failed to retrieve UUID for root partition ($ROOT_PARTITION)."
     exit 1
   fi
 
   echo "cryptroot UUID=$root_uuid none luks,discard" > /mnt/etc/crypttab
-  startup_ok "crypttab created with UUID=$root_uuid"
+
+  if [[ -f /mnt/etc/crypttab ]]; then
+    startup_ok "/etc/crypttab created successfully with root UUID: $root_uuid"
+  else
+    error_print "Failed to create /etc/crypttab."
+    exit 1
+  fi
 }
 
 # ==================== Main ====================
