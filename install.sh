@@ -1602,69 +1602,6 @@ setup_grub_bootloader() {
   startup_ok "GRUB bootloader installed and configured successfully."
 }
 
-# ==================== Setup UKI pacman hook ====================
-
-setup_uki_pacman_hook() {
-  section_header "UKI Auto-Update Pacman Hook Setup"
-
-  local hook_dir="/mnt/etc/pacman.d/hooks"
-  local hook_file="$hook_dir/99-ukify.hook"
-  local script_file="/mnt/usr/local/bin/rebuild-uki"
-  local dracut_conf="/mnt/etc/dracut.conf.d/remote-unlock.conf"
-
-  info_print "Installing UKI auto-update pacman hook..."
-
-  # Create necessary directories
-  mkdir -p "$hook_dir"
-  mkdir -p "$(dirname "$script_file")"
-  mkdir -p "$(dirname "$dracut_conf")"
-
-  # Write rebuild-uki script
-  cat <<EOF > "$script_file"
-#!/bin/bash
-set -euo pipefail
-
-ukify \\
-  kernel=/boot/vmlinuz-${KERNEL_PACKAGE} \\
-  initrd=/boot/${MICROCODE_PACKAGE}.img \\
-  initrd=/boot/initramfs-${KERNEL_PACKAGE}.img \\
-  cmdline=/etc/kernel/cmdline \\
-  output=/efi/EFI/Linux/arch.efi \\
-  os-release=/usr/lib/os-release \\
-  splash=/usr/share/systemd/bootctl/splash-arch.bmp
-
-sbsign --key /etc/secureboot/keys/db.key \\
-       --cert /etc/secureboot/keys/db.crt \\
-       --output /efi/EFI/Linux/arch.efi \\
-       /efi/EFI/Linux/arch.efi
-EOF
-
-  chmod +x "$script_file"
-
-  # Write pacman hook
-  cat <<EOF > "$hook_file"
-[Trigger]
-Type = Package
-Operation = Install
-Operation = Upgrade
-Target = ${KERNEL_PACKAGE}
-Target = linux-firmware
-Target = ${MICROCODE_PACKAGE}
-Target = dracut
-Target = mkinitcpio
-
-[Action]
-Description = Rebuilding and signing Unified Kernel Image (UKI)...
-When = PostTransaction
-Exec = /usr/local/bin/rebuild-uki
-EOF
-
-  # Create dracut unlock config placeholder
-  echo "# Remote LUKS unlock config placeholder" > "$dracut_conf"
-
-  startup_ok "UKI pacman hook, rebuild script, and dracut config placeholder installed successfully."
-}
-
 # ==================== Setup GRUB pacman hook ====================
 
 setup_grub_pacman_hook() {
