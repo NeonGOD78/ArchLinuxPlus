@@ -1550,6 +1550,7 @@ setup_grub_bootloader() {
     ["GRUB_GFXPAYLOAD_LINUX"]="keep"
     ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
     ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
+    ["GRUB_DISABLE_LINUX_UUID"]="true"
   )
 
   for key in "${!grub_vars[@]}"; do
@@ -1590,6 +1591,18 @@ setup_grub_bootloader() {
     error_print "GRUB installation failed."
     exit 1
   fi
+
+  # Add UKI boot entry manually to GRUB
+  info_print "Adding manual GRUB entry for UKI..."
+  cat <<EOF >> /mnt/etc/grub.d/40_custom
+menuentry "Arch Linux (UKI)" {
+    insmod part_gpt
+    insmod fat
+    search --no-floppy --file --set=root /EFI/Linux/arch.efi
+    chainloader /EFI/Linux/arch.efi
+}
+EOF
+  chmod +x /mnt/etc/grub.d/40_custom
 
   # Generate grub.cfg
   info_print "Generating grub.cfg..."
