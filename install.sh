@@ -1909,7 +1909,7 @@ EOF
 
   rm -f /mnt/root/scripts/yay-install.sh
 
-if arch-chroot /mnt command -v yay &>/dev/null; then
+if arch-chroot /mnt bash -c 'which yay' &>/dev/null; then
   startup_ok "yay installed successfully."
   else
   warning_print "yay installation failed or not found in PATH."
