@@ -965,6 +965,7 @@ partition_disk() {
   fi
 
   startup_ok "Disk partitioning completed."
+  export EFI_PARTITION ROOT_PARTITION HOME_PARTITION
 }
 
 # ================== Wipe Existing LUKS Headers ==================
