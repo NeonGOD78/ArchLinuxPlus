@@ -1902,7 +1902,7 @@ sudo -u aurbuilder bash -c '
   makepkg -si --noconfirm
 '
 
-userdel -r aurbuilder
+userdel -r aurbuilder || true
 rm -f /etc/sudoers.d/aurbuilder
 EOF
 
@@ -1916,11 +1916,11 @@ EOF
 
   rm -f /mnt/root/scripts/yay-install.sh
 
-  if arch-chroot /mnt command -v yay &>/dev/null; then
-    startup_ok "yay installed successfully."
+if arch-chroot /mnt command -v yay &>/dev/null; then
+  startup_ok "yay installed successfully."
   else
-    warning_print "yay installation failed or not found in PATH."
-  fi
+  warning_print "yay installation failed or not found in PATH."
+fi
 }
 
 # ======================= Final Cleanup =======================
