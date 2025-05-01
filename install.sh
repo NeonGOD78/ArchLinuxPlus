@@ -1412,19 +1412,14 @@ setup_uki_build() {
   local output_path="/efi/EFI/Linux/arch.efi"
 
   # ======================= File Checks ========================
-  info_print "Checking for necessary files..."
+  info_print "Checking for necessary files in target system..."
 
-  for file in "$kernel_path" "$initramfs_path" "$microcode_path"; do
+  for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
     if [[ ! -f "/mnt$file" ]]; then
       error_print "Missing required file in target system: $file"
       exit 1
     fi
   done
-
-  if [[ ! -f "$cmdline_path" ]]; then
-    error_print "Missing required file on host system: $cmdline_path"
-    exit 1
-  fi
 
   startup_ok "All required files found."
 
