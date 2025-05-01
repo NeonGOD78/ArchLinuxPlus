@@ -1382,68 +1382,50 @@ set_timezone() {
 # ======================= Setup UKI Build ========================
 
 setup_uki_build() {
-  section_header "Unified Kernel Image (UKI) Build"
+  section_header "Unified Kernel Image (UKI) Build with dracut"
 
-  local kernel_path="/boot/vmlinuz-${KERNEL_PACKAGE}"
-  local initramfs_path="/boot/initramfs-${KERNEL_PACKAGE}.img"
-  local microcode_path="/boot/${MICROCODE_PACKAGE}.img"
-  local cmdline_path="/etc/kernel/cmdline"
+  local kernel_version
   local output_path="/efi/EFI/Linux/arch.efi"
+  local cmdline_file="/etc/kernel/cmdline"
 
-  # =============== File Checks ===============
-  info_print "Checking for necessary files in target system..."
+  # Find kernel version from installed system
+  kernel_version=$(ls /mnt/lib/modules | grep -E '^[0-9]' | sort -V | tail -n 1)
 
-  for file in "$kernel_path" "$initramfs_path" "$microcode_path" "$cmdline_path"; do
-    if [[ ! -f "/mnt$file" ]]; then
-      error_print "Missing required file in target system: $file"
-      exit 1
-    fi
-  done
+  if [[ -z "$kernel_version" ]]; then
+    error_print "Unable to determine kernel version for dracut."
+    exit 1
+  fi
 
-  startup_ok "All required files found."
+  info_print "Kernel version detected: $kernel_version"
 
-  # =============== Create Output Directory ===============
+  # Ensure target directory exists
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-  # =============== UKI Build Script ===============
-  info_print "Building UKI with ukify..."
+  # Build UKI with dracut
+  info_print "Building UKI with dracut..."
+  arch-chroot /mnt dracut \
+    --uefi \
+    --kver "$kernel_version" \
+    --kernel-cmdline "$(cat /etc/kernel/cmdline)" \
+    --force \
+    "$output_path" >> "$LOGFILE" 2>&1
 
-  mkdir -p /mnt/root/scripts
-
-  cat <<EOF > /mnt/root/scripts/ukify-build.sh
-#!/bin/bash
-set -euo pipefail
-
-ukify build \
-  --linux=/boot/vmlinuz-${KERNEL_PACKAGE} \
-  --initrd=/boot/${MICROCODE_PACKAGE}.img \
-  --initrd=/boot/initramfs-${KERNEL_PACKAGE}.img \
-  --cmdline=/etc/kernel/cmdline \
-  --output=/efi/EFI/Linux/arch.efi \
-  --os-release=/usr/lib/os-release \
-  --splash=/usr/share/systemd/bootctl/splash-arch.bmp
-EOF
-
-  chmod +x /mnt/root/scripts/ukify-build.sh
-
-  arch-chroot /mnt /root/scripts/ukify-build.sh >> "$LOGFILE" 2>&1 || {
-    error_print "Failed to build UKI."
-    rm -f /mnt/root/scripts/ukify-build.sh
+  if [[ $? -ne 0 ]]; then
+    error_print "Failed to build UKI with dracut."
     exit 1
-  }
+  fi
 
-  rm -f /mnt/root/scripts/ukify-build.sh
-  startup_ok "UKI built and placed at $output_path"
+  startup_ok "UKI built successfully at $output_path"
 
-  # =============== UKI Signing ===============
+  # Sign UKI for Secure Boot
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
     --output "$output_path" \
     "$output_path" >> "$LOGFILE" 2>&1 || {
-    error_print "Failed to sign UKI."
-    exit 1
+      error_print "Failed to sign UKI."
+      exit 1
   }
 
   startup_ok "UKI signed successfully."
