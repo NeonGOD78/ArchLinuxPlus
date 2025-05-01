@@ -1429,9 +1429,11 @@ setup_uki_build() {
   # ===================== UKI Build Script ======================
   info_print "Building UKI with ukify..."
 
-  # Sikrer at tmp-mappe eksisterer
+  # Ensure /tmp exists both in host and chroot
   mkdir -p /mnt/tmp
+  arch-chroot /mnt mkdir -p /tmp
 
+  # Write the ukify build script into target system
   cat <<'EOF' > /mnt/tmp/ukify-build.sh
 #!/bin/bash
 set -euo pipefail
@@ -1448,6 +1450,7 @@ EOF
 
   chmod +x /mnt/tmp/ukify-build.sh
 
+  # Run script inside chroot and capture output to temporary log
   arch-chroot /mnt /tmp/ukify-build.sh >> /mnt/tmp/ukify.log 2>&1 || {
     error_print "Failed to build UKI."
     cat /mnt/tmp/ukify.log >> "$LOGFILE"
@@ -1459,7 +1462,7 @@ EOF
   rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/ukify.log
 
   startup_ok "UKI built and placed at $output_path"
-  
+
   # ======================== UKI Signing ========================
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
