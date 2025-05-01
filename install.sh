@@ -2101,6 +2101,17 @@ setup_secureboot_timers() {
 
   local timer_dir="/mnt/etc/systemd/system"
 
+  # Check that the scripts exist
+  if [[ ! -f "/mnt/usr/local/bin/rebuild-uki" ]]; then
+    error_print "Missing /usr/local/bin/rebuild-uki, timer cannot be created."
+    exit 1
+  fi
+
+  if [[ ! -f "/mnt/usr/local/bin/resign-grub" ]]; then
+    error_print "Missing /usr/local/bin/resign-grub, timer cannot be created."
+    exit 1
+  fi
+
   # --------- UKI Timer ---------
   info_print "Installing UKI auto-rebuild timer..."
 
@@ -2113,6 +2124,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/rebuild-uki
+StandardOutput=journal
 EOF
 
   cat <<EOF > "$timer_dir/uki-update.timer"
@@ -2128,7 +2140,10 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-  arch-chroot /mnt systemctl enable uki-update.timer >> "$LOGFILE" 2>&1
+  arch-chroot /mnt systemctl enable uki-update.timer >> "$LOGFILE" 2>&1 || {
+    error_print "Failed to enable uki-update.timer"
+    exit 1
+  }
 
   # --------- GRUB Timer ---------
   info_print "Installing GRUB re-sign timer..."
@@ -2142,6 +2157,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/resign-grub
+StandardOutput=journal
 EOF
 
   cat <<EOF > "$timer_dir/grub-resign.timer"
@@ -2157,7 +2173,10 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-  arch-chroot /mnt systemctl enable grub-resign.timer >> "$LOGFILE" 2>&1
+  arch-chroot /mnt systemctl enable grub-resign.timer >> "$LOGFILE" 2>&1 || {
+    error_print "Failed to enable grub-resign.timer"
+    exit 1
+  }
 
   startup_ok "Secure Boot timers installed and enabled (UKI + GRUB)."
 }
