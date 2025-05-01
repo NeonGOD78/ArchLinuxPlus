@@ -1519,7 +1519,7 @@ setup_cmdline_file() {
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Hent UUID’er for root og home luks-enheder
+  # Get UUIDs
   root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
   home_uuid=$(blkid -s UUID -o value "$HOMEPARTITION")
 
@@ -1528,34 +1528,33 @@ setup_cmdline_file() {
     exit 1
   fi
 
-  # Skriv kernel cmdline
+  # Write the cmdline
   cat <<EOF > "$cmdline_path"
-rd.luks.name=$root_uuid=cryptroot rd.luks.name=$home_uuid=crypthome root=/dev/mapper/cryptroot rw quiet splash loglevel=3
+rd.luks.name=$root_uuid=cryptroot rd.luks.name=$home_uuid=crypthome root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3
 EOF
 
-  # Valider at filen eksisterer og ikke er tom
+  # Validate file
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
   fi
 
-  # Valider at crypttab eksisterer
   if [[ ! -f "$crypttab_path" ]]; then
-    error_print "Missing /etc/crypttab. It must exist before generating kernel cmdline."
+    error_print "Missing /etc/crypttab — must exist before cmdline can be verified."
     exit 1
   fi
 
-  # Valider at UUID’er findes i /etc/crypttab
   if ! grep -q "$root_uuid" "$crypttab_path"; then
-    error_print "cryptroot UUID ($root_uuid) not found in /etc/crypttab."
-    exit 1
-  fi
-  if ! grep -q "$home_uuid" "$crypttab_path"; then
-    error_print "crypthome UUID ($home_uuid) not found in /etc/crypttab."
+    error_print "cryptroot UUID ($root_uuid) not found in /etc/crypttab"
     exit 1
   fi
 
-  startup_ok "Kernel command line written and verified against /etc/crypttab"
+  if ! grep -q "$home_uuid" "$crypttab_path"; then
+    error_print "crypthome UUID ($home_uuid) not found in /etc/crypttab"
+    exit 1
+  fi
+
+  startup_ok "Kernel command line written to $cmdline_path and validated successfully"
 }
 
 # ==================== Setup GRUB Bootloader ====================
