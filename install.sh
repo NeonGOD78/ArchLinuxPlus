@@ -2313,34 +2313,26 @@ setup_boot_targets() {
 setup_crypttab() {
   section_header "Creating /etc/crypttab with cryptroot and crypthome mappings"
 
-  # ==== Validation of required variables ====
-  if [[ -z "$ROOT_PARTITION" || -z "$HOME_PARTITION" ]]; then
-    error_print "ROOT_PARTITION or HOME_PARTITION is undefined. Aborting crypttab creation."
-    exit 1
-  fi
-
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Hent UUID’er
-  root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-  home_uuid=$(blkid -s UUID -o value "$HOME_PARTITION")
-  
+  # Hent luksUUID’er
+  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION")
+  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION")
+
   if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
-    error_print "Unable to retrieve UUIDs for root or home partitions."
+    error_print "Unable to retrieve luksUUIDs for root or home partitions."
     exit 1
   fi
 
-  # Sørg for at /mnt/etc findes
   mkdir -p /mnt/etc
 
-  # Skriv crypttab
   cat <<EOF > "$crypttab_path"
 cryptroot UUID=$root_uuid none luks,discard
 crypthome UUID=$home_uuid none luks
 EOF
 
-  # Valider filens eksistens og indhold
+  # Validering
   if [[ ! -s "$crypttab_path" ]]; then
     error_print "/etc/crypttab was not created properly."
     exit 1
@@ -2356,7 +2348,6 @@ EOF
     exit 1
   fi
 
-  # Log til installationslog
   echo "--- /etc/crypttab content ---" >> "$LOGFILE"
   cat "$crypttab_path" >> "$LOGFILE"
   echo "-----------------------------" >> "$LOGFILE"
