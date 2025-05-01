@@ -1905,19 +1905,22 @@ EOF
 
   disable_debug
 
-  # ----------------- Yay installation via chroot-script -----------------
+ # ----------------- Yay installation via chroot-script -----------------
   info_print "Installing yay AUR helper safely..."
-  enable_debug
 
+  # Sikrer at /mnt/tmp eksisterer
+  mkdir -p /mnt/tmp
+
+  # Skriv installationsscript til /mnt/tmp/
   cat <<'EOF' > /mnt/tmp/yay-install.sh
 #!/bin/bash
 set -euo pipefail
 
-# Create temp build user
+# Midlertidig AUR-bygger
 useradd -m aurbuilder
 echo "aurbuilder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/aurbuilder
 
-# Clone and build yay
+# Clone og byg yay
 sudo -u aurbuilder bash -c '
   cd /home/aurbuilder
   git clone https://aur.archlinux.org/yay.git
@@ -1925,25 +1928,25 @@ sudo -u aurbuilder bash -c '
   makepkg -si --noconfirm
 '
 
-# Clean up
+# Ryd op
 userdel -r aurbuilder
 rm -f /etc/sudoers.d/aurbuilder
 EOF
 
   chmod +x /mnt/tmp/yay-install.sh
 
-arch-chroot /mnt /tmp/yay-install.sh >> /mnt/tmp/yay.log 2>&1 || {
-  error_print "Yay installation failed."
+  # Kør scriptet tavst og log til logfil
+  arch-chroot /mnt /tmp/yay-install.sh >> /mnt/tmp/yay.log 2>&1 || {
+    error_print "Yay installation failed."
+    cat /mnt/tmp/yay.log >> "$LOGFILE"
+    rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
+    return 1
+  }
+
   cat /mnt/tmp/yay.log >> "$LOGFILE"
   rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
-  return 1
-}
 
-cat /mnt/tmp/yay.log >> "$LOGFILE"
-rm -f /mnt/tmp/yay-install.sh /mnt/tmp/yay.log
-  rm -f /mnt/tmp/yay-install.sh
-  disable_debug
-
+  # Verificér at yay findes
   if arch-chroot /mnt command -v yay &>/dev/null; then
     startup_ok "yay installed successfully."
   else
