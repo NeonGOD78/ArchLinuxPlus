@@ -1594,7 +1594,7 @@ setup_grub_bootloader() {
 
   # Install GRUB
   info_print "Installing GRUB bootloader..."
-  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck --no-nvram >> "$LOGFILE" 2>&1
+  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1
   if [[ $? -ne 0 ]]; then
     error_print "GRUB installation failed."
     exit 1
