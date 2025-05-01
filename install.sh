@@ -1520,21 +1520,20 @@ setup_cmdline_file() {
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Get UUIDs
-  root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-  home_uuid=$(blkid -s UUID -o value "$HOMEPARTITION")
+  # Get luks UUIDs
+  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
+  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
 
   if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
-    error_print "Unable to determine UUIDs for encrypted partitions."
+    error_print "Unable to determine luksUUIDs for encrypted partitions."
     exit 1
   fi
 
-  # Write the cmdline
+  # Write kernel command line
   cat <<EOF > "$cmdline_path"
 rd.luks.name=$root_uuid=cryptroot rd.luks.name=$home_uuid=crypthome root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3
 EOF
 
-  # Validate file exists and has content
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
@@ -1547,16 +1546,15 @@ EOF
   fi
 
   if ! grep -q "$root_uuid" "$crypttab_path"; then
-    error_print "cryptroot UUID ($root_uuid) not found in /etc/crypttab"
+    error_print "cryptroot UUID not found in /etc/crypttab"
     exit 1
   fi
 
   if ! grep -q "$home_uuid" "$crypttab_path"; then
-    error_print "crypthome UUID ($home_uuid) not found in /etc/crypttab"
+    error_print "crypthome UUID not found in /etc/crypttab"
     exit 1
   fi
 
-  # Log to installation log
   echo "--- /etc/kernel/cmdline content ---" >> "$LOGFILE"
   cat "$cmdline_path" >> "$LOGFILE"
   echo "-----------------------------------" >> "$LOGFILE"
