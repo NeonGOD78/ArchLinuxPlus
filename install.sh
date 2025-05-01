@@ -1281,8 +1281,7 @@ install_base_system() {
     base "$KERNEL_PACKAGE" "$MICROCODE_PACKAGE" linux-firmware "$KERNEL_PACKAGE"-headers
     btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
     zram-generator sudo bash-completion inotify-tools zsh unzip unrar fzf zoxide colordiff curl
-    btop mc git systemd ukify openssl sbsigntools sbctl base-devel
-    "$NETWORK_PKGS"
+    btop mc git systemd ukify openssl sbsigntools sbctl base-devel go "$NETWORK_PKGS"
   )
 
   enable_debug
