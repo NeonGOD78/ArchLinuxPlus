@@ -1426,32 +1426,40 @@ setup_uki_build() {
   # ================== Create Output Directory ==================
   arch-chroot /mnt mkdir -p /efi/EFI/Linux
 
-# UKI Build Script
+  # ===================== UKI Build Script ======================
   info_print "Building UKI with ukify..."
-  cat << 'EOF' > /mnt/tmp/ukify-build.sh
+
+  # Sikrer at tmp-mappe eksisterer
+  mkdir -p /mnt/tmp
+
+  cat <<'EOF' > /mnt/tmp/ukify-build.sh
 #!/bin/bash
-set -e
+set -euo pipefail
+
 ukify build \
-  kernel='/boot/vmlinuz-${KERNEL_PACKAGE}' \
-  initrd='/boot/${MICROCODE_PACKAGE}.img' \
-  initrd='/boot/initramfs-${KERNEL_PACKAGE}.img' \
-  cmdline='/etc/kernel/cmdline' \
-  output='/efi/EFI/Linux/arch.efi' \
-  os-release='/usr/lib/os-release' \
-  splash='/usr/share/systemd/bootctl/splash-arch.bmp'
+  kernel="/boot/vmlinuz-${KERNEL_PACKAGE}" \
+  initrd="/boot/${MICROCODE_PACKAGE}.img" \
+  initrd="/boot/initramfs-${KERNEL_PACKAGE}.img" \
+  cmdline="/etc/kernel/cmdline" \
+  output="/efi/EFI/Linux/arch.efi" \
+  os-release="/usr/lib/os-release" \
+  splash="/usr/share/systemd/bootctl/splash-arch.bmp"
 EOF
 
   chmod +x /mnt/tmp/ukify-build.sh
+
   arch-chroot /mnt /tmp/ukify-build.sh >> /mnt/tmp/ukify.log 2>&1 || {
     error_print "Failed to build UKI."
     cat /mnt/tmp/ukify.log >> "$LOGFILE"
-    rm -f /mnt/tmp/ukify.log /mnt/tmp/ukify-build.sh
+    rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/ukify.log
     exit 1
   }
 
   cat /mnt/tmp/ukify.log >> "$LOGFILE"
-  rm -f /mnt/tmp/ukify.log /mnt/tmp/ukify-build.sh
+  rm -f /mnt/tmp/ukify-build.sh /mnt/tmp/ukify.log
+
   startup_ok "UKI built and placed at $output_path"
+  
   # ======================== UKI Signing ========================
   info_print "Signing UKI with Secure Boot keys..."
   arch-chroot /mnt sbsign \
