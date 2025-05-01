@@ -1880,6 +1880,9 @@ EOF
 
   disable_debug
 
+  info_print "Updating pacman database and installing build dependencies..."
+  arch-chroot /mnt pacman -Sy >> "$LOGFILE" 2>&1
+
   # Yay installation
   info_print "Installing yay AUR helper safely..."
   mkdir -p /mnt/root/scripts
