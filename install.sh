@@ -1471,8 +1471,8 @@ setup_secureboot_structure() {
 
   info_print "Generating Secure Boot keys (PK, KEK, db)..."
 
-  # Run everything *inside* chroot
-  arch-chroot /mnt /bin/bash -e <<'EOF'
+  # Run everything *inside* chroot and redirect output to log
+  arch-chroot /mnt /bin/bash -e <<'EOF' >> /mnt/tmp/secureboot.log 2>&1
 set -euo pipefail
 
 keydir="/etc/secureboot/keys"
@@ -1499,8 +1499,13 @@ openssl req -new -x509 -newkey rsa:4096 \
 chmod 600 "$keydir/"*.key
 EOF
 
+  # Append chroot log to master log file and delete temp log
+  cat /mnt/tmp/secureboot.log >> "$LOGFILE"
+  rm -f /mnt/tmp/secureboot.log
+
   startup_ok "Secure Boot keys generated and stored in /etc/secureboot/keys."
 }
+
 # ==================== Setup cmdline file ====================
 
 setup_cmdline_file() {
