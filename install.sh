@@ -2305,34 +2305,51 @@ setup_boot_targets() {
 # ==================== Setup Crypttab ====================
 
 setup_crypttab() {
-  section_header "Creating /etc/crypttab for systemd-encrypt (root + home)"
+  section_header "Creating /etc/crypttab with cryptroot and crypthome mappings"
 
+  local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
+
+  # Hent UUID’er
   root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-  home_uuid=$(blkid -s UUID -o value "$HOME_PARTITION")
+  home_uuid=$(blkid -s UUID -o value "$HOMEPARTITION")
 
-  if [[ -z "$root_uuid" ]]; then
-    error_print "Failed to retrieve UUID for root partition ($ROOT_PARTITION)."
+  if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
+    error_print "Unable to retrieve UUIDs for root or home partitions."
     exit 1
   fi
 
-  echo "cryptroot UUID=$root_uuid none luks,discard" > /mnt/etc/crypttab
-  info_print "Added cryptroot to /etc/crypttab"
+  # Sørg for at /mnt/etc findes
+  mkdir -p /mnt/etc
 
-  if [[ -n "$home_uuid" ]]; then
-    echo "crypthome UUID=$home_uuid none luks" >> /mnt/etc/crypttab
-    info_print "Added crypthome to /etc/crypttab"
-  fi
+  # Skriv crypttab
+  cat <<EOF > "$crypttab_path"
+cryptroot UUID=$root_uuid none luks,discard
+crypthome UUID=$home_uuid none luks
+EOF
 
-  if [[ -s /mnt/etc/crypttab ]]; then
-    startup_ok "/etc/crypttab created successfully"
-    echo "--- /etc/crypttab content ---" >> "$LOGFILE"
-    cat /mnt/etc/crypttab >> "$LOGFILE"
-    echo "----------------------------" >> "$LOGFILE"
-  else
-    error_print "Failed to create /etc/crypttab."
+  # Valider filens eksistens og indhold
+  if [[ ! -s "$crypttab_path" ]]; then
+    error_print "/etc/crypttab was not created properly."
     exit 1
   fi
+
+  if ! grep -q "$root_uuid" "$crypttab_path"; then
+    error_print "cryptroot UUID not found in /etc/crypttab"
+    exit 1
+  fi
+
+  if ! grep -q "$home_uuid" "$crypttab_path"; then
+    error_print "crypthome UUID not found in /etc/crypttab"
+    exit 1
+  fi
+
+  # Log til installationslog
+  echo "--- /etc/crypttab content ---" >> "$LOGFILE"
+  cat "$crypttab_path" >> "$LOGFILE"
+  echo "-----------------------------" >> "$LOGFILE"
+
+  startup_ok "/etc/crypttab created and validated successfully"
 }
 
 # ==================== Main ====================
