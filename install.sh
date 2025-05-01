@@ -1830,7 +1830,7 @@ configure_package_management() {
 
   enable_debug
 
-  # Pacman.conf tweaks
+  # ----------------- Pacman.conf tweaks -----------------
   info_print "Applying visual and performance tweaks to pacman.conf..."
   sed -Ei '
     s/^#Color$/Color/
@@ -1841,7 +1841,7 @@ configure_package_management() {
   ' "$pacman_conf" >> "$LOGFILE" 2>&1
   startup_ok "Pacman.conf tweaked."
 
-  # Enable multilib and testing repositories
+  # ----------------- Enable repos -----------------
   info_print "Enabling multilib and limited testing repositories..."
   sed -i '/#\[multilib\]/,/^#Include/ s/^#//' "$pacman_conf" >> "$LOGFILE" 2>&1
 
@@ -1889,24 +1889,28 @@ EOF
     info_print "Testing repositories already present. Skipping addition."
   fi
 
-  # makepkg.conf tweaks
+  # ----------------- makepkg.conf tweaks -----------------
   info_print "Optimizing makepkg.conf for parallel build and better output..."
   sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf" >> "$LOGFILE" 2>&1
-  sed -i 's/^#*\\s*BUILDENV=.*/BUILDENV=(!distcc color !ccache !check !sign)/' "$makepkg_conf" >> "$LOGFILE" 2>&1
-  sed -i 's/^PKGEXT=.*/PKGEXT=\".pkg.tar.zst\"/' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  sed -i 's|^#\?\s*BUILDENV=.*|BUILDENV=(!distcc color !ccache !check !sign)|' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf" >> "$LOGFILE" 2>&1
   startup_ok "makepkg.conf optimized."
 
   disable_debug
 
-  # Install Yay safely
+  # ----------------- Yay installation via chroot-script -----------------
   info_print "Installing yay AUR helper safely..."
   enable_debug
-  arch-chroot /mnt /bin/bash -e <<'EOF'
+
+  cat <<'EOF' > /mnt/tmp/yay-install.sh
+#!/bin/bash
 set -euo pipefail
 
+# Create temp build user
 useradd -m aurbuilder
 echo "aurbuilder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/aurbuilder
 
+# Clone and build yay
 sudo -u aurbuilder bash -c '
   cd /home/aurbuilder
   git clone https://aur.archlinux.org/yay.git
@@ -1914,9 +1918,20 @@ sudo -u aurbuilder bash -c '
   makepkg -si --noconfirm
 '
 
+# Clean up
 userdel -r aurbuilder
 rm -f /etc/sudoers.d/aurbuilder
 EOF
+
+  chmod +x /mnt/tmp/yay-install.sh
+
+  arch-chroot /mnt /tmp/yay-install.sh >> "$LOGFILE" 2>&1 || {
+    error_print "Yay installation failed."
+    rm -f /mnt/tmp/yay-install.sh
+    return 1
+  }
+
+  rm -f /mnt/tmp/yay-install.sh
   disable_debug
 
   if arch-chroot /mnt command -v yay &>/dev/null; then
