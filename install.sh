@@ -1435,7 +1435,7 @@ setup_uki_build() {
 set -euo pipefail
 
 ukify build \
-  --kernel=/boot/vmlinuz-${KERNEL_PACKAGE} \
+  --linux=/boot/vmlinuz-${KERNEL_PACKAGE} \
   --initrd=/boot/${MICROCODE_PACKAGE}.img \
   --initrd=/boot/initramfs-${KERNEL_PACKAGE}.img \
   --cmdline=/etc/kernel/cmdline \
