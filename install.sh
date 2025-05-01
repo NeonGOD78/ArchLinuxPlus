@@ -1469,6 +1469,47 @@ EOF
   startup_ok "UKI signed successfully."
 }
 
+# ======================= Setup Secureboot Structure ========================
+
+setup_secureboot_structure() {
+  section_header "Secure Boot Key Generation"
+  info_print "Generating Secure Boot keys (PK, KEK, db)..."
+  # Run everything *inside* chroot and redirect output to log
+  arch-chroot /mnt /bin/bash -e <<'EOF' >> /mnt/tmp/secureboot.log 2>&1
+set -euo pipefail
+keydir="/etc/secureboot/keys"
+mkdir -p "$keydir"
+
+# Platform Key (PK)
+
+openssl req -new -x509 -newkey rsa:4096 \
+  -subj "/CN=Platform Key/" \
+  -keyout "$keydir/PK.key" -out "$keydir/PK.crt" \
+  -days 3650 -nodes -sha256
+
+# Key Exchange Key (KEK)
+openssl req -new -x509 -newkey rsa:4096 \
+  -subj "/CN=Key Exchange Key/" \
+  -keyout "$keydir/KEK.key" -out "$keydir/KEK.crt" \
+  -days 3650 -nodes -sha256
+
+# Signature Database Key (db)
+ 
+openssl req -new -x509 -newkey rsa:4096 \
+  -subj "/CN=Signature Database/" \
+  -keyout "$keydir/db.key" -out "$keydir/db.crt" \
+  -days 3650 -nodes -sha256
+
+chmod 600 "$keydir/"*.key
+EOF
+
+  # Append chroot log to master log file and delete temp log
+  cat /mnt/tmp/secureboot.log >> "$LOGFILE"
+  rm -f /mnt/tmp/secureboot.log
+
+  startup_ok "Secure Boot keys generated and stored in /etc/secureboot/keys."
+}
+
 # ==================== Setup cmdline file ====================
 
 setup_cmdline_file() {
