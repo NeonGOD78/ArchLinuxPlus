@@ -2195,60 +2195,58 @@ EOF
 verify_boot_integrity() {
   section_header "Verifying Boot Setup Integrity"
 
-  local fail=false
+  local fail=0
 
-  {
-    echo "== Boot Verification Start =="
+  log_msg "== Boot Verification Start =="
 
-    # Check UKI
-    if [[ ! -f /mnt/efi/EFI/Linux/arch.efi ]]; then
-      error_print "Missing UKI: /efi/EFI/Linux/arch.efi"
-      echo "[FAIL] UKI missing"
-      fail=true
-    else
-      echo "[OK] UKI present"
-    fi
+  # UKI presence
+  if [[ -f /mnt/efi/EFI/Linux/arch.efi ]]; then
+    log_msg "[OK] UKI present"
+  else
+    error_print "Missing UKI: /efi/EFI/Linux/arch.efi"
+    fail=1
+  fi
 
-    # Check GRUB EFI
-    if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
-      error_print "Missing GRUB EFI binary: /efi/EFI/GRUB/grubx64.efi"
-      echo "[FAIL] GRUB EFI missing"
-      fail=true
-    else
-      echo "[OK] GRUB EFI present"
-    fi
+  # GRUB EFI
+  if [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
+    log_msg "[OK] GRUB EFI present"
+  else
+    error_print "Missing GRUB EFI binary: /efi/EFI/GRUB/grubx64.efi"
+    fail=1
+  fi
 
-    # Optional fallback
-    if [[ ! -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
-      warning_print "Fallback BOOTX64.EFI not found (some UEFI firmwares require this)."
-      echo "[WARN] BOOTX64.EFI fallback missing"
-    else
-      echo "[OK] BOOTX64.EFI fallback present"
-    fi
+  # Fallback bootloader
+  if [[ -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
+    log_msg "[OK] BOOTX64.EFI fallback present"
+  else
+    warning_print "Fallback BOOTX64.EFI not found (some UEFI firmware needs it)"
+  fi
 
-    # GRUB config
-    if [[ ! -s /mnt/boot/grub/grub.cfg ]]; then
-      error_print "Missing or empty GRUB config: /boot/grub/grub.cfg"
-      echo "[FAIL] GRUB config missing or empty"
-      fail=true
-    else
-      echo "[OK] GRUB config present"
-    fi
+  # GRUB config
+  if [[ -s /mnt/boot/grub/grub.cfg ]]; then
+    log_msg "[OK] GRUB config present"
+  else
+    error_print "Missing or empty GRUB config: /boot/grub/grub.cfg"
+    fail=1
+  fi
 
-    # Kernel cmdline
-    if ! grep -q "rd.luks.uuid=" /mnt/etc/kernel/cmdline; then
-      error_print "Missing 'rd.luks.uuid=' in /etc/kernel/cmdline."
-      echo "[FAIL] rd.luks.uuid missing in cmdline"
-      fail=true
-    else
-      echo "[OK] cmdline includes rd.luks.uuid"
-    fi
+  # Kernel cmdline contains root= or rd.luks.name=
+  if grep -qE "root=|rd.luks.name=" /mnt/etc/kernel/cmdline; then
+    log_msg "[OK] Kernel cmdline has root= and/or rd.luks.name= entries"
+  else
+    error_print "Missing 'root=' or 'rd.luks.name=' in kernel cmdline"
+    fail=1
+  fi
 
-    echo "== Boot Verification Complete =="
+  # Detect possible rebuild-uki failure on boot
+  if [[ -f /mnt/var/log/uki-failure.log ]]; then
+    warning_print "UKI failure log exists: /var/log/uki-failure.log"
+    log_msg "[WARN] UKI rebuild is expected to fail after reboot"
+  fi
 
-  } >> "$LOGFILE"
+  log_msg "== Boot Verification Complete =="
 
-  if [[ "$fail" = true ]]; then
+  if [[ "$fail" -ne 0 ]]; then
     error_print "Boot setup verification failed. System may not boot!"
     exit 1
   else
