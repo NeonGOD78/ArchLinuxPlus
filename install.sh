@@ -1637,6 +1637,9 @@ setup_grub_bootloader() {
   local theme_dir="$GRUB_THEME_DIR"
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
+  local grub_cfg_file="/mnt/etc/default/grub"
+  local cryptodisk_flag="GRUB_ENABLE_CRYPTODISK=y"
+  local cryptodisk_added=false
 
   # Download and extract theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1651,7 +1654,6 @@ setup_grub_bootloader() {
 
   # Configure /etc/default/grub
   info_print "Configuring /etc/default/grub..."
-  local grub_cfg_file="/mnt/etc/default/grub"
   declare -A grub_vars=(
     ["GRUB_GFXMODE"]="$gfx_mode"
     ["GRUB_GFXPAYLOAD_LINUX"]="keep"
@@ -1686,6 +1688,13 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
+  # Temporarily enable GRUB_ENABLE_CRYPTODISK for GRUB install
+  if ! grep -q "^$cryptodisk_flag" "$grub_cfg_file"; then
+    echo "$cryptodisk_flag" >> "$grub_cfg_file"
+    cryptodisk_added=true
+    info_print "Temporarily enabling GRUB_ENABLE_CRYPTODISK for GRUB installation"
+  fi
+
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
@@ -1702,6 +1711,12 @@ setup_grub_bootloader() {
   else
     error_print "GRUB installation failed."
     exit 1
+  fi
+
+  # Remove temporary GRUB_ENABLE_CRYPTODISK after install
+  if [[ "$cryptodisk_added" == true ]]; then
+    sed -i "/^$cryptodisk_flag/d" "$grub_cfg_file"
+    info_print "Removed temporary GRUB_ENABLE_CRYPTODISK from $grub_cfg_file"
   fi
 
   # Generate grub.cfg
