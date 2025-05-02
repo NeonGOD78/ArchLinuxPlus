@@ -1394,19 +1394,23 @@ setup_uki_build() {
   local timer_dir="/etc/systemd/system"
   local key_dir="/etc/secureboot/keys"
 
-  # Check for dracut
-  if ! arch-chroot /mnt command -v dracut &>/dev/null; then
-    error_print "dracut is not installed inside chroot. Cannot build UKI."
+  # Sikker dracut-tilgængelighedskontrol
+  if ! arch-chroot /mnt bash -c '
+    which dracut >/dev/null || exit 1
+    kver=$(ls /lib/modules | sort -V | tail -n1)
+    [[ -d "/lib/modules/$kver" ]] || exit 2
+  '; then
+    error_print "dracut is not installed or kernel modules missing inside chroot. Cannot build UKI."
     exit 1
   fi
 
-  # Check for kernel cmdline
+  # Kernel cmdline skal findes
   if [[ ! -f /mnt${cmdline_path} ]]; then
     error_print "$cmdline_path not found in chroot. Cannot continue."
     exit 1
   fi
 
-  # Get installed kernel version
+  # Find kernelversion i målsystemet
   local kernel_version
   kernel_version=$(ls /mnt/lib/modules | sort -V | tail -n 1)
   if [[ -z "$kernel_version" ]]; then
@@ -1450,9 +1454,8 @@ setup_uki_build() {
 
   startup_ok "UKI build and signing completed."
 
-  # =============== Install rebuild-uki script ===============
+  # === Geninstaller rebuild-uki script og systemd timer ===
   info_print "Installing UKI rebuild script and timer..."
-
   mkdir -p /mnt$(dirname "$rebuild_script")
 
   cat << 'EOF' > /mnt$rebuild_script
@@ -1479,7 +1482,6 @@ kernel_version=$(ls /lib/modules | sort -V | tail -n 1)
 [[ -n "$kernel_version" ]] || fail "Could not detect installed kernel version"
 
 echo "[INFO] Building UKI for kernel $kernel_version..."
-
 mkdir -p "$(dirname "$uki_output")"
 
 if ! dracut --uefi --force --kver "$kernel_version" --kernel-cmdline "$(cat "$cmdline_file")" "$uki_output"; then
@@ -1492,7 +1494,7 @@ fi
 
 [[ -f "$uki_output" ]] || fail "Signed UKI file not found: $uki_output"
 
-# Cleanup previous failure log if success
+# Fjern fejllog hvis succesfuld
 if [[ -f "$fail_log" ]]; then
   rm -f "$fail_log"
   echo "[INFO] Removed previous failure log: $fail_log"
@@ -1502,8 +1504,6 @@ echo "[OK] UKI rebuilt and signed successfully at $(date)"
 EOF
 
   chmod +x /mnt$rebuild_script
-
-  # =============== Create systemd service and timer ===============
   mkdir -p /mnt$timer_dir
 
   cat << EOF > /mnt$timer_dir/uki-rebuild.service
