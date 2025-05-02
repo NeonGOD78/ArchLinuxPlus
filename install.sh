@@ -2214,58 +2214,83 @@ EOF
 verify_boot_integrity() {
   section_header "Verifying Boot Setup Integrity"
 
-  local fail=0
+  local fail=false
+  local chroot="/mnt"
+  local uki_path="$chroot/efi/EFI/Linux/arch.efi"
+  local grub_efi="$chroot/efi/EFI/GRUB/grubx64.efi"
+  local fallback_efi="$chroot/efi/EFI/Boot/BOOTX64.EFI"
+  local grub_cfg="$chroot/boot/grub/grub.cfg"
+  local cmdline_file="$chroot/etc/kernel/cmdline"
+  local modules_dir="$chroot/lib/modules"
 
-  log_msg "== Boot Verification Start =="
+  echo "== Boot Verification Start ==" >> "$LOGFILE"
 
-  # UKI presence
-  if [[ -f /mnt/efi/EFI/Linux/arch.efi ]]; then
-    log_msg "[OK] UKI present"
-  else
+  # Check UKI exists
+  if [[ ! -f "$uki_path" ]]; then
     error_print "Missing UKI: /efi/EFI/Linux/arch.efi"
-    fail=1
+    echo "[FAIL] UKI missing" >> "$LOGFILE"
+    fail=true
+  else
+    echo "[OK] UKI present" >> "$LOGFILE"
   fi
 
-  # GRUB EFI
-  if [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
-    log_msg "[OK] GRUB EFI present"
-  else
+  # Check GRUB EFI
+  if [[ ! -f "$grub_efi" ]]; then
     error_print "Missing GRUB EFI binary: /efi/EFI/GRUB/grubx64.efi"
-    fail=1
+    echo "[FAIL] GRUB EFI missing" >> "$LOGFILE"
+    fail=true
+  else
+    echo "[OK] GRUB EFI present" >> "$LOGFILE"
   fi
 
-  # Fallback bootloader
-  if [[ -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
-    log_msg "[OK] BOOTX64.EFI fallback present"
+  # Check fallback BOOTX64.EFI
+  if [[ ! -f "$fallback_efi" ]]; then
+    warning_print "Fallback BOOTX64.EFI not found (some UEFI firmwares require this)."
+    echo "[WARN] BOOTX64.EFI fallback missing" >> "$LOGFILE"
   else
-    warning_print "Fallback BOOTX64.EFI not found (some UEFI firmware needs it)"
+    echo "[OK] BOOTX64.EFI fallback present" >> "$LOGFILE"
   fi
 
-  # GRUB config
-  if [[ -s /mnt/boot/grub/grub.cfg ]]; then
-    log_msg "[OK] GRUB config present"
-  else
+  # Check GRUB config
+  if [[ ! -s "$grub_cfg" ]]; then
     error_print "Missing or empty GRUB config: /boot/grub/grub.cfg"
-    fail=1
-  fi
-
-  # Kernel cmdline contains root= or rd.luks.name=
-  if grep -qE "root=|rd.luks.name=" /mnt/etc/kernel/cmdline; then
-    log_msg "[OK] Kernel cmdline has root= and/or rd.luks.name= entries"
+    echo "[FAIL] GRUB config missing or empty" >> "$LOGFILE"
+    fail=true
   else
-    error_print "Missing 'root=' or 'rd.luks.name=' in kernel cmdline"
-    fail=1
+    echo "[OK] GRUB config present" >> "$LOGFILE"
   fi
 
-  # Detect possible rebuild-uki failure on boot
-  if [[ -f /mnt/var/log/uki-failure.log ]]; then
-    warning_print "UKI failure log exists: /var/log/uki-failure.log"
-    log_msg "[WARN] UKI rebuild is expected to fail after reboot"
+  # Check kernel cmdline
+  if ! grep -q "rd.luks.uuid=" "$cmdline_file" 2>/dev/null; then
+    error_print "Missing 'rd.luks.uuid=' in /etc/kernel/cmdline."
+    echo "[FAIL] rd.luks.uuid missing in cmdline" >> "$LOGFILE"
+    fail=true
+  else
+    echo "[OK] cmdline includes rd.luks.uuid" >> "$LOGFILE"
   fi
 
-  log_msg "== Boot Verification Complete =="
+  # Verify UKI kernel version matches installed modules
+  local installed_kver
+  installed_kver=$(ls "$modules_dir" 2>/dev/null | sort -V | tail -n1)
+  if [[ -z "$installed_kver" ]]; then
+    warning_print "No installed kernel version detected in /lib/modules."
+    echo "[WARN] No installed kernel version detected" >> "$LOGFILE"
+  else
+    # Try to extract kernel version from UKI using objdump
+    local uki_kernel_version
+    uki_kernel_version=$(objdump -s -j .cmdline "$uki_path" 2>/dev/null | grep -oP 'BOOT_IMAGE=/vmlinuz-linux(\S*)' || true)
 
-  if [[ "$fail" -ne 0 ]]; then
+    if [[ -n "$uki_kernel_version" && "$uki_kernel_version" != *"$installed_kver"* ]]; then
+      warning_print "Kernel version mismatch: UKI references different version ($uki_kernel_version vs $installed_kver)"
+      echo "[WARN] UKI kernel version does not match installed: $uki_kernel_version vs $installed_kver" >> "$LOGFILE"
+    else
+      echo "[OK] Kernel version in UKI matches installed modules" >> "$LOGFILE"
+    fi
+  fi
+
+  echo "== Boot Verification Complete ==" >> "$LOGFILE"
+
+  if [[ "$fail" == true ]]; then
     error_print "Boot setup verification failed. System may not boot!"
     exit 1
   else
