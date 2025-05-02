@@ -2395,7 +2395,6 @@ main() {
   setup_grub_bootloader
   setup_grub_pacman_hook
   setup_grub_resign_timer
-  setup_uki_dracut_timer
   setup_snapper
   enable_services
   final_cleanup
