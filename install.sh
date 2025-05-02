@@ -2362,22 +2362,32 @@ setup_crypttab() {
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Get luks UUIDs directly from encrypted block devices
+  # Hent luks UUIDs
   root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
   home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
 
-  if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
-    error_print "Unable to retrieve luksUUIDs for root or home partitions."
+  # Valider UUIDs
+  if [[ -z "$root_uuid" ]]; then
+    error_print "Unable to retrieve LUKS UUID for root partition."
+    exit 1
+  fi
+
+  if [[ "$SEPARATE_HOME" == true && -z "$home_uuid" ]]; then
+    error_print "Unable to retrieve LUKS UUID for /home partition."
     exit 1
   fi
 
   mkdir -p /mnt/etc
 
-  cat <<EOF > "$crypttab_path"
-cryptroot UUID=$root_uuid none luks,discard
-crypthome UUID=$home_uuid none luks
-EOF
+  # Skriv filen
+  {
+    echo "cryptroot UUID=$root_uuid none luks,discard"
+    if [[ "$SEPARATE_HOME" == true ]]; then
+      echo "crypthome UUID=$home_uuid none luks,nofail,x-systemd.device-timeout=0"
+    fi
+  } > "$crypttab_path"
 
+  # Valider at filen blev skrevet
   if [[ ! -s "$crypttab_path" ]]; then
     error_print "/etc/crypttab was not created properly."
     exit 1
