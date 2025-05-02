@@ -2303,54 +2303,54 @@ verify_boot_integrity() {
 setup_boot_targets() {
   section_header "Final Bootloader Targets (Fallback + UEFI Boot Entry)"
 
-  local uki_source="/mnt/efi/EFI/Linux/arch.efi"
-  local fallback_dir="/mnt/efi/EFI/Boot"
-  local fallback_target="$fallback_dir/BOOTX64.EFI"
-  local loader_path="\\EFI\\GRUB\\grubx64.efi"
+  local script_path="/mnt/root/scripts/efibootmgr-setup.sh"
+  mkdir -p /mnt/root/scripts
 
-  local disk
-  disk="/dev/$(lsblk -no pkname "$ROOT_PARTITION" 2>/dev/null)"
-  local partnum
-  partnum=$(lsblk -no PARTNUM "$EFI_PARTITION" 2>/dev/null)
+  cat << 'EOF' > "$script_path"
+#!/bin/bash
+set -euo pipefail
 
-  if [[ -z "$disk" || -z "$partnum" ]]; then
-    error_print "Could not detect disk or EFI partition number for efibootmgr."
+logfile="/var/log/archinstall.log"
+uki_source="/efi/EFI/Linux/arch.efi"
+fallback_dir="/efi/EFI/Boot"
+fallback_target="$fallback_dir/BOOTX64.EFI"
+loader_path="\\EFI\\GRUB\\grubx64.efi"
+
+echo "[INFO] Starting boot target setup..." | tee -a "$logfile"
+
+# Fallback BOOTX64.EFI
+if [[ -f "$uki_source" ]]; then
+  mkdir -p "$fallback_dir"
+  cp "$uki_source" "$fallback_target"
+  if [[ -f "$fallback_target" ]]; then
+    echo "[OK] Fallback BOOTX64.EFI created at $fallback_target" | tee -a "$logfile"
+  else
+    echo "[ERROR] Failed to create fallback BOOTX64.EFI" | tee -a "$logfile"
     exit 1
   fi
+else
+  echo "[ERROR] UKI not found: $uki_source" | tee -a "$logfile"
+  exit 1
+fi
 
-  # --- Step 1: Create fallback BOOTX64.EFI ---
-  if [[ -f "$uki_source" ]]; then
-    mkdir -p "$fallback_dir" || {
-      error_print "Failed to create fallback directory: $fallback_dir"
-      exit 1
-    }
+# UEFI boot entry
+disk="/dev/$(lsblk -no pkname "$(findmnt -nvo SOURCE /efi)")"
+partnum=$(lsblk -no PARTNUM "$(findmnt -nvo SOURCE /efi)")
 
-    cp "$uki_source" "$fallback_target" || {
-      error_print "Failed to copy fallback UKI to $fallback_target"
-      exit 1
-    }
+if efibootmgr --disk "$disk" --part "$partnum" --create --label "ArchLinuxPlus" --loader "$loader_path" >> "$logfile" 2>&1; then
+  echo "[OK] UEFI boot entry 'ArchLinuxPlus' created successfully" | tee -a "$logfile"
+else
+  echo "[WARN] Failed to register UEFI boot entry (fallback may still work)" | tee -a "$logfile"
+fi
+EOF
 
-    if [[ -f "$fallback_target" ]]; then
-      startup_ok "Fallback BOOTX64.EFI created at $fallback_target"
-    else
-      error_print "Fallback copy did not succeed. File missing: $fallback_target"
-      exit 1
-    fi
+  chmod +x "$script_path"
+
+  if arch-chroot /mnt bash "/root/scripts/efibootmgr-setup.sh"; then
+    startup_ok "Boot target setup completed successfully inside chroot."
   else
-    error_print "Missing UKI source file: $uki_source"
+    error_print "Boot target setup failed inside chroot."
     exit 1
-  fi
-
-  # --- Step 2: Register UEFI Boot Entry ---
-  if arch-chroot /mnt command -v efibootmgr &>/dev/null; then
-    if arch-chroot /mnt efibootmgr --disk "$disk" --part "$partnum" \
-      --create --label "ArchLinuxPlus" --loader "$loader_path" >> "$LOGFILE" 2>&1; then
-      startup_ok "UEFI boot entry 'ArchLinuxPlus' registered successfully."
-    else
-      warning_print "Failed to register UEFI boot entry. Fallback BOOTX64.EFI will still be used."
-    fi
-  else
-    warning_print "efibootmgr is not available in chroot. Skipping UEFI entry registration."
   fi
 }
 
