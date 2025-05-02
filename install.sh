@@ -2003,14 +2003,33 @@ final_message() {
   # Check Snapper systemd timers
   if ! arch-chroot /mnt systemctl is-enabled snapper-timeline.timer &>/dev/null; then
     warning_print "snapper-timeline.timer is not enabled."
+    log_msg "WARN: snapper-timeline.timer is not enabled."
   fi
   if ! arch-chroot /mnt systemctl is-enabled snapper-cleanup.timer &>/dev/null; then
     warning_print "snapper-cleanup.timer is not enabled."
+    log_msg "WARN: snapper-cleanup.timer is not enabled."
   fi
 
-  # Check for Secure Boot keys presence now
+  # Check for Secure Boot keys presence
   if [[ ! -d /mnt/secureboot/keys || -z "$(ls -A /mnt/secureboot/keys 2>/dev/null)" ]]; then
     warning_print "Secure Boot keys not found in /mnt/secureboot/keys (temporary install path)."
+    log_msg "WARN: Secure Boot keys not found in /mnt/secureboot/keys"
+  fi
+
+  # UKI failure detection
+  if [[ -f /mnt/var/log/uki-failure.log ]]; then
+    warning_print "UKI failure log detected at /var/log/uki-failure.log"
+    info_print "This indicates the automatic UKI rebuild may fail after reboot."
+    log_msg "WARN: Detected uki-failure.log — UKI rebuild may fail post-boot"
+    echo
+  fi
+
+  # UEFI boot entry detection
+  if command -v efibootmgr &>/dev/null && ! efibootmgr | grep -q "ArchLinuxPlus"; then
+    warning_print "No UEFI boot entry for 'ArchLinuxPlus' detected in NVRAM."
+    info_print "Your system will rely on fallback loader: EFI/Boot/BOOTX64.EFI"
+    log_msg "WARN: No UEFI boot entry detected for ArchLinuxPlus — relying on fallback"
+    echo
   fi
 
   echo
