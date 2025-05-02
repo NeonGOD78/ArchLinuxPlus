@@ -1638,13 +1638,10 @@ setup_grub_bootloader() {
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
   local grub_cfg_file="/mnt/etc/default/grub"
-  local cryptodisk_flag="GRUB_ENABLE_CRYPTODISK=y"
-  local cryptodisk_added=false
 
   # Download and extract theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
   mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-
   if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
     bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
     startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
@@ -1665,8 +1662,8 @@ setup_grub_bootloader() {
     local value="${grub_vars[$key]}"
     if grep -q "^$key=" "$grub_cfg_file"; then
       sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
-    elif grep -q "^#\s*$key=" "$grub_cfg_file"; then
-      sed -i "s|^#\s*$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
+    elif grep -q "^#\\s*$key=" "$grub_cfg_file"; then
+      sed -i "s|^#\\s*$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
     else
       echo "$key=$value" >> "$grub_cfg_file"
     fi
@@ -1688,35 +1685,23 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
-  # Temporarily enable GRUB_ENABLE_CRYPTODISK for GRUB install
-  if ! grep -q "^$cryptodisk_flag" "$grub_cfg_file"; then
-    echo "$cryptodisk_flag" >> "$grub_cfg_file"
-    cryptodisk_added=true
-    info_print "Temporarily enabling GRUB_ENABLE_CRYPTODISK for GRUB installation"
-  fi
-
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Install GRUB bootloader (with removable workaround)
+  # Install GRUB without cryptodisk module
   info_print "Installing GRUB bootloader..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     --removable \
+    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
     error_print "GRUB installation failed."
     exit 1
-  fi
-
-  # Remove temporary GRUB_ENABLE_CRYPTODISK after install
-  if [[ "$cryptodisk_added" == true ]]; then
-    sed -i "/^$cryptodisk_flag/d" "$grub_cfg_file"
-    info_print "Removed temporary GRUB_ENABLE_CRYPTODISK from $grub_cfg_file"
   fi
 
   # Generate grub.cfg
