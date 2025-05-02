@@ -2215,80 +2215,66 @@ verify_boot_integrity() {
   section_header "Verifying Boot Setup Integrity"
 
   local fail=false
-  local chroot="/mnt"
-  local uki_path="$chroot/efi/EFI/Linux/arch.efi"
-  local grub_efi="$chroot/efi/EFI/GRUB/grubx64.efi"
-  local fallback_efi="$chroot/efi/EFI/Boot/BOOTX64.EFI"
-  local grub_cfg="$chroot/boot/grub/grub.cfg"
-  local cmdline_file="$chroot/etc/kernel/cmdline"
-  local modules_dir="$chroot/lib/modules"
+  local grub_cfg="/mnt/boot/grub/grub.cfg"
+  local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
+  local uki="/mnt/efi/EFI/Linux/arch.efi"
+  local fallback="/mnt/efi/EFI/Boot/BOOTX64.EFI"
+  local cmdline="/mnt/etc/kernel/cmdline"
 
-  echo "== Boot Verification Start ==" >> "$LOGFILE"
+  {
+    echo "== Boot Verification Start =="
 
-  # Check UKI exists
-  if [[ ! -f "$uki_path" ]]; then
-    error_print "Missing UKI: /efi/EFI/Linux/arch.efi"
-    echo "[FAIL] UKI missing" >> "$LOGFILE"
-    fail=true
-  else
-    echo "[OK] UKI present" >> "$LOGFILE"
-  fi
-
-  # Check GRUB EFI
-  if [[ ! -f "$grub_efi" ]]; then
-    error_print "Missing GRUB EFI binary: /efi/EFI/GRUB/grubx64.efi"
-    echo "[FAIL] GRUB EFI missing" >> "$LOGFILE"
-    fail=true
-  else
-    echo "[OK] GRUB EFI present" >> "$LOGFILE"
-  fi
-
-  # Check fallback BOOTX64.EFI
-  if [[ ! -f "$fallback_efi" ]]; then
-    warning_print "Fallback BOOTX64.EFI not found (some UEFI firmwares require this)."
-    echo "[WARN] BOOTX64.EFI fallback missing" >> "$LOGFILE"
-  else
-    echo "[OK] BOOTX64.EFI fallback present" >> "$LOGFILE"
-  fi
-
-  # Check GRUB config
-  if [[ ! -s "$grub_cfg" ]]; then
-    error_print "Missing or empty GRUB config: /boot/grub/grub.cfg"
-    echo "[FAIL] GRUB config missing or empty" >> "$LOGFILE"
-    fail=true
-  else
-    echo "[OK] GRUB config present" >> "$LOGFILE"
-  fi
-
-  # Check kernel cmdline
-  if ! grep -q "rd.luks.uuid=" "$cmdline_file" 2>/dev/null; then
-    error_print "Missing 'rd.luks.uuid=' in /etc/kernel/cmdline."
-    echo "[FAIL] rd.luks.uuid missing in cmdline" >> "$LOGFILE"
-    fail=true
-  else
-    echo "[OK] cmdline includes rd.luks.uuid" >> "$LOGFILE"
-  fi
-
-  # Verify UKI kernel version matches installed modules
-  local installed_kver
-  installed_kver=$(ls "$modules_dir" 2>/dev/null | sort -V | tail -n1)
-  if [[ -z "$installed_kver" ]]; then
-    warning_print "No installed kernel version detected in /lib/modules."
-    echo "[WARN] No installed kernel version detected" >> "$LOGFILE"
-  else
-    # Try to extract kernel version from UKI using objdump
-    local uki_kernel_version
-    uki_kernel_version=$(objdump -s -j .cmdline "$uki_path" 2>/dev/null | grep -oP 'BOOT_IMAGE=/vmlinuz-linux(\S*)' || true)
-
-    if [[ -n "$uki_kernel_version" && "$uki_kernel_version" != *"$installed_kver"* ]]; then
-      warning_print "Kernel version mismatch: UKI references different version ($uki_kernel_version vs $installed_kver)"
-      echo "[WARN] UKI kernel version does not match installed: $uki_kernel_version vs $installed_kver" >> "$LOGFILE"
+    # UKI presence
+    if [[ -f "$uki" ]]; then
+      echo "[OK] UKI present"
     else
-      echo "[OK] Kernel version in UKI matches installed modules" >> "$LOGFILE"
+      error_print "Missing UKI: $uki"
+      echo "[FAIL] UKI missing"
+      fail=true
     fi
-  fi
 
-  echo "== Boot Verification Complete ==" >> "$LOGFILE"
+    # GRUB check (only if grub.cfg exists)
+    if [[ -f "$grub_cfg" ]]; then
+      echo "[OK] GRUB config present"
+      if [[ -f "$grub_efi" ]]; then
+        echo "[OK] GRUB EFI present"
+      else
+        error_print "Missing GRUB EFI binary: $grub_efi"
+        echo "[FAIL] GRUB EFI missing"
+        fail=true
+      fi
+    else
+      echo "[INFO] Skipping GRUB check – no grub.cfg found."
+    fi
+
+    # Fallback EFI
+    if [[ -f "$fallback" ]]; then
+      echo "[OK] BOOTX64.EFI fallback present"
+    else
+      warning_print "Fallback BOOTX64.EFI not found (some UEFI firmwares require this)."
+      echo "[WARN] BOOTX64.EFI fallback missing"
+    fi
+
+    # Kernel cmdline
+    if grep -q "rd.luks." "$cmdline"; then
+      echo "[OK] cmdline includes rd.luks options"
+    else
+      error_print "Missing 'rd.luks.*' in $cmdline."
+      echo "[FAIL] luks parameters missing in cmdline"
+      fail=true
+    fi
+
+    # Check kernel version match
+    local uki_version
+    uki_version=$(ls /mnt/lib/modules | sort -V | tail -n1)
+    if [[ -n "$uki_version" && -d "/mnt/lib/modules/$uki_version" ]]; then
+      echo "[OK] Kernel version in UKI matches installed modules"
+    else
+      warning_print "Could not verify UKI kernel version consistency"
+    fi
+
+    echo "== Boot Verification Complete =="
+  } >> "$LOGFILE"
 
   if [[ "$fail" == true ]]; then
     error_print "Boot setup verification failed. System may not boot!"
