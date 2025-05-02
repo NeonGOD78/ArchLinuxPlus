@@ -1531,9 +1531,9 @@ setup_grub_bootloader() {
   info_print "Downloading and installing GRUB theme: $theme_dir"
   mkdir -p "/mnt/boot/grub/themes/$theme_dir"
   if ! curl -L "$theme_url" -o /tmp/theme.zip; then
-      warning_print "Failed to download GRUB theme. Skipping theme installation."
+    warning_print "Failed to download GRUB theme. Skipping theme installation."
   else
-      bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir"
+    bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir"
   fi
 
   # Configure /etc/default/grub
@@ -1579,7 +1579,14 @@ setup_grub_bootloader() {
 
   # Install GRUB
   info_print "Installing GRUB bootloader..."
-  arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1
+  arch-chroot /mnt grub-install \
+    --target=x86_64-efi \
+    --efi-directory=/efi \
+    --boot-directory=/boot \
+    --bootloader-id=GRUB \
+    --no-nvram \
+    --recheck >> "$LOGFILE" 2>&1
+
   if [[ $? -ne 0 ]]; then
     error_print "GRUB installation failed."
     exit 1
