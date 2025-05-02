@@ -1530,10 +1530,12 @@ setup_grub_bootloader() {
   # Download and extract theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
   mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-  if ! curl -L "$theme_url" -o /tmp/theme.zip; then
-    warning_print "Failed to download GRUB theme. Skipping theme installation."
+
+  if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
+    bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
+    startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
   else
-    bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir"
+    warning_print "Failed to download GRUB theme. Skipping theme installation."
   fi
 
   # Configure /etc/default/grub
@@ -1549,9 +1551,9 @@ setup_grub_bootloader() {
   for key in "${!grub_vars[@]}"; do
     local value="${grub_vars[$key]}"
     if grep -q "^$key=" "$grub_cfg_file"; then
-      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file"
+      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
     elif grep -q "^#\s*$key=" "$grub_cfg_file"; then
-      sed -i "s|^#\s*$key=.*|$key=$value|" "$grub_cfg_file"
+      sed -i "s|^#\s*$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
     else
       echo "$key=$value" >> "$grub_cfg_file"
     fi
@@ -1560,7 +1562,7 @@ setup_grub_bootloader() {
   # Enable Plymouth splash
   info_print "Enabling Plymouth splash in GRUB..."
   if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
-    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file"
+    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
   else
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
   fi
@@ -1568,7 +1570,7 @@ setup_grub_bootloader() {
   # Add/modify GRUB_CMDLINE_LINUX
   info_print "Adding 'quiet splash' to GRUB_CMDLINE_LINUX..."
   if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
-    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file"
+    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
   else
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
@@ -1577,30 +1579,28 @@ setup_grub_bootloader() {
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Install GRUB
+  # Install GRUB bootloader (with removable workaround)
   info_print "Installing GRUB bootloader..."
-  arch-chroot /mnt grub-install \
+  if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
     --efi-directory=/efi \
-    --boot-directory=/boot \
     --bootloader-id=GRUB \
-    --no-nvram \
-    --recheck >> "$LOGFILE" 2>&1
-
-  if [[ $? -ne 0 ]]; then
+    --removable \
+    --recheck >> "$LOGFILE" 2>&1; then
+    startup_ok "GRUB bootloader installed successfully."
+  else
     error_print "GRUB installation failed."
     exit 1
   fi
 
   # Generate grub.cfg
   info_print "Generating grub.cfg..."
-  arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1
-  if [[ $? -ne 0 ]]; then
+  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+    startup_ok "grub.cfg generated successfully."
+  else
     error_print "Failed to generate grub.cfg."
     exit 1
   fi
-
-  startup_ok "GRUB bootloader installed and configured successfully."
 }
 
 # ==================== Setup GRUB pacman hook ====================
