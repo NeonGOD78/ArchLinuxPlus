@@ -2263,18 +2263,33 @@ setup_boot_targets() {
   local fallback_dir="/mnt/efi/EFI/Boot"
   local fallback_target="$fallback_dir/BOOTX64.EFI"
   local loader_path="\\EFI\\GRUB\\grubx64.efi"
-  local disk="/dev/$(lsblk -no pkname "$ROOT_PARTITION")"
-  local partnum
-  partnum=$(lsblk -no PARTNUM "$EFI_PARTITION")
 
-  # --- Step 1: Fallback bootloader ---
+  local disk
+  disk="/dev/$(lsblk -no pkname "$ROOT_PARTITION" 2>/dev/null)"
+  local partnum
+  partnum=$(lsblk -no PARTNUM "$EFI_PARTITION" 2>/dev/null)
+
+  if [[ -z "$disk" || -z "$partnum" ]]; then
+    error_print "Could not detect disk or EFI partition number for efibootmgr."
+    exit 1
+  fi
+
+  # --- Step 1: Create fallback BOOTX64.EFI ---
   if [[ -f "$uki_source" ]]; then
-    mkdir -p "$fallback_dir"
-    cp "$uki_source" "$fallback_target"
+    mkdir -p "$fallback_dir" || {
+      error_print "Failed to create fallback directory: $fallback_dir"
+      exit 1
+    }
+
+    cp "$uki_source" "$fallback_target" || {
+      error_print "Failed to copy fallback UKI to $fallback_target"
+      exit 1
+    }
+
     if [[ -f "$fallback_target" ]]; then
       startup_ok "Fallback BOOTX64.EFI created at $fallback_target"
     else
-      error_print "Failed to create fallback BOOTX64.EFI."
+      error_print "Fallback copy did not succeed. File missing: $fallback_target"
       exit 1
     fi
   else
@@ -2282,12 +2297,16 @@ setup_boot_targets() {
     exit 1
   fi
 
-  # --- Step 2: Register UEFI boot entry ---
-  if arch-chroot /mnt efibootmgr --disk "$disk" --part "$partnum" \
-    --create --label "ArchLinuxPlus" --loader "$loader_path" >> "$LOGFILE" 2>&1; then
-    startup_ok "UEFI boot entry 'ArchLinuxPlus' registered successfully."
+  # --- Step 2: Register UEFI Boot Entry ---
+  if arch-chroot /mnt command -v efibootmgr &>/dev/null; then
+    if arch-chroot /mnt efibootmgr --disk "$disk" --part "$partnum" \
+      --create --label "ArchLinuxPlus" --loader "$loader_path" >> "$LOGFILE" 2>&1; then
+      startup_ok "UEFI boot entry 'ArchLinuxPlus' registered successfully."
+    else
+      warning_print "Failed to register UEFI boot entry. Fallback BOOTX64.EFI will still be used."
+    fi
   else
-    warning_print "Failed to register UEFI boot entry. Fallback boot will still work."
+    warning_print "efibootmgr is not available in chroot. Skipping UEFI entry registration."
   fi
 }
 
