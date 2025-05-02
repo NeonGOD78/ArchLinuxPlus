@@ -1389,41 +1389,152 @@ setup_uki_build() {
   section_header "Unified Kernel Image (UKI) Build with dracut"
 
   local output_path="/efi/EFI/Linux/arch.efi"
+  local cmdline_path="/etc/kernel/cmdline"
+  local rebuild_script="/usr/local/bin/rebuild-uki"
+  local timer_dir="/etc/systemd/system"
+  local key_dir="/etc/secureboot/keys"
 
-  # Find kernel version automatically
+  # Check for dracut
+  if ! arch-chroot /mnt command -v dracut &>/dev/null; then
+    error_print "dracut is not installed inside chroot. Cannot build UKI."
+    exit 1
+  fi
+
+  # Check for kernel cmdline
+  if [[ ! -f /mnt${cmdline_path} ]]; then
+    error_print "$cmdline_path not found in chroot. Cannot continue."
+    exit 1
+  fi
+
+  # Get installed kernel version
   local kernel_version
-  kernel_version=$(ls /mnt/lib/modules | head -n1)
-
+  kernel_version=$(ls /mnt/lib/modules | sort -V | tail -n 1)
   if [[ -z "$kernel_version" ]]; then
-    error_print "Unable to detect kernel version in /mnt/lib/modules"
+    error_print "Could not detect installed kernel version in /mnt/lib/modules."
     exit 1
   fi
 
   info_print "Detected kernel version: $kernel_version"
-  info_print "Generating UKI using dracut..."
+  info_print "Generating UKI with dracut..."
 
-  # Ensure output directory exists
-  arch-chroot /mnt mkdir -p /efi/EFI/Linux
+  arch-chroot /mnt mkdir -p /efi/EFI/Linux >> "$LOGFILE" 2>&1
 
-  # Generate UKI
-  if arch-chroot /mnt dracut --uefi -f /efi/EFI/Linux/arch.efi "$kernel_version" >> "$LOGFILE" 2>&1; then
-    startup_ok "UKI built successfully at $output_path"
+  if arch-chroot /mnt dracut \
+    --uefi \
+    --force \
+    --kver "$kernel_version" \
+    --kernel-cmdline "$(cat /mnt${cmdline_path})" \
+    "$output_path" >> "$LOGFILE" 2>&1; then
+    info_print "UKI built at $output_path"
   else
     error_print "UKI build failed"
     exit 1
   fi
 
-  # Sign the UKI with sbctl if available
-  info_print "Signing UKI with Secure Boot key..."
+  info_print "Signing UKI..."
   if arch-chroot /mnt sbsign \
-    --key /etc/secureboot/keys/db.key \
-    --cert /etc/secureboot/keys/db.crt \
-    --output "$output_path" "$output_path" >> "$LOGFILE" 2>&1; then
+    --key "$key_dir/db.key" \
+    --cert "$key_dir/db.crt" \
+    --output "$output_path" \
+    "$output_path" >> "$LOGFILE" 2>&1; then
     startup_ok "UKI signed successfully."
   else
-    error_print "Failed to sign UKI."
+    error_print "UKI signing failed."
     exit 1
   fi
+
+  if [[ ! -f /mnt$output_path ]]; then
+    error_print "Signed UKI file not found: $output_path"
+    exit 1
+  fi
+
+  startup_ok "UKI build and signing completed."
+
+  # =============== Install rebuild-uki script ===============
+  info_print "Installing UKI rebuild script and timer..."
+
+  mkdir -p /mnt$(dirname "$rebuild_script")
+
+  cat << 'EOF' > /mnt$rebuild_script
+#!/bin/bash
+set -euo pipefail
+
+cmdline_file="/etc/kernel/cmdline"
+uki_output="/efi/EFI/Linux/arch.efi"
+key_dir="/etc/secureboot/keys"
+fail_log="/var/log/uki-failure.log"
+
+echo "[INFO] UKI rebuild started at $(date)"
+
+fail() {
+  local msg="$1"
+  echo "[ERROR] $msg" >&2
+  echo "$(date '+%F %T') [FAIL] $msg" >> "$fail_log"
+  exit 1
+}
+
+[[ -f "$cmdline_file" ]] || fail "$cmdline_file not found"
+
+kernel_version=$(ls /lib/modules | sort -V | tail -n 1)
+[[ -n "$kernel_version" ]] || fail "Could not detect installed kernel version"
+
+echo "[INFO] Building UKI for kernel $kernel_version..."
+
+mkdir -p "$(dirname "$uki_output")"
+
+if ! dracut --uefi --force --kver "$kernel_version" --kernel-cmdline "$(cat "$cmdline_file")" "$uki_output"; then
+  fail "dracut failed to build UKI"
+fi
+
+if ! sbsign --key "$key_dir/db.key" --cert "$key_dir/db.crt" --output "$uki_output" "$uki_output"; then
+  fail "sbsign failed to sign UKI"
+fi
+
+[[ -f "$uki_output" ]] || fail "Signed UKI file not found: $uki_output"
+
+# Cleanup previous failure log if success
+if [[ -f "$fail_log" ]]; then
+  rm -f "$fail_log"
+  echo "[INFO] Removed previous failure log: $fail_log"
+fi
+
+echo "[OK] UKI rebuilt and signed successfully at $(date)"
+EOF
+
+  chmod +x /mnt$rebuild_script
+
+  # =============== Create systemd service and timer ===============
+  mkdir -p /mnt$timer_dir
+
+  cat << EOF > /mnt$timer_dir/uki-rebuild.service
+[Unit]
+Description=Rebuild and sign UKI using dracut
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$rebuild_script
+EOF
+
+  cat << EOF > /mnt$timer_dir/uki-rebuild.timer
+[Unit]
+Description=Daily UKI rebuild and Secure Boot sign
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1d
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  arch-chroot /mnt systemctl enable uki-rebuild.timer >> "$LOGFILE" 2>&1 || {
+    warning_print "Could not enable UKI rebuild timer"
+  }
+
+  startup_ok "UKI rebuild script and timer installed."
 }
 
 # ======================= Setup Secureboot Structure ========================
