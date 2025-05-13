@@ -1712,6 +1712,13 @@ setup_grub_bootloader() {
     exit 1
   fi
 
+  # Copy fallback to GRUB dir if grubx64.efi is missing
+  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
+    info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
+    mkdir -p /mnt/efi/EFI/GRUB
+    cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
+  fi
+
   # Generate grub.cfg
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
