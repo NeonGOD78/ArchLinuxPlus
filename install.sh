@@ -1689,13 +1689,15 @@ setup_grub_bootloader() {
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Install GRUB without cryptodisk module
+  # Install GRUB to unencrypted EFI partition without touching encrypted root
   info_print "Installing GRUB bootloader..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
     --efi-directory=/efi \
     --bootloader-id=GRUB \
+    --boot-directory=/boot \
     --removable \
+    --no-nvram \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
