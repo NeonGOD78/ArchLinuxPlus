@@ -1662,6 +1662,7 @@ setup_grub_bootloader() {
     ["GRUB_GFXPAYLOAD_LINUX"]="keep"
     ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
     ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
+    ["GRUB_TIMEOUT_STYLE"]="menu"
   )
 
   for key in "${!grub_vars[@]}"; do
@@ -1714,11 +1715,16 @@ setup_grub_bootloader() {
     warning_print "GRUB install failed, fallback loader will be used if available."
   fi
 
-  # Ensure grubx64.efi exists
-  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
-    info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
-    mkdir -p /mnt/efi/EFI/GRUB
-    cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
+  # Ensure grubx64.efi exists by copying fallback if needed
+  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
+    if [[ -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
+      info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
+      mkdir -p /mnt/efi/EFI/GRUB
+      cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
+      startup_ok "Copied fallback as GRUB/grubx64.efi."
+    else
+      warning_print "No fallback BOOTX64.EFI found to copy as grubx64.efi."
+    fi
   fi
 
   # Generate grub.cfg (no cryptodisk)
