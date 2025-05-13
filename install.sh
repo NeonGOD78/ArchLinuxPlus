@@ -1829,6 +1829,27 @@ setup_snapper() {
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
+
+  # ==================== grub-btrfs integration ====================
+  info_print "Creating grub-btrfs config..."
+  mkdir -p /mnt/etc/default
+  cat <<EOF > /mnt/etc/default/grub-btrfs/config
+GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"
+GRUB_BTRFS_DISABLE_SNAPPER=true
+EOF
+  startup_ok "grub-btrfs config created."
+
+  info_print "Running initial grub-btrfs-generator..."
+  arch-chroot /mnt grub-btrfs-generator -o /boot/grub/btrfs.cfg >> "$LOGFILE" 2>&1 || {
+    warning_print "Initial grub-btrfs generation failed. Will retry on next snapshot."
+  }
+
+  info_print "Enabling grub-btrfsd.service for live updates..."
+  arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1 || {
+    warning_print "Failed to enable grub-btrfsd.service."
+  }
+
+  startup_ok "grub-btrfs integration completed."
 }
 
 # ==================== Select GRUB THEME ====================
