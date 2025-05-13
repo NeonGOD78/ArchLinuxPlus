@@ -1700,6 +1700,22 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
+    # Ensure GRUB menu is always shown
+  info_print "Ensuring GRUB menu is always shown at boot..."
+  if grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file"; then
+    sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' "$grub_cfg_file"
+  else
+    echo 'GRUB_TIMEOUT=5' >> "$grub_cfg_file"
+  fi
+
+  if grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file"; then
+    sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' "$grub_cfg_file"
+  else
+    echo 'GRUB_TIMEOUT_STYLE=menu' >> "$grub_cfg_file"
+  fi
+
+  startup_ok "GRUB menu timeout and style configured."
+
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
