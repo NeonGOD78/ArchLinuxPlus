@@ -1644,7 +1644,6 @@ setup_grub_bootloader() {
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
   local grub_cfg_file="/mnt/etc/default/grub"
-  local plymouth_theme="arch-charge"
 
   # Download and extract theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1676,20 +1675,12 @@ setup_grub_bootloader() {
     fi
   done
 
-  # Enable Plymouth splash (GRUB splash image)
-  info_print "Enabling Plymouth splash in GRUB (background image)..."
+  # Enable Plymouth splash
+  info_print "Enabling Plymouth splash in GRUB..."
   if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
     sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
   else
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
-  fi
-
-  # Set Plymouth theme inside chroot
-  info_print "Setting Plymouth theme to '$plymouth_theme'..."
-  if arch-chroot /mnt plymouth-set-default-theme -R "$plymouth_theme" >> "$LOGFILE" 2>&1; then
-    startup_ok "Plymouth theme set to '$plymouth_theme'"
-  else
-    warning_print "Failed to set Plymouth theme. Will use default fallback."
   fi
 
   # Add/modify GRUB_CMDLINE_LINUX
@@ -1707,7 +1698,7 @@ setup_grub_bootloader() {
   # Clean up cryptodisk just in case
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # Install GRUB without luks support
+  # Install GRUB without luks modules
   info_print "Installing GRUB bootloader (no luks modules)..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
@@ -1716,13 +1707,11 @@ setup_grub_bootloader() {
     --boot-directory=/boot \
     --removable \
     --no-nvram \
-    --disable-cryptodisk \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
-    error_print "GRUB install failed – grubx64.efi will be missing!"
-    return 1
+    warning_print "GRUB install failed, fallback loader will be used if available."
   fi
 
   # Ensure grubx64.efi exists
@@ -1732,7 +1721,7 @@ setup_grub_bootloader() {
     cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
   fi
 
-  # Generate grub.cfg
+  # Generate grub.cfg (no cryptodisk)
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
     startup_ok "grub.cfg generated successfully."
@@ -1743,6 +1732,7 @@ setup_grub_bootloader() {
 
   success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
 }
+
 
 # ==================== Setup GRUB pacman hook ====================
 
