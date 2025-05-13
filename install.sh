@@ -1644,7 +1644,7 @@ setup_grub_bootloader() {
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
   local grub_cfg_file="/mnt/etc/default/grub"
-  local plymouth_theme="arch-charge"
+  local plymouth_theme="spinner"
 
   # Download and extract theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1676,7 +1676,7 @@ setup_grub_bootloader() {
     fi
   done
 
-  # Enable Plymouth splash (GRUB splash image)
+  # Enable Plymouth splash (GRUB background image)
   info_print "Enabling Plymouth splash in GRUB (background image)..."
   if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
     sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
@@ -1684,7 +1684,7 @@ setup_grub_bootloader() {
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
   fi
 
-  # Set Plymouth theme inside chroot
+  # Set Plymouth theme
   info_print "Setting Plymouth theme to '$plymouth_theme'..."
   if arch-chroot /mnt plymouth-set-default-theme -R "$plymouth_theme" >> "$LOGFILE" 2>&1; then
     startup_ok "Plymouth theme set to '$plymouth_theme'"
@@ -1699,22 +1699,6 @@ setup_grub_bootloader() {
   else
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
-
-    # Ensure GRUB menu is always shown
-  info_print "Ensuring GRUB menu is always shown at boot..."
-  if grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file"; then
-    sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' "$grub_cfg_file"
-  else
-    echo 'GRUB_TIMEOUT=5' >> "$grub_cfg_file"
-  fi
-
-  if grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file"; then
-    sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' "$grub_cfg_file"
-  else
-    echo 'GRUB_TIMEOUT_STYLE=menu' >> "$grub_cfg_file"
-  fi
-
-  startup_ok "GRUB menu timeout and style configured."
 
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
@@ -1746,7 +1730,7 @@ setup_grub_bootloader() {
     cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
   fi
 
-  # Generate grub.cfg (no cryptodisk)
+  # Generate grub.cfg
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
     startup_ok "grub.cfg generated successfully."
@@ -1757,7 +1741,6 @@ setup_grub_bootloader() {
 
   success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
 }
-
 
 # ==================== Setup GRUB pacman hook ====================
 
