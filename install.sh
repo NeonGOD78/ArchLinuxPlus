@@ -1685,11 +1685,17 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
+  # Workaround for encrypted disk install block
+  info_print "Enabling GRUB cryptodisk workaround for install..."
+  if ! grep -q '^GRUB_ENABLE_CRYPTODISK=y' "$grub_cfg_file"; then
+    echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
+  fi
+
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Install GRUB to unencrypted EFI partition without touching encrypted root
+  # Install GRUB
   info_print "Installing GRUB bootloader..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
