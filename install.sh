@@ -2348,37 +2348,47 @@ setup_boot_targets() {
   local loader_path="\\EFI\\GRUB\\grubx64.efi"
   local disk partnum
 
+  echo "== Setup Boot Targets ==" >> "$LOGFILE"
+
   # Step 1: Create fallback BOOTX64.EFI pointing to GRUB
   if [[ -f "$grub_efi" ]]; then
     mkdir -p "$fallback_dir"
     cp "$grub_efi" "$fallback_target"
     if [[ -f "$fallback_target" ]]; then
       startup_ok "Fallback BOOTX64.EFI now points to GRUB (GRUB menu will show at boot)"
+      echo "[OK] BOOTX64.EFI copied to $fallback_target" >> "$LOGFILE"
     else
       error_print "Failed to copy GRUB fallback to BOOTX64.EFI"
+      echo "[FAIL] Failed to copy $grub_efi to $fallback_target" >> "$LOGFILE"
       exit 1
     fi
   else
     error_print "grubx64.efi not found at $grub_efi"
+    echo "[FAIL] grubx64.efi missing – fallback not created." >> "$LOGFILE"
     exit 1
   fi
 
-  # Step 2: Check if we’re in a VM
+  # Step 2: Detect if running in virtual machine
   if systemd-detect-virt --quiet --vm; then
     info_print "Virtual machine detected – skipping efibootmgr UEFI boot entry registration."
+    echo "[INFO] Skipping efibootmgr (VM detected)" >> "$LOGFILE"
     return
   fi
 
-  # Step 3: Register UEFI boot entry (for physical systems)
-  disk="/dev/$(lsblk -no pkname \"$ROOT_PARTITION\")"
+  # Step 3: Register UEFI boot entry
+  disk="/dev/$(lsblk -no pkname "$ROOT_PARTITION")"
   partnum=$(lsblk -no PARTNUM "$EFI_PARTITION")
 
   if arch-chroot /mnt efibootmgr --disk "$disk" --part "$partnum" \
     --create --label "ArchLinuxPlus" --loader "$loader_path" >> "$LOGFILE" 2>&1; then
     startup_ok "UEFI boot entry 'ArchLinuxPlus' registered successfully."
+    echo "[OK] efibootmgr UEFI boot entry created for loader $loader_path" >> "$LOGFILE"
   else
     warning_print "Failed to register UEFI boot entry. Fallback BOOTX64.EFI should still work."
+    echo "[WARN] efibootmgr failed. Check UEFI support or fallback use." >> "$LOGFILE"
   fi
+
+  echo "== Setup Boot Targets Complete ==" >> "$LOGFILE"
 }
 
 # ==================== Setup Crypttab ====================
