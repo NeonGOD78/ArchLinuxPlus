@@ -1727,7 +1727,13 @@ setup_grub_bootloader() {
     error_print "Failed to generate grub.cfg."
     exit 1
   fi
+
+# Remove GRUB luks unlock to let systemd handle it instead
+info_print "Removing GRUB luks-unlock (handled by UKI)..."
+sed -i '/^GRUB_ENABLE_CRYPTODISK/d' /mnt/etc/default/grub
+arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1
 }
+
 
 # ==================== Setup GRUB pacman hook ====================
 
