@@ -1644,99 +1644,99 @@ setup_grub_bootloader() {
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
   local grub_cfg_file="/mnt/etc/default/grub"
+  local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
+  local fallback_dir="/mnt/efi/EFI/Boot"
 
   # Download and extract theme
-  info_print "Downloading and installing GRUB theme: $theme_dir"
+  info_print "Installing GRUB theme: $theme_dir"
   mkdir -p "/mnt/boot/grub/themes/$theme_dir"
   if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
     bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
-    startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
+    startup_ok "Theme extracted to /boot/grub/themes/$theme_dir"
   else
-    warning_print "Failed to download GRUB theme. Skipping theme installation."
+    warning_print "Failed to download GRUB theme. Skipping."
   fi
 
-  # Configure /etc/default/grub
-  info_print "Configuring /etc/default/grub..."
+  # Configure grub default
+  info_print "Configuring /etc/default/grub"
   declare -A grub_vars=(
     ["GRUB_GFXMODE"]="$gfx_mode"
     ["GRUB_GFXPAYLOAD_LINUX"]="keep"
     ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
     ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
-    ["GRUB_TIMEOUT_STYLE"]="menu"
+    ["GRUB_DISABLE_SUBMENU"]="y"
   )
 
   for key in "${!grub_vars[@]}"; do
     local value="${grub_vars[$key]}"
     if grep -q "^$key=" "$grub_cfg_file"; then
-      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
-    elif grep -q "^#\\s*$key=" "$grub_cfg_file"; then
-      sed -i "s|^#\\s*$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
+      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file"
     else
       echo "$key=$value" >> "$grub_cfg_file"
     fi
   done
 
-  # Enable Plymouth splash
-  info_print "Enabling Plymouth splash in GRUB..."
-  if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
-    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
-  else
+  # Plymouth splash
+  if ! grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
   fi
 
-  # Add/modify GRUB_CMDLINE_LINUX
-  info_print "Adding 'quiet splash' to GRUB_CMDLINE_LINUX..."
+  # Kernel parameters
   if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
-    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
+    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file"
   else
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
-  # Save theme and resolution choices
+  # Remove luks unlocking via GRUB
+  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
+
+  # Save theme info
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Clean up cryptodisk just in case
-  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
-
-  # Install GRUB without luks modules
-  info_print "Installing GRUB bootloader (no luks modules)..."
+  # Install GRUB
+  info_print "Installing GRUB to /efi/EFI/GRUB..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     --boot-directory=/boot \
-    --removable \
-    --no-nvram \
-    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
-    startup_ok "GRUB bootloader installed successfully."
+    startup_ok "GRUB installed successfully."
   else
-    warning_print "GRUB install failed, fallback loader will be used if available."
-  fi
-
-  # Ensure grubx64.efi exists by copying fallback if needed
-  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
-    if [[ -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
-      info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
-      mkdir -p /mnt/efi/EFI/GRUB
-      cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
-      startup_ok "Copied fallback as GRUB/grubx64.efi."
-    else
-      warning_print "No fallback BOOTX64.EFI found to copy as grubx64.efi."
-    fi
-  fi
-
-  # Generate grub.cfg (no cryptodisk)
-  info_print "Generating grub.cfg..."
-  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-    startup_ok "grub.cfg generated successfully."
-  else
-    error_print "Failed to generate grub.cfg."
+    error_print "GRUB install failed."
     exit 1
   fi
 
-  success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
+  # Sign GRUB
+  if [[ -f "$grub_efi" ]]; then
+    info_print "Signing GRUB EFI binary for Secure Boot..."
+    arch-chroot /mnt sbsign \
+      --key /etc/secureboot/keys/db.key \
+      --cert /etc/secureboot/keys/db.crt \
+      --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1 && \
+    startup_ok "GRUB EFI signed successfully."
+  else
+    warning_print "GRUB EFI binary not found at $grub_efi"
+  fi
+
+  # Create fallback BOOTX64.EFI
+  mkdir -p "$fallback_dir"
+  if cp "$grub_efi" "$fallback_dir/BOOTX64.EFI"; then
+    startup_ok "Fallback BOOTX64.EFI created."
+  else
+    warning_print "Failed to create fallback BOOTX64.EFI"
+  fi
+
+  # Generate grub.cfg
+  info_print "Generating grub.cfg..."
+  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+    startup_ok "grub.cfg generated."
+  else
+    error_print "Failed to generate grub.cfg"
+    exit 1
+  fi
 }
 
 # ==================== Setup GRUB pacman hook ====================
