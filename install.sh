@@ -1751,11 +1751,9 @@ setup_grub_pacman_hook() {
 
   info_print "Installing GRUB re-sign pacman hook..."
 
-  # Create directories
   mkdir -p "$hook_dir"
   mkdir -p "$(dirname "$script_file")"
 
-  # Write the resign script
   cat <<EOF > "$script_file"
 #!/bin/bash
 set -euo pipefail
@@ -1763,7 +1761,7 @@ set -euo pipefail
 GRUB_EFI="$grub_efi"
 
 if [[ ! -f "\$GRUB_EFI" ]]; then
-  >&2 echo -e "\e[91m[ERROR]\e[0m GRUB EFI binary not found at \$GRUB_EFI"
+  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI" >&2
   exit 1
 fi
 
@@ -1774,7 +1772,6 @@ EOF
 
   chmod +x "$script_file"
 
-  # Write the pacman hook
   cat <<EOF > "$hook_file"
 [Trigger]
 Type = Package
@@ -1788,7 +1785,7 @@ When = PostTransaction
 Exec = /usr/local/bin/resign-grub
 EOF
 
-  startup_ok "GRUB pacman hook and re-sign script installed successfully."
+  startup_ok "GRUB pacman hook and sign script installed."
 }
 
 # ==================== Setup Snapper ====================
