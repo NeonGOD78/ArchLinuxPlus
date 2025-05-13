@@ -695,23 +695,28 @@ create_users() {
     error_print "ROOT_PASSWORD is empty. Skipping root setup."
   fi
 
-  # === Create user ===
-  if [[ -n "$USERNAME" ]]; then
-    info_print "Creating user '$USERNAME'..."
-    arch-chroot /mnt useradd -m -G wheel -s /bin/zsh "$USERNAME" >> "$LOGFILE" 2>&1 || {
-      error_print "Failed to create user '$USERNAME'."
-      exit 1
-    }
+# === Create user ===
+if [[ -n "$USERNAME" ]]; then
+  info_print "Creating user '$USERNAME'..."
+  arch-chroot /mnt useradd -m -G wheel -s /bin/zsh "$USERNAME" >> "$LOGFILE" 2>&1 || {
+    error_print "Failed to create user '$USERNAME'."
+    exit 1
+  }
 
-    if [[ -n "$USER_PASSWORD" ]]; then
-      echo "$USERNAME:$USER_PASSWORD" | arch-chroot /mnt chpasswd >> "$LOGFILE" 2>&1
-      startup_ok "User '$USERNAME' created and password set."
-    else
-      startup_warn "USER_PASSWORD is empty. User created without password."
-    fi
+  if [[ -n "$USER_PASSWORD" ]]; then
+    echo "$USERNAME:$USER_PASSWORD" | arch-chroot /mnt chpasswd >> "$LOGFILE" 2>&1
+    startup_ok "User '$USERNAME' created and password set."
   else
-    info_print "No user created. Only root account available."
+    startup_warn "USER_PASSWORD is empty. User created without password."
   fi
+
+  # === Add sudo permissions ===
+  echo "$USERNAME ALL=(ALL) ALL" >> "/mnt/etc/sudoers.d/$USERNAME"
+  chmod 440 "/mnt/etc/sudoers.d/$USERNAME"
+  startup_ok "Sudo access granted to $USERNAME."
+else
+  info_print "No user created. Only root account available."
+fi
 
   # === Optional: Restore dotfiles ===
   if [[ "$RESTORE_DOTFILES" == "yes" && -n "$DOTFILES_REPO" ]]; then
