@@ -1657,7 +1657,7 @@ setup_grub_bootloader() {
 
   # Configure /etc/default/grub
   info_print "Configuring /etc/default/grub..."
-  declare -A grub_vars=(
+  declare -A grub_vars=( 
     ["GRUB_GFXMODE"]="$gfx_mode"
     ["GRUB_GFXPAYLOAD_LINUX"]="keep"
     ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
@@ -1675,34 +1675,24 @@ setup_grub_bootloader() {
     fi
   done
 
-  # Enable Plymouth splash
-  info_print "Enabling Plymouth splash in GRUB..."
-  if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
-    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
-  else
-    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
-  fi
+  # Add splash
+  info_print "Adding splash to GRUB..."
+  sed -i 's|^GRUB_CMDLINE_LINUX="\(.*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1 || true
 
-  info_print "Adding 'quiet splash' to GRUB_CMDLINE_LINUX..."
-  if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
-    sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
-  else
-    echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
-  fi
+  # Clean up cryptodisk just in case
+  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # Save theme and resolution choices
+  # Save theme settings for summary
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Clean up cryptodisk if present
-  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
-
-  # === GRUB INSTALL (rettet) ===
-  info_print "Installing GRUB bootloader (correct paths, no luks modules)..."
+  # Install GRUB
+  info_print "Installing GRUB bootloader..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
     --efi-directory=/efi \
     --bootloader-id=GRUB \
+    --boot-directory=/boot \
     --removable \
     --no-nvram \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
@@ -1712,14 +1702,19 @@ setup_grub_bootloader() {
     warning_print "GRUB install failed, fallback loader will be used if available."
   fi
 
-  # Ensure grubx64.efi exists
-  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
-    info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
-    mkdir -p /mnt/efi/EFI/GRUB
-    cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
-  fi
+  # === Manuelt GRUB-menuentry til UKI ===
+  info_print "Adding manual GRUB entry for Unified Kernel Image (UKI)..."
+  mkdir -p /mnt/boot/grub/custom
+  cat <<EOF > /mnt/boot/grub/custom/uki.cfg
+menuentry 'Arch Linux (UKI)' {
+  search --file --no-floppy --set=root /EFI/Linux/arch.efi
+  chainloader /EFI/Linux/arch.efi
+}
+EOF
 
-  # === Generate grub.cfg ===
+  echo "GRUB_CUSTOM_CFG=/boot/grub/custom/uki.cfg" >> "$grub_cfg_file"
+
+  # === Generer grub.cfg igen ===
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
     startup_ok "grub.cfg generated successfully."
@@ -1728,7 +1723,15 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
+  # === Sikr fallback GRUB EFI-fil eksisterer ===
+  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
+    info_print "Copying fallback BOOTX64.EFI to /EFI/GRUB/grubx64.efi..."
+    mkdir -p /mnt/efi/EFI/GRUB
+    cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
+    startup_ok "Fallback GRUB EFI copied to /EFI/GRUB/grubx64.efi"
+  fi
+
+  success_print "GRUB configured. UKI boot menu entry added."
 }
 
 # ==================== Setup GRUB pacman hook ====================
