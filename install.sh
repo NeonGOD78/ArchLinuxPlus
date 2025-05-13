@@ -1644,8 +1644,12 @@ setup_grub_bootloader() {
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
   local grub_cfg_file="/mnt/etc/default/grub"
+  local plymouth_theme_url="https://github.com/adi1090x/plymouth-themes/archive/refs/heads/master.tar.gz"
+  local plymouth_theme_dir="/mnt/usr/share/plymouth/themes/arch-charge"
 
-  # Download and extract theme
+  # ------------------------------
+  # Download and extract GRUB theme
+  # ------------------------------
   info_print "Downloading and installing GRUB theme: $theme_dir"
   mkdir -p "/mnt/boot/grub/themes/$theme_dir"
   if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
@@ -1655,7 +1659,9 @@ setup_grub_bootloader() {
     warning_print "Failed to download GRUB theme. Skipping theme installation."
   fi
 
+  # ------------------------------
   # Configure /etc/default/grub
+  # ------------------------------
   info_print "Configuring /etc/default/grub..."
   declare -A grub_vars=(
     ["GRUB_GFXMODE"]="$gfx_mode"
@@ -1675,15 +1681,9 @@ setup_grub_bootloader() {
     fi
   done
 
-  # Enable Plymouth splash
-  info_print "Enabling Plymouth splash in GRUB..."
-  if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
-    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
-  else
-    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
-  fi
-
-  # Add/modify GRUB_CMDLINE_LINUX
+  # ------------------------------
+  # Plymouth splash i GRUB
+  # ------------------------------
   info_print "Adding 'quiet splash' to GRUB_CMDLINE_LINUX..."
   if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
     sed -i 's|^GRUB_CMDLINE_LINUX="\([^"]*\)"|GRUB_CMDLINE_LINUX="quiet splash \1"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
@@ -1691,14 +1691,50 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
-  # Save theme and resolution choices
+  info_print "Setting GRUB splash to /boot/plymouth/arch-logo.png..."
+  if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
+    sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
+  else
+    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
+  fi
+
+  # ------------------------------
+  # Save user choices
+  # ------------------------------
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Clean up cryptodisk just in case
+  # ------------------------------
+  # Plymouth theme setup (UKI)
+  # ------------------------------
+  info_print "Installing Plymouth theme 'arch-charge'..."
+  mkdir -p "$plymouth_theme_dir"
+  if curl -sSL "$plymouth_theme_url" -o /tmp/plymouth.tar.gz >> "$LOGFILE" 2>&1; then
+    bsdtar -xf /tmp/plymouth.tar.gz -C /tmp >> "$LOGFILE" 2>&1
+    cp -r /tmp/plymouth-themes-master/arch-charge/* "$plymouth_theme_dir" >> "$LOGFILE" 2>&1
+    echo "[OK] Plymouth theme installed to $plymouth_theme_dir" >> "$LOGFILE"
+  else
+    warning_print "Failed to download Plymouth theme. Fallback will be used."
+  fi
+
+  # ------------------------------
+  # Set Plymouth theme
+  # ------------------------------
+  echo 'Theme=arch-charge' > /mnt/etc/plymouth/plymouthd.conf
+
+  # ------------------------------
+  # Ensure dracut includes plymouth
+  # ------------------------------
+  echo 'add_dracutmodules+=" plymouth "' > /mnt/etc/dracut.conf.d/plymouth.conf
+
+  # ------------------------------
+  # Clean up cryptodisk
+  # ------------------------------
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # Install GRUB without luks modules
+  # ------------------------------
+  # Install GRUB (no luks modules)
+  # ------------------------------
   info_print "Installing GRUB bootloader (no luks modules)..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
@@ -1714,14 +1750,18 @@ setup_grub_bootloader() {
     warning_print "GRUB install failed, fallback loader will be used if available."
   fi
 
-  # Ensure grubx64.efi exists
+  # ------------------------------
+  # Fallback grubx64.efi (if missing)
+  # ------------------------------
   if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
     info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
     mkdir -p /mnt/efi/EFI/GRUB
     cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
   fi
 
-  # Generate grub.cfg (no cryptodisk)
+  # ------------------------------
+  # Generate grub.cfg
+  # ------------------------------
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
     startup_ok "grub.cfg generated successfully."
@@ -1732,7 +1772,6 @@ setup_grub_bootloader() {
 
   success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
 }
-
 
 # ==================== Setup GRUB pacman hook ====================
 
