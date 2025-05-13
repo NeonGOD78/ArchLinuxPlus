@@ -1686,16 +1686,15 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
-  # Temporarily enable GRUB cryptodisk support to allow install
-  info_print "Temporarily enabling GRUB cryptodisk workaround..."
-  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
-
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
   echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
 
-  # Install GRUB
-  info_print "Installing GRUB bootloader..."
+  # Clean up cryptodisk just in case
+  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
+
+  # Install GRUB without luks modules
+  info_print "Installing GRUB bootloader (no luks modules)..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
     --efi-directory=/efi \
@@ -1707,21 +1706,7 @@ setup_grub_bootloader() {
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
-    error_print "GRUB installation failed."
-    exit 1
-  fi
-
-  # Remove GRUB_ENABLE_CRYPTODISK again so it doesn't attempt luks-unlock
-  info_print "Disabling GRUB cryptodisk after install..."
-  sed -i '/^GRUB_ENABLE_CRYPTODISK=/d' "$grub_cfg_file"
-
-  # Regenerate grub.cfg WITHOUT cryptodisk support
-  info_print "Regenerating grub.cfg without cryptodisk..."
-  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-    startup_ok "grub.cfg generated successfully (no luks in GRUB)."
-  else
-    error_print "Failed to regenerate grub.cfg."
-    exit 1
+    warning_print "GRUB install failed, fallback loader will be used if available."
   fi
 
   # Ensure grubx64.efi exists
@@ -1731,9 +1716,17 @@ setup_grub_bootloader() {
     cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
   fi
 
-  success_print "GRUB configured without cryptodisk. LUKS handled via UKI initramfs."
-}
+  # Generate grub.cfg (no cryptodisk)
+  info_print "Generating grub.cfg..."
+  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+    startup_ok "grub.cfg generated successfully."
+  else
+    error_print "Failed to generate grub.cfg."
+    exit 1
+  fi
 
+  success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
+}
 
 # ==================== Setup GRUB pacman hook ====================
 
