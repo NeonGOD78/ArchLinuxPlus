@@ -1287,7 +1287,7 @@ install_base_system() {
     base "$KERNEL_PACKAGE" "$MICROCODE_PACKAGE" linux-firmware "$KERNEL_PACKAGE"-headers
     "$NETWORK_PKGS" btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
     zram-generator sudo bash-completion inotify-tools zsh unzip unrar fzf zoxide colordiff curl
-    btop mc git systemd openssl sbsigntools base-devel go dracut plymouth plymouth-theme-arch-charge
+    btop mc git systemd openssl sbsigntools base-devel go dracut plymouth
   )
 
   enable_debug
