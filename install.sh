@@ -2486,9 +2486,10 @@ main() {
   setup_secureboot_structure
   setup_cmdline_file
   setup_uki_build
+  setup_grub_bootloader
   setup_boot_targets
   
-  setup_grub_bootloader
+  
   setup_grub_pacman_hook
   setup_grub_resign_timer
   setup_snapper
