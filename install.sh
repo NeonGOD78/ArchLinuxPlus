@@ -2126,7 +2126,7 @@ enable_services() {
   enable_debug
 
   # Netværk
-  case "$NETWORK_PACKAGE" in
+  case "$NETWORK_PKGS" in
     networkmanager)
       info_print "Enabling NetworkManager service..."
       arch-chroot /mnt systemctl enable NetworkManager.service >> "$LOGFILE" 2>&1
@@ -2135,16 +2135,16 @@ enable_services() {
       info_print "Enabling iwd and dhcpcd services..."
       arch-chroot /mnt systemctl enable iwd.service dhcpcd.service >> "$LOGFILE" 2>&1
       ;;
-    systemd-networkd)
-      info_print "Enabling systemd-networkd and resolved..."
-      arch-chroot /mnt systemctl enable systemd-networkd.service systemd-resolved.service >> "$LOGFILE" 2>&1
-      ;;
-    wpa_supplicant)
+    wpa_supplicant\ dhcpcd)
       info_print "Enabling wpa_supplicant and dhcpcd..."
       arch-chroot /mnt systemctl enable wpa_supplicant@.service dhcpcd.service >> "$LOGFILE" 2>&1
       ;;
+    dhcpcd)
+      info_print "Enabling dhcpcd..."
+      arch-chroot /mnt systemctl enable dhcpcd.service >> "$LOGFILE" 2>&1
+      ;;
     *)
-      warning_print "No known services for $NETWORK_PACKAGE – skipping service enablement."
+      warning_print "No known network service to enable for: $NETWORK_PKGS"
       ;;
   esac
 
@@ -2154,7 +2154,7 @@ enable_services() {
     arch-chroot /mnt systemctl enable systemd-zram-setup@zram0.service >> "$LOGFILE" 2>&1
   fi
 
-  # Snapper cleanup (optional, hvis ønsket)
+  # Snapper cleanup (optional)
   if [[ -d /mnt/.snapshots ]]; then
     info_print "Enabling snapper-cleanup.timer..."
     arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
