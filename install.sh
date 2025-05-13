@@ -1644,7 +1644,7 @@ setup_grub_bootloader() {
   local gfx_mode="$GRUB_GFXMODE"
   local theme_url="$GRUB_THEME_URL"
   local grub_cfg_file="/mnt/etc/default/grub"
-  local plymouth_theme="spinner"
+  local plymouth_theme="arch-charge"
 
   # Download and extract theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1676,7 +1676,7 @@ setup_grub_bootloader() {
     fi
   done
 
-  # Enable Plymouth splash (GRUB background image)
+  # Enable Plymouth splash (GRUB splash image)
   info_print "Enabling Plymouth splash in GRUB (background image)..."
   if grep -q "^GRUB_SPLASH=" "$grub_cfg_file"; then
     sed -i 's|^GRUB_SPLASH=.*|GRUB_SPLASH="/boot/plymouth/arch-logo.png"|' "$grub_cfg_file" >> "$LOGFILE" 2>&1
@@ -1684,7 +1684,7 @@ setup_grub_bootloader() {
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
   fi
 
-  # Set Plymouth theme
+  # Set Plymouth theme inside chroot
   info_print "Setting Plymouth theme to '$plymouth_theme'..."
   if arch-chroot /mnt plymouth-set-default-theme -R "$plymouth_theme" >> "$LOGFILE" 2>&1; then
     startup_ok "Plymouth theme set to '$plymouth_theme'"
@@ -1707,7 +1707,7 @@ setup_grub_bootloader() {
   # Clean up cryptodisk just in case
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # Install GRUB without luks modules
+  # Install GRUB without luks support
   info_print "Installing GRUB bootloader (no luks modules)..."
   if arch-chroot /mnt grub-install \
     --target=x86_64-efi \
@@ -1716,11 +1716,13 @@ setup_grub_bootloader() {
     --boot-directory=/boot \
     --removable \
     --no-nvram \
+    --disable-cryptodisk \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
-    warning_print "GRUB install failed, fallback loader will be used if available."
+    error_print "GRUB install failed – grubx64.efi will be missing!"
+    return 1
   fi
 
   # Ensure grubx64.efi exists
