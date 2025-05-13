@@ -1629,6 +1629,7 @@ EOF
   startup_ok "Kernel command line written to $cmdline_path and validated"
 }
 
+
 # ==================== Setup GRUB Bootloader ====================
 
 setup_grub_bootloader() {
@@ -1685,11 +1686,9 @@ setup_grub_bootloader() {
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
-  # Workaround for encrypted disk install block
-  info_print "Enabling GRUB cryptodisk workaround for install..."
-  if ! grep -q '^GRUB_ENABLE_CRYPTODISK=y' "$grub_cfg_file"; then
-    echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
-  fi
+  # Temporarily enable GRUB cryptodisk support to allow install
+  info_print "Temporarily enabling GRUB cryptodisk workaround..."
+  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # Save theme and resolution choices
   echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
@@ -1712,26 +1711,27 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  # Copy fallback to GRUB dir if grubx64.efi is missing
+  # Remove GRUB_ENABLE_CRYPTODISK again so it doesn't attempt luks-unlock
+  info_print "Disabling GRUB cryptodisk after install..."
+  sed -i '/^GRUB_ENABLE_CRYPTODISK=/d' "$grub_cfg_file"
+
+  # Regenerate grub.cfg WITHOUT cryptodisk support
+  info_print "Regenerating grub.cfg without cryptodisk..."
+  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+    startup_ok "grub.cfg generated successfully (no luks in GRUB)."
+  else
+    error_print "Failed to regenerate grub.cfg."
+    exit 1
+  fi
+
+  # Ensure grubx64.efi exists
   if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
     info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
     mkdir -p /mnt/efi/EFI/GRUB
     cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
   fi
 
-  # Generate grub.cfg
-  info_print "Generating grub.cfg..."
-  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-    startup_ok "grub.cfg generated successfully."
-  else
-    error_print "Failed to generate grub.cfg."
-    exit 1
-  fi
-
-# Remove GRUB luks unlock to let systemd handle it instead
-info_print "Removing GRUB luks-unlock (handled by UKI)..."
-sed -i '/^GRUB_ENABLE_CRYPTODISK/d' /mnt/etc/default/grub
-arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1
+  success_print "GRUB configured without cryptodisk. LUKS handled via UKI initramfs."
 }
 
 
