@@ -2176,11 +2176,9 @@ setup_grub_resign_timer() {
   local script_path="/mnt/usr/local/bin/resign-grub"
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
 
-  # Create necessary dirs
   mkdir -p "$timer_dir"
   mkdir -p "$(dirname "$script_path")"
 
-  # Write GRUB re-sign script
   cat <<EOF > "$script_path"
 #!/bin/bash
 set -euo pipefail
@@ -2188,7 +2186,7 @@ set -euo pipefail
 GRUB_EFI="$grub_efi"
 
 if [[ ! -f "\$GRUB_EFI" ]]; then
-  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI"
+  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI" >&2
   exit 1
 fi
 
@@ -2199,19 +2197,15 @@ EOF
 
   chmod +x "$script_path"
 
-  # Write systemd service
   cat <<EOF > "$timer_dir/grub-resign.service"
 [Unit]
 Description=Re-sign GRUB EFI binary for Secure Boot
-Wants=network-online.target
-After=network-online.target
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/resign-grub
 EOF
 
-  # Write systemd timer
   cat <<EOF > "$timer_dir/grub-resign.timer"
 [Unit]
 Description=Daily GRUB re-signing for Secure Boot
@@ -2225,7 +2219,6 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-  # Enable timer
   arch-chroot /mnt systemctl enable grub-resign.timer >> "$LOGFILE" 2>&1
 
   startup_ok "GRUB re-sign timer installed and enabled."
