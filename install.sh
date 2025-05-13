@@ -2308,24 +2308,24 @@ verify_boot_integrity() {
 setup_boot_targets() {
   section_header "Final Bootloader Targets (Fallback + UEFI Boot Entry)"
 
-  local uki_source="/mnt/efi/EFI/Linux/arch.efi"
   local fallback_dir="/mnt/efi/EFI/Boot"
   local fallback_target="$fallback_dir/BOOTX64.EFI"
+  local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
   local loader_path="\\EFI\\GRUB\\grubx64.efi"
   local disk partnum
 
-  # Step 1: Create fallback BOOTX64.EFI
-  if [[ -f "$uki_source" ]]; then
+  # Step 1: Create fallback BOOTX64.EFI pointing to GRUB
+  if [[ -f "$grub_efi" ]]; then
     mkdir -p "$fallback_dir"
-    cp "$uki_source" "$fallback_target"
+    cp "$grub_efi" "$fallback_target"
     if [[ -f "$fallback_target" ]]; then
-      startup_ok "Fallback BOOTX64.EFI created at $fallback_target"
+      startup_ok "Fallback BOOTX64.EFI now points to GRUB (GRUB menu will show at boot)"
     else
-      error_print "Failed to create fallback BOOTX64.EFI."
+      error_print "Failed to copy GRUB fallback to BOOTX64.EFI"
       exit 1
     fi
   else
-    error_print "Missing UKI source file: $uki_source"
+    error_print "grubx64.efi not found at $grub_efi"
     exit 1
   fi
 
@@ -2335,7 +2335,7 @@ setup_boot_targets() {
     return
   fi
 
-  # Step 3: Register UEFI boot entry (physical systems only)
+  # Step 3: Register UEFI boot entry (for physical systems)
   disk="/dev/$(lsblk -no pkname \"$ROOT_PARTITION\")"
   partnum=$(lsblk -no PARTNUM "$EFI_PARTITION")
 
