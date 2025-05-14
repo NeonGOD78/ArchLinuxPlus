@@ -1638,6 +1638,7 @@ setup_grub_bootloader() {
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
   local early_config="/mnt/boot/grub/user.cfg"
+  local chainloader_cfg="/mnt/boot/grub/custom.cfg"
 
   # Download and extract GRUB theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1667,7 +1668,7 @@ setup_grub_bootloader() {
 
   # Add 'quiet splash'
   if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
-    sed -i 's|^GRUB_CMDLINE_LINUX=\"\([^"]*\)\"|GRUB_CMDLINE_LINUX=\"quiet splash \1\"|' "$grub_cfg_file"
+    sed -i 's|^GRUB_CMDLINE_LINUX=\"\([^\"]*\)\"|GRUB_CMDLINE_LINUX=\"quiet splash \1\"|' "$grub_cfg_file"
   else
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
@@ -1728,6 +1729,26 @@ setup_grub_bootloader() {
   else
     error_print "Failed to generate grub.cfg!"
     exit 1
+  fi
+
+  # Add static chainloader entry for UKI using FS UUID
+  info_print "Creating static chainloader GRUB entry for UKI..."
+
+  local esp_uuid
+  esp_uuid=$(blkid -s UUID -o value "$EFI_PARTITION")
+
+  if [[ -n "$esp_uuid" ]]; then
+    cat <<EOF > "$chainloader_cfg"
+menuentry "Arch Linux (UKI fallback)" {
+    insmod fat
+    insmod chain
+    search --no-floppy --set=root --fs-uuid $esp_uuid
+    chainloader /EFI/Linux/arch.efi
+}
+EOF
+    startup_ok "GRUB custom.cfg chainloader entry added with fs-uuid: $esp_uuid"
+  else
+    warning_print "Could not determine FS UUID for $EFI_PARTITION – custom.cfg not written."
   fi
 
   startup_ok "GRUB setup complete. Using UKI for LUKS unlock."
