@@ -1732,36 +1732,31 @@ setup_grub_bootloader() {
   # ------------------------------
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # ------------------------------
-  # Install GRUB (no luks modules)
-  # ------------------------------
-  info_print "Installing GRUB bootloader (no luks modules)..."
-  if arch-chroot /mnt grub-install \
-    --target=x86_64-efi \
-    --efi-directory=/efi \
-    --bootloader-id=GRUB \
-    --boot-directory=/boot \
-    --removable \
-    --no-nvram \
-    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
-    --recheck >> "$LOGFILE" 2>&1; then
-    startup_ok "GRUB bootloader installed successfully."
-  else
-    warning_print "GRUB install failed, attempting manual fallback copy..."
+# ------------------------------
+# Install GRUB bootloader (no luks modules)
+# ------------------------------
+info_print "Installing GRUB bootloader (no luks modules)..."
+if arch-chroot /mnt grub-install \
+  --target=x86_64-efi \
+  --efi-directory=/efi \
+  --bootloader-id=GRUB \
+  --boot-directory=/boot \
+  --no-nvram \
+  --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
+  --recheck >> "$LOGFILE" 2>&1; then
+  startup_ok "GRUB bootloader installed successfully."
 
-    # Forsøg at finde grubx64.efi og lave fallback manuelt
-    if [[ -f /mnt/boot/efi/EFI/GRUB/grubx64.efi ]]; then
-      mkdir -p /mnt/efi/EFI/Boot
-      cp /mnt/boot/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-      startup_ok "Manual fallback BOOTX64.EFI created from /boot/efi."
-    elif [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
-      mkdir -p /mnt/efi/EFI/Boot
-      cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-      startup_ok "Manual fallback BOOTX64.EFI created from /efi/EFI/GRUB."
-    else
-      error_print "Fallback failed: grubx64.efi not found anywhere!"
-    fi
+  # Fallback: Copy grubx64.efi to BOOTX64.EFI
+  if [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
+    mkdir -p /mnt/efi/EFI/Boot
+    cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+    startup_ok "Copied GRUB fallback BOOTX64.EFI manually."
+  else
+    warning_print "grubx64.efi not found after install. No fallback created."
   fi
+else
+  error_print "GRUB install failed. Cannot proceed."
+fi
 
   # ------------------------------
   # Generate grub.cfg
