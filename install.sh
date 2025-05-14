@@ -1648,20 +1648,34 @@ setup_grub_bootloader() {
     warning_print "Failed to download GRUB theme. Skipping theme installation."
   fi
 
-  # Configure /etc/default/grub
+  # Configure grub
   info_print "Configuring /etc/default/grub..."
-  {
-    echo "GRUB_GFXMODE=$gfx_mode"
-    echo "GRUB_GFXPAYLOAD_LINUX=keep"
-    echo "GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\""
-    echo "GRUB_TERMINAL_OUTPUT=gfxterm"
-    echo "GRUB_TIMEOUT=5"
-    echo "GRUB_TIMEOUT_STYLE=menu"
-    echo 'GRUB_CMDLINE_LINUX="quiet splash"'
-    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"'
-    echo 'GRUB_ENABLE_CRYPTODISK=y'
-    echo 'GRUB_DISABLE_LINUX_UUID=true'
-  } >> "$grub_cfg_file"
+  sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
+  sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
+  sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"|" "$grub_cfg_file"
+  sed -i "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|" "$grub_cfg_file"
+  sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=5|" "$grub_cfg_file"
+  sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
+
+  grep -q "^GRUB_GFXMODE=" "$grub_cfg_file" || echo "GRUB_GFXMODE=$gfx_mode" >> "$grub_cfg_file"
+  grep -q "^GRUB_GFXPAYLOAD_LINUX=" "$grub_cfg_file" || echo "GRUB_GFXPAYLOAD_LINUX=keep" >> "$grub_cfg_file"
+  grep -q "^GRUB_THEME=" "$grub_cfg_file" || echo "GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"" >> "$grub_cfg_file"
+  grep -q "^GRUB_TERMINAL_OUTPUT=" "$grub_cfg_file" || echo "GRUB_TERMINAL_OUTPUT=gfxterm" >> "$grub_cfg_file"
+  grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file" || echo "GRUB_TIMEOUT=5" >> "$grub_cfg_file"
+  grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file" || echo "GRUB_TIMEOUT_STYLE=menu" >> "$grub_cfg_file"
+  grep -q "^GRUB_DISABLE_LINUX_UUID=" "$grub_cfg_file" || echo "GRUB_DISABLE_LINUX_UUID=true" >> "$grub_cfg_file"
+
+  # Add 'quiet splash'
+  if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
+    sed -i 's|^GRUB_CMDLINE_LINUX=\"\([^\"]*\)\"|GRUB_CMDLINE_LINUX=\"quiet splash \1\"|' "$grub_cfg_file"
+  else
+    echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
+  fi
+
+  echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
+
+  # Temporarily enable cryptodisk for install
+  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # Install GRUB bootloader
   info_print "Installing GRUB bootloader..."
@@ -1684,12 +1698,12 @@ setup_grub_bootloader() {
   # Remove cryptodisk again
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # Sign grubx64.efi
-  info_print "Signing grubx64.efi with Secure Boot keys..."
+  # Sign grubx64.efi (inside chroot)
   if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
-    --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1; then
+    --output /efi/EFI/GRUB/grubx64.efi \
+    /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
     startup_ok "grubx64.efi signed."
   else
     warning_print "Failed to sign grubx64.efi"
@@ -1698,6 +1712,7 @@ setup_grub_bootloader() {
   # Copy to fallback
   mkdir -p /mnt/efi/EFI/Boot
   cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+
   if [[ -f "$fallback_efi" ]]; then
     startup_ok "Fallback BOOTX64.EFI updated."
   else
@@ -1715,6 +1730,7 @@ setup_grub_bootloader() {
 
   startup_ok "GRUB setup complete. Using UKI for LUKS unlock."
 }
+
 
 # ==================== Setup GRUB pacman hook ====================
 
