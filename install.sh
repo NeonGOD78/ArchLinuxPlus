@@ -1723,12 +1723,13 @@ setup_grub_bootloader() {
   echo 'add_dracutmodules+=" plymouth "' > /mnt/etc/dracut.conf.d/plymouth.conf
 
   # ------------------------------
-  # Clean up cryptodisk
+  # Temporarily enable GRUB_ENABLE_CRYPTODISK to satisfy grub-install
   # ------------------------------
-  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
+  info_print "Temporarily enabling GRUB_ENABLE_CRYPTODISK to satisfy grub-install..."
+  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # ------------------------------
-  # Install GRUB bootloader (no luks modules)
+  # Install GRUB bootloader
   # ------------------------------
   info_print "Installing GRUB bootloader (no luks modules)..."
   local grub_nvram_flag
@@ -1739,7 +1740,6 @@ setup_grub_bootloader() {
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     $grub_nvram_flag \
-    --no-bootsector \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
@@ -1757,7 +1757,13 @@ setup_grub_bootloader() {
   fi
 
   # ------------------------------
-  # Generate grub.cfg
+  # Remove cryptodisk setting again
+  # ------------------------------
+  info_print "Removing GRUB_ENABLE_CRYPTODISK again to avoid conflict with UKI..."
+  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
+
+  # ------------------------------
+  # Generate grub.cfg (after cryptodisk removal)
   # ------------------------------
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
