@@ -1668,6 +1668,8 @@ setup_grub_bootloader() {
     ["GRUB_GFXPAYLOAD_LINUX"]="keep"
     ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
     ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
+    ["GRUB_TIMEOUT"]="5"
+    ["GRUB_TIMEOUT_STYLE"]="menu"
   )
 
   for key in "${!grub_vars[@]}"; do
@@ -1732,31 +1734,34 @@ setup_grub_bootloader() {
   # ------------------------------
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-# ------------------------------
-# Install GRUB bootloader (no luks modules)
-# ------------------------------
-info_print "Installing GRUB bootloader (no luks modules)..."
-if arch-chroot /mnt grub-install \
-  --target=x86_64-efi \
-  --efi-directory=/efi \
-  --bootloader-id=GRUB \
-  --boot-directory=/boot \
-  --no-nvram \
-  --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
-  --recheck >> "$LOGFILE" 2>&1; then
-  startup_ok "GRUB bootloader installed successfully."
+  # ------------------------------
+  # Install GRUB bootloader (dynamic nvram flag)
+  # ------------------------------
+  info_print "Installing GRUB bootloader (no luks modules)..."
+  local grub_nvram_flag
+  grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
-  # Fallback: Copy grubx64.efi to BOOTX64.EFI
-  if [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
-    mkdir -p /mnt/efi/EFI/Boot
-    cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-    startup_ok "Copied GRUB fallback BOOTX64.EFI manually."
+  if arch-chroot /mnt grub-install \
+    --target=x86_64-efi \
+    --efi-directory=/efi \
+    --bootloader-id=GRUB \
+    --boot-directory=/boot \
+    $grub_nvram_flag \
+    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
+    --recheck >> "$LOGFILE" 2>&1; then
+    startup_ok "GRUB bootloader installed successfully."
+
+    # Fallback: Copy grubx64.efi to BOOTX64.EFI
+    if [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
+      mkdir -p /mnt/efi/EFI/Boot
+      cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+      startup_ok "Copied GRUB fallback BOOTX64.EFI manually."
+    else
+      warning_print "grubx64.efi not found after install. No fallback created."
+    fi
   else
-    warning_print "grubx64.efi not found after install. No fallback created."
+    error_print "GRUB install failed. Cannot proceed."
   fi
-else
-  error_print "GRUB install failed. Cannot proceed."
-fi
 
   # ------------------------------
   # Generate grub.cfg
