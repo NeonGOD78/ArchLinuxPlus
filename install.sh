@@ -1645,6 +1645,10 @@ setup_grub_bootloader() {
   local grub_cfg_file="/mnt/etc/default/grub"
   local plymouth_theme_url="https://github.com/adi1090x/plymouth-themes/archive/refs/heads/master.tar.gz"
   local plymouth_theme_dir="/mnt/usr/share/plymouth/themes/arch-charge"
+  local key="/mnt/etc/secureboot/keys/db.key"
+  local cert="/mnt/etc/secureboot/keys/db.crt"
+  local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
+  local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
   # ------------------------------
   # Download and extract GRUB theme
@@ -1694,44 +1698,14 @@ setup_grub_bootloader() {
   fi
 
   # ------------------------------
-  # Save user choices
+  # Temporarily enable cryptodisk
   # ------------------------------
-  echo "grub_theme='$theme_dir'" >> /mnt/etc/archinstaller.conf
-  echo "grub_resolution='$gfx_mode'" >> /mnt/etc/archinstaller.conf
-
-  # ------------------------------
-  # Plymouth theme setup (UKI)
-  # ------------------------------
-  info_print "Installing Plymouth theme 'arch-charge'..."
-  mkdir -p "$plymouth_theme_dir"
-  if curl -sSL "$plymouth_theme_url" -o /tmp/plymouth.tar.gz >> "$LOGFILE" 2>&1; then
-    bsdtar -xf /tmp/plymouth.tar.gz -C /tmp >> "$LOGFILE" 2>&1
-    cp -r /tmp/plymouth-themes-master/arch-charge/* "$plymouth_theme_dir" >> "$LOGFILE" 2>&1
-    echo "[OK] Plymouth theme installed to $plymouth_theme_dir" >> "$LOGFILE"
-  else
-    warning_print "Failed to download Plymouth theme. Fallback will be used."
-  fi
-
-  # ------------------------------
-  # Set Plymouth theme
-  # ------------------------------
-  echo 'Theme=arch-charge' > /mnt/etc/plymouth/plymouthd.conf
-
-  # ------------------------------
-  # Ensure dracut includes plymouth
-  # ------------------------------
-  echo 'add_dracutmodules+=" plymouth "' > /mnt/etc/dracut.conf.d/plymouth.conf
-
-  # ------------------------------
-  # Temporarily enable GRUB_ENABLE_CRYPTODISK to satisfy grub-install
-  # ------------------------------
-  info_print "Temporarily enabling GRUB_ENABLE_CRYPTODISK to satisfy grub-install..."
   echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # ------------------------------
   # Install GRUB bootloader
   # ------------------------------
-  info_print "Installing GRUB bootloader (no luks modules)..."
+  info_print "Installing GRUB bootloader..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
@@ -1743,37 +1717,44 @@ setup_grub_bootloader() {
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
-
-    # Fallback: Copy grubx64.efi to BOOTX64.EFI
-    if [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
-      mkdir -p /mnt/efi/EFI/Boot
-      cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-      startup_ok "Copied GRUB fallback BOOTX64.EFI manually."
-    else
-      warning_print "grubx64.efi not found after install. No fallback created."
-    fi
   else
-    error_print "GRUB install failed. Cannot proceed."
-  fi
-
-  # ------------------------------
-  # Remove cryptodisk setting again
-  # ------------------------------
-  info_print "Removing GRUB_ENABLE_CRYPTODISK again to avoid conflict with UKI..."
-  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
-
-  # ------------------------------
-  # Generate grub.cfg (after cryptodisk removal)
-  # ------------------------------
-  info_print "Generating grub.cfg..."
-  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-    startup_ok "grub.cfg generated successfully."
-  else
-    error_print "Failed to generate grub.cfg."
+    error_print "GRUB install failed!"
     exit 1
   fi
 
-  startup_ok "GRUB configured. LUKS will be unlocked via UKI initramfs only."
+  # ------------------------------
+  # Remove cryptodisk again
+  # ------------------------------
+  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
+
+  # ------------------------------
+  # Sign GRUB EFI
+  # ------------------------------
+  if [[ -f "$grub_efi" ]]; then
+    info_print "Signing grubx64.efi with Secure Boot keys..."
+    sbsign --key "$key" --cert "$cert" --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1
+    startup_ok "grubx64.efi signed."
+
+    info_print "Copying signed grubx64.efi to fallback BOOTX64.EFI..."
+    mkdir -p "$(dirname "$fallback_efi")"
+    cp "$grub_efi" "$fallback_efi"
+    startup_ok "Fallback BOOTX64.EFI updated."
+  else
+    warning_print "grubx64.efi not found — could not sign or create fallback."
+  fi
+
+  # ------------------------------
+  # Generate grub.cfg
+  # ------------------------------
+  info_print "Generating grub.cfg..."
+  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+    startup_ok "grub.cfg generated."
+  else
+    error_print "Failed to generate grub.cfg!"
+    exit 1
+  fi
+
+  startup_ok "GRUB setup complete. Using UKI for LUKS unlock."
 }
 
 # ==================== Setup GRUB pacman hook ====================
