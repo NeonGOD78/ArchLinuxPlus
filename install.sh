@@ -1122,7 +1122,7 @@ mount_subvolumes() {
 
   # Step 1: Mount root
   if mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt; then
-    startup_ok "Mounted /mnt (root @)"
+    startup_ok "Mounted @ as /"
   else
     startup_fail "Failed to mount /mnt (root @)"
     exit 1
@@ -1133,7 +1133,7 @@ mount_subvolumes() {
 
   # Step 3: Mount initial subvolumes
   if mount "$EFI_PARTITION" /mnt/efi; then
-    startup_ok "Mounted EFI partition to /mnt/efi"
+    startup_ok "Mounted EFI partition to /efi"
   else
     startup_fail "Failed to mount EFI partition"
     exit 1
@@ -1141,14 +1141,14 @@ mount_subvolumes() {
 
   if [[ "$SEPARATE_HOME" == true ]]; then
     if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home; then
-      startup_ok "Mounted separate home partition to /mnt/home"
+      startup_ok "Mounted separate home partition to /home"
     else
       startup_fail "Failed to mount separate home partition"
       exit 1
     fi
   else
     if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home; then
-      startup_ok "Mounted home subvolume from root to /mnt/home"
+      startup_ok "Mounted home subvolume from root to /home"
     else
       startup_fail "Failed to mount home subvolume"
       exit 1
