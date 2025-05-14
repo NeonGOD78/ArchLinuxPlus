@@ -1666,15 +1666,18 @@ setup_grub_bootloader() {
 
   # Add 'quiet splash'
   if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
-    sed -i 's|^GRUB_CMDLINE_LINUX=\"\([^\"]*\)\"|GRUB_CMDLINE_LINUX=\"quiet splash \1\"|' "$grub_cfg_file"
+    sed -i 's|^GRUB_CMDLINE_LINUX=\"\([^"]*\)\"|GRUB_CMDLINE_LINUX=\"quiet splash \1\"|' "$grub_cfg_file"
   else
     echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
   fi
 
   echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-  # Install GRUB bootloader without luks modules
-  info_print "Installing GRUB bootloader without luks modules..."
+  # Temporarily enable cryptodisk for GRUB install to succeed
+  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
+
+  # Install GRUB bootloader
+  info_print "Installing GRUB bootloader with cryptodisk modules..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
@@ -1683,7 +1686,7 @@ setup_grub_bootloader() {
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     $grub_nvram_flag \
-    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
+    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file luks cryptodisk gcry_sha256 gcry_rijndael" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
@@ -1691,7 +1694,13 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  # Sign grubx64.efi (inside chroot)
+  # Remove cryptodisk line again
+  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
+
+  # Prevent GRUB from generating luks unlock prompts in grub.cfg
+  echo "set disable_cryptodisk=true" > /mnt/boot/grub/user.cfg
+
+  # Sign grubx64.efi
   if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
@@ -1705,6 +1714,7 @@ setup_grub_bootloader() {
   # Copy to fallback
   mkdir -p /mnt/efi/EFI/Boot
   cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+
   if [[ -f "$fallback_efi" ]]; then
     startup_ok "Fallback BOOTX64.EFI updated."
   else
@@ -1722,7 +1732,6 @@ setup_grub_bootloader() {
 
   startup_ok "GRUB setup complete. Using UKI for LUKS unlock."
 }
-
 
 # ==================== Setup GRUB pacman hook ====================
 
