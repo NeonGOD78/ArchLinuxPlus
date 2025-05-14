@@ -1803,13 +1803,7 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
-  # Clean up potential existing .snapshots state
-  info_print "Cleaning up old .snapshots state..."
-  arch-chroot /mnt umount /.snapshots &>/dev/null || true
-  arch-chroot /mnt btrfs subvolume delete /.snapshots &>> "$LOGFILE" || true
-  arch-chroot /mnt rm -rf /.snapshots
-
-  # Create Snapper config (also recreates .snapshots subvolume)
+  # Create Snapper config (creates .snapshots subvolume automatically)
   info_print "Creating snapper config for root..."
   arch-chroot /mnt snapper --no-dbus --config root create-config /
   startup_ok "Snapper configuration for root created."
@@ -1838,26 +1832,16 @@ setup_snapper() {
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
 
-  # Enable grub-btrfsd (modern replacement for .path)
-  info_print "Enabling grub-btrfsd.service..."
-  arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1
-  startup_ok "grub-btrfsd service enabled."
-}
-
-# ==================== grub-btrfs integration ====================
+  # Create grub-btrfs config
   info_print "Creating grub-btrfs config..."
-  mkdir -p /mnt/etc/default
+  mkdir -p /mnt/etc/default/grub-btrfs
   cat <<EOF > /mnt/etc/default/grub-btrfs/config
-  GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"
-  GRUB_BTRFS_DISABLE_SNAPPER=true
-  EOF
+GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"
+GRUB_BTRFS_DISABLE_SNAPPER=true
+EOF
   startup_ok "grub-btrfs config created."
 
-  info_print "Running initial grub-btrfs-generator..."
-  arch-chroot /mnt grub-btrfs-generator -o /boot/grub/btrfs.cfg >> "$LOGFILE" 2>&1 || {
-    warning_print "Initial grub-btrfs generation failed. Will retry on next snapshot."
-  }
-
+  # Enable grub-btrfsd
   info_print "Enabling grub-btrfsd.service for live updates..."
   arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1 || {
     warning_print "Failed to enable grub-btrfsd.service."
