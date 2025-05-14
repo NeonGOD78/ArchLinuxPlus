@@ -2270,8 +2270,8 @@ verify_boot_integrity() {
   if [[ -f "$grub_efi" ]]; then
     echo "[OK] grubx64.efi found." >> "$LOGFILE"
 
-    # Check signature
-    if sbverify --cert /mnt/etc/secureboot/keys/db.crt "$grub_efi" >> "$LOGFILE" 2>&1; then
+    # Check signature inside chroot
+    if arch-chroot /mnt sbverify --cert /etc/secureboot/keys/db.crt /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
       echo "[OK] grubx64.efi is signed and valid." >> "$LOGFILE"
     else
       error_print "grubx64.efi is not signed correctly!"
