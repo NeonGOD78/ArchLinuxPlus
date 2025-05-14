@@ -1637,6 +1637,7 @@ setup_grub_bootloader() {
   local grub_cfg_file="/mnt/etc/default/grub"
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
+  local early_config="/mnt/boot/grub/user.cfg"
 
   # Download and extract GRUB theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1673,11 +1674,18 @@ setup_grub_bootloader() {
 
   echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-  # Temporarily enable cryptodisk for GRUB install to succeed
+  # Create GRUB user config to disable cryptodisk
+  info_print "Creating GRUB early user config to disable cryptodisk..."
+  mkdir -p "$(dirname "$early_config")"
+  echo "set disable_cryptodisk=true" > "$early_config"
+  echo "GRUB_DISABLE_CRYPTODISK=y" >> "$grub_cfg_file"
+  startup_ok "Early GRUB config created to disable cryptodisk."
+
+  # Enable cryptodisk for install step only
   echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # Install GRUB bootloader
-  info_print "Installing GRUB bootloader with cryptodisk modules..."
+  info_print "Installing GRUB bootloader without luks modules..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
@@ -1686,7 +1694,7 @@ setup_grub_bootloader() {
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     $grub_nvram_flag \
-    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file luks cryptodisk gcry_sha256 gcry_rijndael" \
+    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
@@ -1694,13 +1702,10 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  # Remove cryptodisk line again
+  # Remove cryptodisk again
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
-  # Prevent GRUB from generating luks unlock prompts in grub.cfg
-  echo "set disable_cryptodisk=true" > /mnt/boot/grub/user.cfg
-
-  # Sign grubx64.efi
+  # Sign grubx64.efi (inside chroot)
   if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
@@ -1714,12 +1719,7 @@ setup_grub_bootloader() {
   # Copy to fallback
   mkdir -p /mnt/efi/EFI/Boot
   cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-
-  if [[ -f "$fallback_efi" ]]; then
-    startup_ok "Fallback BOOTX64.EFI updated."
-  else
-    warning_print "Fallback BOOTX64.EFI was not created."
-  fi
+  [[ -f "$fallback_efi" ]] && startup_ok "Fallback BOOTX64.EFI updated." || warning_print "Fallback BOOTX64.EFI was not created."
 
   # Generate grub.cfg
   info_print "Generating grub.cfg..."
@@ -1732,6 +1732,7 @@ setup_grub_bootloader() {
 
   startup_ok "GRUB setup complete. Using UKI for LUKS unlock."
 }
+
 
 # ==================== Setup GRUB pacman hook ====================
 
