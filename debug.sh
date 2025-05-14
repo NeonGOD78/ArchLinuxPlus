@@ -4,14 +4,14 @@ set -euo pipefail
 
 echo "Opening LUKS volumes..."
 
-cryptsetup open /dev/nvme1n1p3 cryptroot
-cryptsetup open /dev/nvme1n1p4 crypthome
+cryptsetup open /dev/nvme0n1p2 cryptroot
+cryptsetup open /dev/nvme0n1p3 crypthome
 
 echo "Mounting root (@) subvolume..."
 mount -o noatime,compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
 
 echo "Mounting EFI partition..."
-mount /dev/nvme1n1p1 /mnt/efi
+mount /dev/nvme0n1p1 /mnt/efi
 
 echo "Mounting separate /home..."
 mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home
