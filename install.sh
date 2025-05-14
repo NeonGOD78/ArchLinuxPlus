@@ -1638,7 +1638,7 @@ setup_grub_bootloader() {
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
   local early_config="/mnt/boot/grub/user.cfg"
-  local chainloader_cfg="/mnt/boot/grub/custom.cfg"
+  local custom_cfg="/mnt/boot/grub/custom.cfg"
 
   # Download and extract GRUB theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1686,7 +1686,7 @@ setup_grub_bootloader() {
   echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # Install GRUB bootloader
-  info_print "Installing GRUB bootloader without luks modules..."
+  info_print "Installing GRUB bootloader with cryptodisk enabled (temporary)..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
@@ -1706,6 +1706,9 @@ setup_grub_bootloader() {
   # Remove cryptodisk again
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
+  # Remove luks-related grub modules to prevent luks-unlock
+  rm -f /mnt/boot/grub/*luks*.mod /mnt/boot/grub/cryptodisk.mod
+
   # Sign grubx64.efi (inside chroot)
   if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
@@ -1722,6 +1725,19 @@ setup_grub_bootloader() {
   cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
   [[ -f "$fallback_efi" ]] && startup_ok "Fallback BOOTX64.EFI updated." || warning_print "Fallback BOOTX64.EFI was not created."
 
+  # Write custom.cfg with chainloader entry
+  info_print "Adding custom GRUB entry to chainload signed UKI..."
+  local efi_uuid=$(blkid -s UUID -o value "$EFI_PARTITION")
+  cat <<EOF > "$custom_cfg"
+menuentry "Arch Linux (UKI chainload)" {
+  insmod fat
+  insmod chain
+  search --no-floppy --set=root --fs-uuid $efi_uuid
+  chainloader /EFI/Linux/arch.efi
+}
+EOF
+  startup_ok "Custom GRUB chainloader entry created."
+
   # Generate grub.cfg
   info_print "Generating grub.cfg..."
   if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
@@ -1731,27 +1747,7 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  # Add static chainloader entry for UKI using FS UUID
-  info_print "Creating static chainloader GRUB entry for UKI..."
-
-  local esp_uuid
-  esp_uuid=$(blkid -s UUID -o value "$EFI_PARTITION")
-
-  if [[ -n "$esp_uuid" ]]; then
-    cat <<EOF > "$chainloader_cfg"
-menuentry "Arch Linux (UKI fallback)" {
-    insmod fat
-    insmod chain
-    search --no-floppy --set=root --fs-uuid $esp_uuid
-    chainloader /EFI/Linux/arch.efi
-}
-EOF
-    startup_ok "GRUB custom.cfg chainloader entry added with fs-uuid: $esp_uuid"
-  else
-    warning_print "Could not determine FS UUID for $EFI_PARTITION – custom.cfg not written."
-  fi
-
-  startup_ok "GRUB setup complete. Using UKI for LUKS unlock."
+  startup_ok "GRUB setup complete. Using UKI for LUKS unlock via chainloader."
 }
 
 
