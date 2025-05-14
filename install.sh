@@ -1662,25 +1662,19 @@ setup_grub_bootloader() {
   # Configure /etc/default/grub
   # ------------------------------
   info_print "Configuring /etc/default/grub..."
-  declare -A grub_vars=(
-    ["GRUB_GFXMODE"]="$gfx_mode"
-    ["GRUB_GFXPAYLOAD_LINUX"]="keep"
-    ["GRUB_THEME"]='"/boot/grub/themes/'"$theme_dir"'/theme.txt"'
-    ["GRUB_TERMINAL_OUTPUT"]="gfxterm"
-    ["GRUB_TIMEOUT"]="5"
-    ["GRUB_TIMEOUT_STYLE"]="menu"
-  )
+  sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
+  sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
+  sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"|" "$grub_cfg_file"
+  sed -i "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|" "$grub_cfg_file"
+  sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=5|" "$grub_cfg_file"
+  sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
 
-  for key in "${!grub_vars[@]}"; do
-    local value="${grub_vars[$key]}"
-    if grep -q "^$key=" "$grub_cfg_file"; then
-      sed -i "s|^$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
-    elif grep -q "^#\\s*$key=" "$grub_cfg_file"; then
-      sed -i "s|^#\\s*$key=.*|$key=$value|" "$grub_cfg_file" >> "$LOGFILE" 2>&1
-    else
-      echo "$key=$value" >> "$grub_cfg_file"
-    fi
-  done
+  grep -q "^GRUB_GFXMODE=" "$grub_cfg_file" || echo "GRUB_GFXMODE=$gfx_mode" >> "$grub_cfg_file"
+  grep -q "^GRUB_GFXPAYLOAD_LINUX=" "$grub_cfg_file" || echo "GRUB_GFXPAYLOAD_LINUX=keep" >> "$grub_cfg_file"
+  grep -q "^GRUB_THEME=" "$grub_cfg_file" || echo "GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"" >> "$grub_cfg_file"
+  grep -q "^GRUB_TERMINAL_OUTPUT=" "$grub_cfg_file" || echo "GRUB_TERMINAL_OUTPUT=gfxterm" >> "$grub_cfg_file"
+  grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file" || echo "GRUB_TIMEOUT=5" >> "$grub_cfg_file"
+  grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file" || echo "GRUB_TIMEOUT_STYLE=menu" >> "$grub_cfg_file"
 
   # ------------------------------
   # Plymouth splash i GRUB
@@ -1745,6 +1739,7 @@ setup_grub_bootloader() {
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     $grub_nvram_flag \
+    --no-bootsector \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
