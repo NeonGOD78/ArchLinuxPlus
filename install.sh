@@ -1637,6 +1637,11 @@ EOF
 
 # ==================== Setup GRUB Bootloader ====================
 
+
+✅ Klar til direkte copy/paste
+bash
+Kopiér
+Rediger
 setup_grub_bootloader() {
   section_header "GRUB Bootloader Installation and Theme Setup"
 
@@ -1735,7 +1740,7 @@ setup_grub_bootloader() {
   sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
 
   # ------------------------------
-  # Install GRUB bootloader (dynamic nvram flag)
+  # Install GRUB bootloader (no luks modules)
   # ------------------------------
   info_print "Installing GRUB bootloader (no luks modules)..."
   local grub_nvram_flag
@@ -1745,7 +1750,6 @@ setup_grub_bootloader() {
     --target=x86_64-efi \
     --efi-directory=/efi \
     --bootloader-id=GRUB \
-    --boot-directory=/boot \
     $grub_nvram_flag \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
     --recheck >> "$LOGFILE" 2>&1; then
@@ -1774,7 +1778,7 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  success_print "GRUB configured. LUKS will be unlocked via UKI initramfs only."
+  startup_ok "GRUB configured. LUKS will be unlocked via UKI initramfs only."
 }
 
 # ==================== Setup GRUB pacman hook ====================
