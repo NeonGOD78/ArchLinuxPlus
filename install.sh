@@ -1747,16 +1747,20 @@ setup_grub_bootloader() {
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
-    warning_print "GRUB install failed, fallback loader will be used if available."
-  fi
+    warning_print "GRUB install failed, attempting manual fallback copy..."
 
-  # ------------------------------
-  # Fallback grubx64.efi (if missing)
-  # ------------------------------
-  if [[ ! -f /mnt/efi/EFI/GRUB/grubx64.efi && -f /mnt/efi/EFI/Boot/BOOTX64.EFI ]]; then
-    info_print "Copying fallback BOOTX64.EFI to GRUB/grubx64.efi..."
-    mkdir -p /mnt/efi/EFI/GRUB
-    cp /mnt/efi/EFI/Boot/BOOTX64.EFI /mnt/efi/EFI/GRUB/grubx64.efi
+    # Forsøg at finde grubx64.efi og lave fallback manuelt
+    if [[ -f /mnt/boot/efi/EFI/GRUB/grubx64.efi ]]; then
+      mkdir -p /mnt/efi/EFI/Boot
+      cp /mnt/boot/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+      startup_ok "Manual fallback BOOTX64.EFI created from /boot/efi."
+    elif [[ -f /mnt/efi/EFI/GRUB/grubx64.efi ]]; then
+      mkdir -p /mnt/efi/EFI/Boot
+      cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+      startup_ok "Manual fallback BOOTX64.EFI created from /efi/EFI/GRUB."
+    else
+      error_print "Fallback failed: grubx64.efi not found anywhere!"
+    fi
   fi
 
   # ------------------------------
