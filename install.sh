@@ -1129,7 +1129,7 @@ mount_subvolumes() {
   fi
 
   # Step 2: Create early directories
-  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home /mnt/.snapshots
+  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home
 
   # Step 3: Mount initial subvolumes
   if mount "$EFI_PARTITION" /mnt/efi; then
@@ -1207,14 +1207,7 @@ mount_subvolumes() {
     exit 1
   fi
 
-  if mount -o noatime,compress=zstd,subvol=@snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
-    startup_ok "Mounted /.snapshots subvolume"
-  else
-    startup_fail "Failed to mount /.snapshots"
-    exit 1
-  fi
-
-  startup_ok "All filesystems mounted successfully."
+   startup_ok "All filesystems mounted successfully."
 }
 
 # ================== Setup NoCOW Attributes ==================
