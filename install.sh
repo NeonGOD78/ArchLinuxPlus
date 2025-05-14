@@ -1637,11 +1637,6 @@ EOF
 
 # ==================== Setup GRUB Bootloader ====================
 
-
-✅ Klar til direkte copy/paste
-bash
-Kopiér
-Rediger
 setup_grub_bootloader() {
   section_header "GRUB Bootloader Installation and Theme Setup"
 
