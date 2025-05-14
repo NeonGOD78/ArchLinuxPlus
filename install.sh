@@ -1817,7 +1817,7 @@ setup_snapper() {
   arch-chroot /mnt btrfs subvolume delete /.snapshots &>> "$LOGFILE" || true
   arch-chroot /mnt rm -rf /.snapshots
 
-  # Create Snapper config
+  # Create Snapper config (also recreates .snapshots subvolume)
   info_print "Creating snapper config for root..."
   arch-chroot /mnt snapper --no-dbus --config root create-config /
   startup_ok "Snapper configuration for root created."
@@ -1829,13 +1829,11 @@ setup_snapper() {
   arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
   startup_ok "Snapper config adjusted."
 
-  # Recreate and mount .snapshots
-  info_print "Recreating .snapshots directory and remounting..."
-  arch-chroot /mnt mkdir /.snapshots
-  arch-chroot /mnt mount -a
+  # Set permissions on .snapshots
+  info_print "Setting permissions on .snapshots..."
   arch-chroot /mnt chmod 750 /.snapshots
   arch-chroot /mnt chown :wheel /.snapshots
-  startup_ok ".snapshots mounted and permission set."
+  startup_ok ".snapshots permission set."
 
   # Create initial snapshot
   info_print "Creating initial snapshot..."
@@ -1848,7 +1846,7 @@ setup_snapper() {
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
 
-  # Enable grub-btrfsd (modern replacement for grub-btrfs.path)
+  # Enable grub-btrfsd (modern replacement for .path)
   info_print "Enabling grub-btrfsd.service..."
   arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1
   startup_ok "grub-btrfsd service enabled."
