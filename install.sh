@@ -1848,13 +1848,19 @@ setup_snapper() {
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
 
-  # ==================== grub-btrfs integration ====================
+  # Enable grub-btrfsd (modern replacement for grub-btrfs.path)
+  info_print "Enabling grub-btrfsd.service..."
+  arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1
+  startup_ok "grub-btrfsd service enabled."
+}
+
+# ==================== grub-btrfs integration ====================
   info_print "Creating grub-btrfs config..."
   mkdir -p /mnt/etc/default
   cat <<EOF > /mnt/etc/default/grub-btrfs/config
-GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"
-GRUB_BTRFS_DISABLE_SNAPPER=true
-EOF
+  GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"
+  GRUB_BTRFS_DISABLE_SNAPPER=true
+  EOF
   startup_ok "grub-btrfs config created."
 
   info_print "Running initial grub-btrfs-generator..."
