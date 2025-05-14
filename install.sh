@@ -1075,7 +1075,7 @@ create_btrfs_subvolumes() {
     "@tmp"
     "@portables"
     "@machines"
-    "@snapshots"
+    # @snapshots removed – Snapper will create it
   )
 
   for subvol in "${subvolumes[@]}"; do
@@ -1114,7 +1114,6 @@ create_btrfs_subvolumes() {
 
   startup_ok "All Btrfs subvolumes created successfully."
 }
-
 
 # ================== Mount Subvolumes ==================
 
