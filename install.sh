@@ -1663,7 +1663,6 @@ setup_grub_bootloader() {
   grep -q "^GRUB_TERMINAL_OUTPUT=" "$grub_cfg_file" || echo "GRUB_TERMINAL_OUTPUT=gfxterm" >> "$grub_cfg_file"
   grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file" || echo "GRUB_TIMEOUT=5" >> "$grub_cfg_file"
   grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file" || echo "GRUB_TIMEOUT_STYLE=menu" >> "$grub_cfg_file"
-  grep -q "^GRUB_DISABLE_LINUX_UUID=" "$grub_cfg_file" || echo "GRUB_DISABLE_LINUX_UUID=true" >> "$grub_cfg_file"
 
   # Add 'quiet splash'
   if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
@@ -1674,11 +1673,8 @@ setup_grub_bootloader() {
 
   echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-  # Temporarily enable cryptodisk for install
-  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
-
-  # Install GRUB bootloader
-  info_print "Installing GRUB bootloader..."
+  # Install GRUB bootloader without luks modules
+  info_print "Installing GRUB bootloader without luks modules..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
@@ -1695,9 +1691,6 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  # Remove cryptodisk again
-  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
-
   # Sign grubx64.efi (inside chroot)
   if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
@@ -1712,7 +1705,6 @@ setup_grub_bootloader() {
   # Copy to fallback
   mkdir -p /mnt/efi/EFI/Boot
   cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-
   if [[ -f "$fallback_efi" ]]; then
     startup_ok "Fallback BOOTX64.EFI updated."
   else
