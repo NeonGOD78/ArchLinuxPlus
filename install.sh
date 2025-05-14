@@ -116,21 +116,20 @@ section_header() {
   local title="$1"
   local char="${2:--}"
   local color="${3:-$DARKGRAY}"
-  local width padding
+  local width indent
 
   width=$(tput cols 2>/dev/null || echo 80)
+  indent=8
 
   printf "${color}"
-  printf "%${width}s" "" | tr " " "$char"
-  printf "${RESET}\n"
+  printf "%${width}s\n" "" | tr " " "$char"
 
-  padding=$(( (width - ${#title}) / 2 ))
-  printf "${color}%*s%s\n" "$padding" "" "$title"
-  
-  printf "%${width}s" "" | tr " " "$char"
-  printf "${RESET}\n"
+  # Print title left-aligned at column 8
+  printf "${color}%*s%s\n" "$indent" "" "$title"
+
+  printf "%${width}s\n" "" | tr " " "$char"
+  printf "${RESET}"
 }
-
 # ==================== Banner ====================
 
 banner_archlinuxplus() {
