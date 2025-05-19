@@ -1580,26 +1580,42 @@ setup_grub_pacman_hook() {
   local hook_file="$hook_dir/99-grub-sign.hook"
   local script_file="/mnt/usr/local/bin/resign-grub"
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
+  local log_file="/var/log/grub-sign.log"
 
   info_print "Installing GRUB re-sign pacman hook..."
 
   mkdir -p "$hook_dir"
   mkdir -p "$(dirname "$script_file")"
 
-  cat <<EOF > "$script_file"
+  cat <<'EOF' > "$script_file"
 #!/bin/bash
 set -euo pipefail
 
-GRUB_EFI="$grub_efi"
+GRUB_EFI="/efi/EFI/GRUB/grubx64.efi"
+KEY="/etc/secureboot/keys/db.key"
+CERT="/etc/secureboot/keys/db.crt"
+LOG="/var/log/grub-sign.log"
 
-if [[ ! -f "\$GRUB_EFI" ]]; then
-  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI" >&2
+echo "[INFO] GRUB re-sign triggered at $(date)" >> "$LOG"
+
+if [[ ! -f "$GRUB_EFI" ]]; then
+  echo "[ERROR] GRUB EFI binary not found at $GRUB_EFI" >> "$LOG"
   exit 1
 fi
 
-sbsign --key /etc/secureboot/keys/db.key \\
-       --cert /etc/secureboot/keys/db.crt \\
-       --output "\$GRUB_EFI" "\$GRUB_EFI"
+if sbsign --key "$KEY" --cert "$CERT" --output "$GRUB_EFI" "$GRUB_EFI" >> "$LOG" 2>&1; then
+  echo "[OK] GRUB EFI binary signed." >> "$LOG"
+else
+  echo "[FAIL] GRUB EFI signing failed!" >> "$LOG"
+  exit 1
+fi
+
+if sbverify --cert "$CERT" "$GRUB_EFI" >> "$LOG" 2>&1; then
+  echo "[OK] Signature verified." >> "$LOG"
+else
+  echo "[FAIL] Signature verification failed!" >> "$LOG"
+  exit 1
+fi
 EOF
 
   chmod +x "$script_file"
@@ -1617,7 +1633,7 @@ When = PostTransaction
 Exec = /usr/local/bin/resign-grub
 EOF
 
-  startup_ok "GRUB pacman hook and sign script installed."
+  startup_ok "GRUB pacman hook and signing script installed."
 }
 
 # ==================== Setup Snapper ====================
