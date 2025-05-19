@@ -2021,24 +2021,40 @@ setup_grub_resign_timer() {
   local timer_dir="/mnt/etc/systemd/system"
   local script_path="/mnt/usr/local/bin/resign-grub"
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
+  local log_file="/var/log/grub-sign.log"
 
   mkdir -p "$timer_dir"
   mkdir -p "$(dirname "$script_path")"
 
-  cat <<EOF > "$script_path"
+  cat <<'EOF' > "$script_path"
 #!/bin/bash
 set -euo pipefail
 
-GRUB_EFI="$grub_efi"
+GRUB_EFI="/efi/EFI/GRUB/grubx64.efi"
+KEY="/etc/secureboot/keys/db.key"
+CERT="/etc/secureboot/keys/db.crt"
+LOG="/var/log/grub-sign.log"
 
-if [[ ! -f "\$GRUB_EFI" ]]; then
-  echo "[ERROR] GRUB EFI binary not found at \$GRUB_EFI" >&2
+echo "[INFO] Scheduled GRUB re-sign at $(date)" >> "$LOG"
+
+if [[ ! -f "$GRUB_EFI" ]]; then
+  echo "[ERROR] GRUB EFI binary not found at $GRUB_EFI" >> "$LOG"
   exit 1
 fi
 
-sbsign --key /etc/secureboot/keys/db.key \\
-       --cert /etc/secureboot/keys/db.crt \\
-       --output "\$GRUB_EFI" "\$GRUB_EFI"
+if sbsign --key "$KEY" --cert "$CERT" --output "$GRUB_EFI" "$GRUB_EFI" >> "$LOG" 2>&1; then
+  echo "[OK] GRUB EFI binary signed." >> "$LOG"
+else
+  echo "[FAIL] GRUB EFI signing failed!" >> "$LOG"
+  exit 1
+fi
+
+if sbverify --cert "$CERT" "$GRUB_EFI" >> "$LOG" 2>&1; then
+  echo "[OK] Signature verified." >> "$LOG"
+else
+  echo "[FAIL] Signature verification failed!" >> "$LOG"
+  exit 1
+fi
 EOF
 
   chmod +x "$script_path"
