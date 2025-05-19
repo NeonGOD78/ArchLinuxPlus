@@ -1420,6 +1420,7 @@ EOF
   startup_ok "Secure Boot keys generated and stored in /etc/secureboot/keys."
 }
 
+
 # ==================== Setup cmdline file ====================
 
 setup_cmdline_file() {
@@ -1429,28 +1430,37 @@ setup_cmdline_file() {
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Get luks UUIDs
+  # Hent luks UUID for root
   root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
-  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
-
-  if [[ -z "$root_uuid" || -z "$home_uuid" ]]; then
-    error_print "Unable to determine luksUUIDs for encrypted partitions."
+  if [[ -z "$root_uuid" ]]; then
+    error_print "Unable to determine LUKS UUID for root partition."
     exit 1
   fi
 
-  # Write kernel command line
-  cat <<EOF > "$cmdline_path"
-rd.luks.name=$root_uuid=cryptroot rd.luks.name=$home_uuid=crypthome root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3
-EOF
+  # Hvis separat home bruges, hent UUID for den også
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
+    if [[ -z "$home_uuid" ]]; then
+      error_print "Unable to determine LUKS UUID for /home partition."
+      exit 1
+    fi
+  fi
+
+  # Skriv cmdline
+  {
+    echo -n "rd.luks.name=$root_uuid=cryptroot"
+    [[ "$SEPARATE_HOME" == true ]] && echo -n " rd.luks.name=$home_uuid=crypthome"
+    echo " root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
+  } > "$cmdline_path"
 
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
   fi
 
-  # Validate against /etc/crypttab
+  # Valider mod crypttab
   if [[ ! -f "$crypttab_path" ]]; then
-    error_print "Missing /etc/crypttab — must exist before cmdline can be verified."
+    error_print "Missing /etc/crypttab – must exist before cmdline can be verified."
     exit 1
   fi
 
@@ -1459,7 +1469,7 @@ EOF
     exit 1
   fi
 
-  if ! grep -q "$home_uuid" "$crypttab_path"; then
+  if [[ "$SEPARATE_HOME" == true && ! $(grep -q "$home_uuid" "$crypttab_path") ]]; then
     error_print "crypthome UUID not found in /etc/crypttab"
     exit 1
   fi
@@ -1468,9 +1478,8 @@ EOF
   cat "$cmdline_path" >> "$LOGFILE"
   echo "-----------------------------------" >> "$LOGFILE"
 
-  startup_ok "Kernel command line written to $cmdline_path and validated"
+  startup_ok "Kernel command line written to $cmdline_path and validated."
 }
-
 
 # ==================== Setup GRUB Bootloader ====================
 
