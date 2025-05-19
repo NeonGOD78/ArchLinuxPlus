@@ -1128,7 +1128,7 @@ mount_subvolumes() {
   fi
 
   # Step 2: Create early directories
-  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home /mnt/.snapshots
+  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home
 
   # Step 3: Mount EFI
   if mount "$EFI_PARTITION" /mnt/efi; then
@@ -1155,9 +1155,7 @@ mount_subvolumes() {
     fi
   fi
 
-  # Step 5: Mount other subvolumes
-  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
-
+  # Step 5: Mount /var
   if mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var; then
     startup_ok "Mounted /var subvolume"
   else
@@ -1165,6 +1163,10 @@ mount_subvolumes() {
     exit 1
   fi
 
+  # Step 6: Create nested var dirs
+  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
+
+  # Step 7: Mount nested var subvolumes
   if mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log; then
     startup_ok "Mounted /var/log subvolume"
   else
@@ -1200,6 +1202,7 @@ mount_subvolumes() {
     exit 1
   fi
 
+  # Step 8: Mount /srv
   if mount -o noatime,compress=zstd,subvol=@srv /dev/mapper/cryptroot /mnt/srv; then
     startup_ok "Mounted /srv subvolume"
   else
@@ -1207,12 +1210,15 @@ mount_subvolumes() {
     exit 1
   fi
 
-   if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
-    startup_ok "Mounted .snapshots subvolume"
+  # Step 9: Mount /.snapshots
+  mkdir -p /mnt/.snapshots
+  if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
+    startup_ok "Mounted /.snapshots subvolume"
   else
-    startup_fail "Failed to mount .snapshots subvolume"
+    startup_fail "Failed to mount /.snapshots"
     exit 1
   fi
+
   startup_ok "All filesystems mounted successfully."
 }
 
