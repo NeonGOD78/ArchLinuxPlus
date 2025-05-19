@@ -2252,19 +2252,27 @@ generate_initramfs_with_dracut() {
   kernel_version=$(ls /mnt/lib/modules | grep -E '^([0-9]+\.){2}[0-9]+' | head -n1)
 
   if [[ -z "$kernel_version" ]]; then
-    error_print "Could not determine kernel version inside target system (/mnt/lib/modules)."
+    error_print "Could not determine kernel version inside /mnt/lib/modules."
     exit 1
   fi
 
   info_print "Generating initramfs for kernel: $kernel_version"
+
+  # Midlertidigt bind-mount /mnt/efi for at sikre, at dracut kan se ESP'en korrekt
+  mount --bind /mnt/efi /mnt/efi
+
   if arch-chroot /mnt dracut --force --kver "$kernel_version" >> "$LOGFILE" 2>&1; then
     startup_ok "Initramfs successfully generated with dracut."
   else
     error_print "dracut failed to generate initramfs!"
+    umount /mnt/efi
     exit 1
   fi
 
-  # Secure Boot signing of vmlinuz
+  # Afmount /mnt/efi igen efter dracut kørslen
+  umount /mnt/efi
+
+  # Secure Boot signing af kernel (vmlinuz-linux)
   local kernel_path="/mnt/boot/vmlinuz-linux"
   local signed_output="/mnt/boot/vmlinuz-linux.signed"
   local key="/mnt/etc/secureboot/keys/db.key"
