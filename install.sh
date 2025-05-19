@@ -1060,7 +1060,7 @@ format_btrfs() {
 create_btrfs_subvolumes() {
   section_header "Creating Btrfs Subvolumes"
 
-  # Mount root volume directly
+  # Mount root volume first
   mount /dev/mapper/cryptroot /mnt || {
     startup_fail "Failed to mount /dev/mapper/cryptroot to /mnt"
     exit 1
@@ -1068,7 +1068,6 @@ create_btrfs_subvolumes() {
 
   local subvolumes=(
     "@"
-    "@snapshots"
     "@var"
     "@srv"
     "@log"
@@ -1076,6 +1075,7 @@ create_btrfs_subvolumes() {
     "@tmp"
     "@portables"
     "@machines"
+    "@snapshots"
   )
 
   for subvol in "${subvolumes[@]}"; do
@@ -1086,7 +1086,7 @@ create_btrfs_subvolumes() {
     fi
   done
 
-  # Create @home
+  # If separate home, mount crypthome temporarily and create @home
   if [[ "$SEPARATE_HOME" == true ]]; then
     mkdir -p /mnt/home
     mount /dev/mapper/crypthome /mnt/home || {
@@ -1102,6 +1102,7 @@ create_btrfs_subvolumes() {
 
     umount /mnt/home
   else
+    # Single encrypted root – create @home directly on root
     if btrfs subvolume create /mnt/@home &>/dev/null; then
       startup_ok "Created subvolume /mnt/@home"
     else
