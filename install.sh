@@ -2253,20 +2253,30 @@ setup_crypttab() {
 generate_initramfs_with_mkinitcpio() {
   section_header "Generating Initramfs with mkinitcpio"
 
-  local kernel_image="/mnt/boot/vmlinuz-${KERNEL_PACKAGE}"
-  local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
+  local kernel_pkg="$KERNEL_PACKAGE"
+  local kernel_version
+  kernel_version=$(ls /mnt/lib/modules | grep -E '^([0-9]+\.){2}[0-9]+' | head -n1)
 
-  if [[ ! -f "$kernel_image" ]]; then
-    error_print "Kernel image not found at $kernel_image"
+  if [[ -z "$kernel_version" ]]; then
+    error_print "Could not determine kernel version inside target system (/mnt/lib/modules)."
     exit 1
   fi
 
-  # Optionelt: vis hvilken kernel der bruges
-  info_print "Kernel image found: $kernel_image"
-  info_print "Generating initramfs with mkinitcpio..."
+  info_print "Detected kernel version: $kernel_version"
 
+  local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
+
+  # === Set HOOKS for LUKS, plymouth, and Btrfs ===
+  sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block encrypt filesystems keyboard plymouth)/' "$mkinitcpio_conf"
+  startup_ok "mkinitcpio hooks updated for luks, plymouth, btrfs, etc."
+
+  # === Optional: Set COMPRESSION ===
+  sed -i 's/^#COMPRESSION=.*/COMPRESSION="zstd"/' "$mkinitcpio_conf"
+  startup_ok "Initramfs compression set to zstd."
+
+  # === Generate initramfs ===
   if arch-chroot /mnt mkinitcpio -P >> "$LOGFILE" 2>&1; then
-    startup_ok "Initramfs generated successfully with mkinitcpio."
+    startup_ok "Initramfs successfully generated with mkinitcpio."
   else
     error_print "mkinitcpio failed to generate initramfs!"
     exit 1
