@@ -1426,26 +1426,27 @@ setup_cmdline_file() {
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
-  # Hent luks UUID for root
+  # Hent luks UUIDs
   root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
+  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
+
+  # Tjek UUIDs
   if [[ -z "$root_uuid" ]]; then
-    error_print "Unable to determine LUKS UUID for root partition."
+    error_print "Unable to determine luksUUID for root partition."
     exit 1
   fi
 
-  # Hvis separat home bruges, hent UUID for den også
-  if [[ "$SEPARATE_HOME" == true ]]; then
-    home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
-    if [[ -z "$home_uuid" ]]; then
-      error_print "Unable to determine LUKS UUID for /home partition."
-      exit 1
-    fi
+  if [[ "$SEPARATE_HOME" == true && -z "$home_uuid" ]]; then
+    error_print "Unable to determine luksUUID for home partition."
+    exit 1
   fi
 
   # Skriv cmdline
   {
     echo -n "rd.luks.name=$root_uuid=cryptroot"
-    [[ "$SEPARATE_HOME" == true ]] && echo -n " rd.luks.name=$home_uuid=crypthome"
+    if [[ "$SEPARATE_HOME" == true ]]; then
+      echo -n " rd.luks.name=$home_uuid=crypthome"
+    fi
     echo " root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
   } > "$cmdline_path"
 
@@ -1454,18 +1455,13 @@ setup_cmdline_file() {
     exit 1
   fi
 
-  # Valider mod crypttab
-  if [[ ! -f "$crypttab_path" ]]; then
-    error_print "Missing /etc/crypttab – must exist before cmdline can be verified."
-    exit 1
-  fi
-
-  if ! grep -q "$root_uuid" "$crypttab_path"; then
+  # Tjek om UUIDs findes i /etc/crypttab
+  if ! grep -q "UUID=$root_uuid" "$crypttab_path"; then
     error_print "cryptroot UUID not found in /etc/crypttab"
     exit 1
   fi
 
-  if [[ "$SEPARATE_HOME" == true && ! $(grep -q "$home_uuid" "$crypttab_path") ]]; then
+  if [[ "$SEPARATE_HOME" == true ]] && ! grep -q "UUID=$home_uuid" "$crypttab_path"; then
     error_print "crypthome UUID not found in /etc/crypttab"
     exit 1
   fi
@@ -1474,7 +1470,7 @@ setup_cmdline_file() {
   cat "$cmdline_path" >> "$LOGFILE"
   echo "-----------------------------------" >> "$LOGFILE"
 
-  startup_ok "Kernel command line written to $cmdline_path and validated."
+  startup_ok "Kernel command line written to $cmdline_path and validated"
 }
 
 # ==================== Setup GRUB Bootloader ====================
