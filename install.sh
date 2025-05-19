@@ -1858,7 +1858,7 @@ final_message() {
   echo -e "  ${BOLD}Kernel:${RESET} $KERNEL_PACKAGE"
   echo -e "  ${BOLD}Editor:${RESET} $EDITOR_PACKAGE"
   echo -e "  ${BOLD}GRUB Theme:${RESET} ${GRUB_THEME_DIR:-default} (${GRUB_GFXMODE:-default})"
-  echo -e "  ${BOLD}Secure Boot Keys:${RESET} /efi/secureboot/keys (after reboot)"
+  echo -e "  ${BOLD}Secure Boot Keys:${RESET} /etc/secureboot/keys"
   echo -e "  ${BOLD}Snapper Config:${RESET} /etc/snapper/configs/root"
   echo -e "  ${BOLD}Logfile:${RESET} $LOGFILE"
   echo
@@ -1874,17 +1874,9 @@ final_message() {
   fi
 
   # Check for Secure Boot keys presence
-  if [[ ! -d /mnt/secureboot/keys || -z "$(ls -A /mnt/secureboot/keys 2>/dev/null)" ]]; then
-    warning_print "Secure Boot keys not found in /mnt/secureboot/keys (temporary install path)."
-    log_msg "WARN: Secure Boot keys not found in /mnt/secureboot/keys"
-  fi
-
-  # UKI failure detection
-  if [[ -f /mnt/var/log/uki-failure.log ]]; then
-    warning_print "UKI failure log detected at /var/log/uki-failure.log"
-    info_print "This indicates the automatic UKI rebuild may fail after reboot."
-    log_msg "WARN: Detected uki-failure.log — UKI rebuild may fail post-boot"
-    echo
+  if [[ ! -d /mnt/etc/secureboot/keys || -z "$(ls -A /mnt/etc/secureboot/keys 2>/dev/null)" ]]; then
+    warning_print "Secure Boot keys not found in /mnt/etc/secureboot/keys."
+    log_msg "WARN: Secure Boot keys not found in /mnt/etc/secureboot/keys"
   fi
 
   # UEFI boot entry detection
@@ -1896,9 +1888,6 @@ final_message() {
   fi
 
   echo
-  info_print "Note: After reboot, Secure Boot keys will be located at /efi/secureboot/keys."
-  echo
-
   input_print "Would you like to view the install log now? [y/N]"
   read_from_tty -r view_log_choice
   view_log_choice="${view_log_choice,,}"
@@ -1914,7 +1903,7 @@ final_message() {
   echo
   info_print "Next Steps:"
   echo -e "  - Reboot into your new system."
-  echo -e "  - Enroll your Secure Boot keys in BIOS (located at /efi/secureboot/keys)."
+  echo -e "  - Enroll your Secure Boot keys in BIOS (located at /etc/secureboot/keys)."
   echo -e "  - Snapper will automatically manage Btrfs snapshots."
   echo -e "  - If needed, review installation details in the logfile: $LOGFILE"
   echo
