@@ -2244,6 +2244,28 @@ setup_crypttab() {
   startup_ok "/etc/crypttab created and validated successfully"
 }
 
+# ==================== generate initramfs with dracut ====================
+
+generate_initramfs_with_dracut() {
+  section_header "Generating Initramfs with Dracut"
+
+  local kernel_version
+  kernel_version=$(arch-chroot /mnt uname -r)
+
+  if [[ -z "$kernel_version" ]]; then
+    error_print "Could not determine kernel version inside chroot."
+    exit 1
+  fi
+
+  info_print "Generating initramfs for kernel: $kernel_version"
+  if arch-chroot /mnt dracut --force --kver "$kernel_version" >> "$LOGFILE" 2>&1; then
+    startup_ok "Initramfs successfully generated with dracut."
+  else
+    error_print "dracut failed to generate initramfs!"
+    exit 1
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -2304,7 +2326,7 @@ main() {
   # Secureboot
   setup_secureboot_structure
   setup_cmdline_file
-
+  generate_initramfs_with_dracut
   setup_grub_bootloader
   setup_boot_targets
   
