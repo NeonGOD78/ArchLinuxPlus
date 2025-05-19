@@ -2252,44 +2252,27 @@ setup_crypttab() {
   startup_ok "/etc/crypttab created and validated successfully"
 }
 
-# ==================== Generate Initramfs ====================
+# ==================== Generate Initramfs with mkinitcpio ====================
 
-generate_initramfs_with_dracut() {
-  section_header "Generating Initramfs with Dracut and Signing Kernel"
+generate_initramfs_with_mkinitcpio() {
+  section_header "Generating Initramfs with mkinitcpio"
 
-  local kernel_version
-  kernel_version=$(ls /mnt/lib/modules | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+  local kernel_image="/mnt/boot/vmlinuz-${KERNEL_PACKAGE}"
+  local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-  if [[ -z "$kernel_version" ]]; then
-    error_print "Could not determine kernel version inside target system (/mnt/lib/modules)."
+  if [[ ! -f "$kernel_image" ]]; then
+    error_print "Kernel image not found at $kernel_image"
     exit 1
   fi
 
-  info_print "Generating initramfs for kernel: $kernel_version"
-  if arch-chroot /mnt dracut --force --no-hostonly --no-uefi --kver "$kernel_version" >> "$LOGFILE" 2>&1; then
-    startup_ok "Initramfs successfully generated with dracut."
-  else
-    error_print "dracut failed to generate initramfs!"
-    exit 1
-  fi
+  # Optionelt: vis hvilken kernel der bruges
+  info_print "Kernel image found: $kernel_image"
+  info_print "Generating initramfs with mkinitcpio..."
 
-  # Secure Boot signing of vmlinuz
-  local kernel_path="/mnt/boot/vmlinuz-${KERNEL_PACKAGE}"
-  local signed_output="/mnt/boot/vmlinuz-${KERNEL_PACKAGE}.signed"
-  local key="/mnt/etc/secureboot/keys/db.key"
-  local cert="/mnt/etc/secureboot/keys/db.crt"
-
-  if [[ -f "$kernel_path" ]]; then
-    info_print "Signing kernel image for Secure Boot..."
-    if sbsign --key "$key" --cert "$cert" --output "$signed_output" "$kernel_path" >> "$LOGFILE" 2>&1; then
-      mv "$signed_output" "$kernel_path"
-      startup_ok "Kernel image signed successfully."
-    else
-      error_print "Failed to sign kernel image!"
-      exit 1
-    fi
+  if arch-chroot /mnt mkinitcpio -P >> "$LOGFILE" 2>&1; then
+    startup_ok "Initramfs generated successfully with mkinitcpio."
   else
-    error_print "Kernel image not found at $kernel_path. Cannot sign."
+    error_print "mkinitcpio failed to generate initramfs!"
     exit 1
   fi
 }
@@ -2354,7 +2337,7 @@ main() {
   # Secureboot
   setup_secureboot_structure
   setup_cmdline_file
-  generate_initramfs_with_dracut
+  generate_initramfs_with_mkinitcpio
   setup_grub_bootloader
   setup_boot_targets
   
