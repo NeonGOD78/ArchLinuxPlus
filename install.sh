@@ -2283,6 +2283,19 @@ generate_initramfs_with_mkinitcpio() {
   fi
 }
 
+# ================= get latest commit hash =================================================
+
+get_latest_commit_hash() {
+  GITHUB_COMMIT=$(curl -s https://api.github.com/repos/NeonGOD78/ArchLinuxPlus/commits/main \
+    | grep '"sha"' | head -n 1 | cut -d '"' -f 4 | cut -c1-7)
+
+  if [[ -n "$GITHUB_COMMIT" ]]; then
+    SCRIPT_VERSION="commit: $GITHUB_COMMIT"
+  else
+    SCRIPT_VERSION="unknown (offline?)"
+  fi
+}
+
 # ==================== Main ====================
 
 main() {
@@ -2303,6 +2316,7 @@ main() {
   fi
   
   # User Input
+  get_latest_commit_hash
   banner_archlinuxplus
   log_start
   setup_keymap_and_locale
