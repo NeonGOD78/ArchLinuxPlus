@@ -1483,8 +1483,6 @@ setup_grub_bootloader() {
   local grub_cfg_file="/mnt/etc/default/grub"
   local grub_efi="/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
-  local early_config="/mnt/boot/grub/user.cfg"
-  local custom_cfg="/mnt/boot/grub/custom.cfg"
 
   # Download and extract GRUB theme
   info_print "Downloading and installing GRUB theme: $theme_dir"
@@ -1512,27 +1510,23 @@ setup_grub_bootloader() {
   grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file" || echo "GRUB_TIMEOUT=5" >> "$grub_cfg_file"
   grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file" || echo "GRUB_TIMEOUT_STYLE=menu" >> "$grub_cfg_file"
 
-  # Add 'quiet splash'
-  if grep -q '^GRUB_CMDLINE_LINUX="' "$grub_cfg_file"; then
-    sed -i 's|^GRUB_CMDLINE_LINUX=\"\([^\"]*\)\"|GRUB_CMDLINE_LINUX=\"quiet splash \1\"|' "$grub_cfg_file"
-  else
-    echo 'GRUB_CMDLINE_LINUX="quiet splash"' >> "$grub_cfg_file"
-  fi
-
   echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-  # Create GRUB user config to disable cryptodisk
-  info_print "Creating GRUB early user config to disable cryptodisk..."
-  mkdir -p "$(dirname "$early_config")"
-  echo "set disable_cryptodisk=true" > "$early_config"
-  echo "GRUB_DISABLE_CRYPTODISK=y" >> "$grub_cfg_file"
-  startup_ok "Early GRUB config created to disable cryptodisk."
+  # Get luks UUID and write proper GRUB_CMDLINE_LINUX
+  local luks_uuid
+  luks_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION")
+  if [[ -n "$luks_uuid" ]]; then
+    sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
+    echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$luks_uuid:cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
+    startup_ok "Added GRUB_CMDLINE_LINUX with luks UUID."
+  else
+    warning_print "Could not detect luks UUID. GRUB_CMDLINE_LINUX not set!"
+  fi
 
-  # Enable cryptodisk for install step only
   echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
 
   # Install GRUB bootloader
-  info_print "Installing GRUB bootloader with cryptodisk enabled (temporary)..."
+  info_print "Installing GRUB bootloader with luks support..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
 
@@ -1541,19 +1535,13 @@ setup_grub_bootloader() {
     --efi-directory=/efi \
     --bootloader-id=GRUB \
     $grub_nvram_flag \
-    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file" \
+    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
     --recheck >> "$LOGFILE" 2>&1; then
     startup_ok "GRUB bootloader installed successfully."
   else
     error_print "GRUB install failed!"
     exit 1
   fi
-
-  # Remove cryptodisk again
-  sed -i '/^GRUB_ENABLE_CRYPTODISK/d' "$grub_cfg_file"
-
-  # Remove luks-related grub modules to prevent luks-unlock
-  rm -f /mnt/boot/grub/*luks*.mod /mnt/boot/grub/cryptodisk.mod
 
   # Sign grubx64.efi (inside chroot)
   if arch-chroot /mnt sbsign \
@@ -1566,23 +1554,10 @@ setup_grub_bootloader() {
     warning_print "Failed to sign grubx64.efi"
   fi
 
-  # Copy to fallback
+  # Copy to fallback BOOTX64.EFI
   mkdir -p /mnt/efi/EFI/Boot
   cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
   [[ -f "$fallback_efi" ]] && startup_ok "Fallback BOOTX64.EFI updated." || warning_print "Fallback BOOTX64.EFI was not created."
-
-  # Write custom.cfg with chainloader entry
-  info_print "Adding custom GRUB entry to chainload signed UKI..."
-  local efi_uuid=$(blkid -s UUID -o value "$EFI_PARTITION")
-  cat <<EOF > "$custom_cfg"
-menuentry "Arch Linux (UKI chainload)" {
-  insmod fat
-  insmod chain
-  search --no-floppy --set=root --fs-uuid $efi_uuid
-  chainloader /EFI/Linux/arch.efi
-}
-EOF
-  startup_ok "Custom GRUB chainloader entry created."
 
   # Generate grub.cfg
   info_print "Generating grub.cfg..."
@@ -1593,9 +1568,8 @@ EOF
     exit 1
   fi
 
-  startup_ok "GRUB setup complete. Using UKI for LUKS unlock via chainloader."
+  startup_ok "GRUB setup complete. GRUB will now unlock LUKS and boot normally."
 }
-
 
 # ==================== Setup GRUB pacman hook ====================
 
