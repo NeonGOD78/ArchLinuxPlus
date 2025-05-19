@@ -2074,8 +2074,7 @@ verify_boot_integrity() {
   local grub_cfg="/mnt/boot/grub/grub.cfg"
   local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
-  local uki_file="/mnt/efi/EFI/Linux/arch.efi"
-  local cmdline="/mnt/etc/kernel/cmdline"
+  local cmdline="/mnt/etc/default/grub"
 
   echo "== Boot Verification Start ==" >> "$LOGFILE"
 
@@ -2114,31 +2113,12 @@ verify_boot_integrity() {
     echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
   fi
 
-  # UKI
-  if [[ -f "$uki_file" ]]; then
-    echo "[OK] UKI present: $uki_file" >> "$LOGFILE"
-  else
-    error_print "Missing UKI: $uki_file"
-    echo "[FAIL] UKI missing." >> "$LOGFILE"
-    fail=true
-  fi
-
-  # UKI matches kernel
-  local uki_kver
-  uki_kver=$(ls /mnt/lib/modules | sort -V | tail -n1)
-  if [[ -n "$uki_kver" && -d "/mnt/lib/modules/$uki_kver" ]]; then
-    echo "[OK] UKI kernel version matches installed: $uki_kver" >> "$LOGFILE"
-  else
-    warning_print "Unable to verify UKI kernel version consistency."
-    echo "[WARN] Kernel version match unknown." >> "$LOGFILE"
-  fi
-
   # Cmdline check
-  if grep -q "rd.luks.name=" "$cmdline"; then
-    echo "[OK] Kernel cmdline contains rd.luks.* parameters." >> "$LOGFILE"
+  if grep -q "cryptdevice=" "$cmdline"; then
+    echo "[OK] GRUB cmdline contains cryptdevice parameter." >> "$LOGFILE"
   else
-    error_print "Kernel cmdline is missing luks parameters."
-    echo "[FAIL] luks parameters not found in cmdline." >> "$LOGFILE"
+    error_print "GRUB cmdline is missing cryptdevice parameter."
+    echo "[FAIL] cryptdevice parameter not found in cmdline." >> "$LOGFILE"
     fail=true
   fi
 
