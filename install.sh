@@ -1641,51 +1641,42 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
-  # Create Snapper config (creates .snapshots subvolume automatically)
-  info_print "Creating snapper config for root..."
+  # Step 1: Mount .snapshots subvolume properly
+  mkdir -p /mnt/.snapshots
+  if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
+    startup_ok ".snapshots subvolume mounted."
+  else
+    error_print "Failed to mount .snapshots subvolume."
+    exit 1
+  fi
+
+  # Step 2: Create Snapper config
+  info_print "Creating Snapper config for root..."
   arch-chroot /mnt snapper --no-dbus --config root create-config /
   startup_ok "Snapper configuration for root created."
 
-  # Adjust Snapper config
+  # Step 3: Adjust Snapper config
   info_print "Adjusting snapper config..."
   arch-chroot /mnt sed -i 's|ALLOW_USERS="|"ALLOW_USERS='"$USERNAME"'"|' /etc/snapper/configs/root
   arch-chroot /mnt sed -i 's|TIMELINE_CREATE="no"|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
   arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
   startup_ok "Snapper config adjusted."
 
-  # Set permissions on .snapshots
-  info_print "Setting permissions on .snapshots..."
+  # Step 4: Set permissions
   arch-chroot /mnt chmod 750 /.snapshots
   arch-chroot /mnt chown :wheel /.snapshots
-  startup_ok ".snapshots permission set."
+  startup_ok "Permissions set on /.snapshots"
 
-  # Create initial snapshot
+  # Step 5: Create initial snapshot
   info_print "Creating initial snapshot..."
-  arch-chroot /mnt snapper --config root create --description "Initial install snapshot"
+  arch-chroot /mnt snapper --no-dbus --config root create --description "Initial install snapshot"
   startup_ok "Initial snapshot created."
 
-  # Enable Snapper timers
+  # Step 6: Enable Snapper timers
   info_print "Enabling Snapper systemd timers..."
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
-
-  # Create grub-btrfs config
-  info_print "Creating grub-btrfs config..."
-  mkdir -p /mnt/etc/default/grub-btrfs
-  cat <<EOF > /mnt/etc/default/grub-btrfs/config
-GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"
-GRUB_BTRFS_DISABLE_SNAPPER=true
-EOF
-  startup_ok "grub-btrfs config created."
-
-  # Enable grub-btrfsd
-  info_print "Enabling grub-btrfsd.service for live updates..."
-  arch-chroot /mnt systemctl enable grub-btrfsd.service >> "$LOGFILE" 2>&1 || {
-    warning_print "Failed to enable grub-btrfsd.service."
-  }
-
-  startup_ok "grub-btrfs integration completed."
 }
 
 # ==================== Select GRUB THEME ====================
