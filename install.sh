@@ -1645,37 +1645,49 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
-  # Step 1: Create Snapper config (subvolume already exists and is mounted)
+  local config_path="/mnt/etc/snapper/configs/root"
+  local snapshot_subvol="/mnt/.snapshots"
+
   info_print "Creating Snapper config for root..."
-  arch-chroot /mnt snapper --no-dbus --config root create-config /
-  if [[ ! -f /mnt/etc/snapper/configs/root ]]; then
-    error_print "Snapper config was not created!"
+
+  # Let Snapper create config and .snapshots subvolume
+  if arch-chroot /mnt snapper --config root create-config /; then
+    startup_ok "Snapper config created successfully"
+  else
+    startup_fail "Snapper config creation failed"
     exit 1
   fi
-  startup_ok "Snapper configuration for root created."
 
-  # Step 2: Adjust Snapper config
-  info_print "Adjusting snapper config..."
-  arch-chroot /mnt sed -i 's|ALLOW_USERS=""|ALLOW_USERS="'"$USERNAME"'"|' /etc/snapper/configs/root
-  arch-chroot /mnt sed -i 's|TIMELINE_CREATE="no"|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
-  arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
-  startup_ok "Snapper config adjusted."
+  # Verify .snapshots now exists
+  if [[ ! -d "$snapshot_subvol" ]]; then
+    startup_fail "Expected .snapshots subvolume not found after snapper config"
+    exit 1
+  fi
 
-  # Step 3: Set permissions
-  arch-chroot /mnt chmod 750 /.snapshots
-  arch-chroot /mnt chown :wheel /.snapshots
-  startup_ok "Permissions set on /.snapshots"
+  # Remount .snapshots subvolume (if needed)
+  if mountpoint -q "$snapshot_subvol"; then
+    umount "$snapshot_subvol"
+  fi
 
-  # Step 4: Create initial snapshot
-  info_print "Creating initial snapshot..."
-  arch-chroot /mnt snapper --no-dbus --config root create --description "Initial install snapshot"
-  startup_ok "Initial snapshot created."
+  if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot "$snapshot_subvol"; then
+    startup_ok "Mounted .snapshots subvolume"
+  else
+    warning_print "Failed to remount .snapshots – Snapper may still function"
+  fi
 
-  # Step 5: Enable Snapper timers
-  info_print "Enabling Snapper systemd timers..."
-  arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
-  arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
-  startup_ok "Snapper timers enabled."
+  # Enable systemd services (timeline + cleanup only)
+  if arch-chroot /mnt systemctl enable snapper-timeline.timer snapper-cleanup.timer &>/dev/null; then
+    startup_ok "Enabled snapper-timeline.timer and snapper-cleanup.timer"
+  else
+    warning_print "Failed to enable one or more snapper timer services"
+  fi
+
+  # Create initial snapshot
+  if arch-chroot /mnt snapper create --description "Initial system state"; then
+    startup_ok "Initial snapshot created"
+  else
+    warning_print "Failed to create initial snapshot"
+  fi
 }
 
 
