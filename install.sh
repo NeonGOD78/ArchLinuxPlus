@@ -1642,12 +1642,16 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
-  # Step 1: Mount .snapshots subvolume properly
-  mkdir -p /mnt/.snapshots
-  if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
-    startup_ok ".snapshots subvolume mounted."
+  # Step 1: Create and mount .snapshots subvolume (in chroot)
+  arch-chroot /mnt /bin/bash -c '
+    mkdir -p /.snapshots
+    mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /.snapshots
+  ' >> "$LOGFILE" 2>&1
+
+  if [[ $? -eq 0 ]]; then
+    startup_ok ".snapshots subvolume mounted inside chroot."
   else
-    error_print "Failed to mount .snapshots subvolume."
+    error_print "Failed to mount .snapshots subvolume inside chroot."
     exit 1
   fi
 
@@ -1657,23 +1661,30 @@ setup_snapper() {
   startup_ok "Snapper configuration for root created."
 
   # Step 3: Adjust Snapper config
-  info_print "Adjusting snapper config..."
-  arch-chroot /mnt sed -i 's|ALLOW_USERS="|"ALLOW_USERS='"$USERNAME"'"|' /etc/snapper/configs/root
+  info_print "Adjusting Snapper configuration..."
+
+  if [[ -n "$USERNAME" ]]; then
+    arch-chroot /mnt sed -i 's|ALLOW_USERS="|"ALLOW_USERS='"$USERNAME"'"|' /etc/snapper/configs/root
+    startup_ok "ALLOW_USERS set to $USERNAME in Snapper config."
+  else
+    info_print "No user defined. Snapper will be root-only."
+  fi
+
   arch-chroot /mnt sed -i 's|TIMELINE_CREATE="no"|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
   arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
-  startup_ok "Snapper config adjusted."
+  startup_ok "Snapper config updated."
 
   # Step 4: Set permissions
   arch-chroot /mnt chmod 750 /.snapshots
   arch-chroot /mnt chown :wheel /.snapshots
-  startup_ok "Permissions set on /.snapshots"
+  startup_ok "Permissions set on /.snapshots."
 
   # Step 5: Create initial snapshot
   info_print "Creating initial snapshot..."
   arch-chroot /mnt snapper --no-dbus --config root create --description "Initial install snapshot"
   startup_ok "Initial snapshot created."
 
-  # Step 6: Enable Snapper timers
+  # Step 6: Enable Snapper systemd timers
   info_print "Enabling Snapper systemd timers..."
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
