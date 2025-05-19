@@ -1750,54 +1750,55 @@ configure_package_management() {
 
   enable_debug
 
-  # Pacman tweaks
-  info_print "Applying visual and performance tweaks to pacman.conf..."
-  sed -Ei '
-    s/^#Color$/Color/
-    /Color/ a ILoveCandy
-    s/^#ParallelDownloads.*/ParallelDownloads = 10/
-    s/^#VerbosePkgLists$/VerbosePkgLists/
-    s/^#CheckSpace$/CheckSpace/
-  ' "$pacman_conf" >> "$LOGFILE" 2>&1
-  startup_ok "Pacman.conf tweaked."
+  # === Pacman tweaks: farver, parallel downloads osv. ===
+  info_print "Tweaking pacman.conf for color, parallel downloads, and candy..."
+  sed -i 's/^#Color/Color/' "$pacman_conf"
+  grep -q '^ILoveCandy' "$pacman_conf" || sed -i '/^Color/a ILoveCandy' "$pacman_conf"
+  sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 10/' "$pacman_conf"
+  sed -i 's/^#VerbosePkgLists/VerbosePkgLists/' "$pacman_conf"
+  sed -i 's/^#CheckSpace/CheckSpace/' "$pacman_conf"
 
-  # Repos
-  info_print "Enabling multilib and limited testing repositories..."
-  sed -i '/#\[multilib\]/,/^#Include/ s/^#//' "$pacman_conf" >> "$LOGFILE" 2>&1
+  # === Enable multilib repository ===
+  info_print "Enabling multilib repository..."
+  sed -i '/#\[multilib\]/,/#Include/s/^#//' "$pacman_conf"
 
+  # === Tilføj valgfrie testing-repos (core, extra, multilib) med "Usage = Sync Search" ===
   if ! grep -q "\[core-testing\]" "$pacman_conf"; then
-    cat >> "$pacman_conf" <<'EOF'
+    cat <<EOF >> "$pacman_conf"
 
 [core-testing]
 Include = /etc/pacman.d/mirrorlist
+Usage = Sync Search
+
 [extra-testing]
 Include = /etc/pacman.d/mirrorlist
-[community-testing]
-Include = /etc/pacman.d/mirrorlist
+Usage = Sync Search
+
 [multilib-testing]
 Include = /etc/pacman.d/mirrorlist
+Usage = Sync Search
 EOF
-    startup_ok "Testing repositories added."
+    startup_ok "Testing repositories (core, extra, multilib) added with 'Usage = Sync Search'."
   else
     info_print "Testing repositories already present. Skipping addition."
   fi
 
-  # makepkg tweaks
-  info_print "Optimizing makepkg.conf for parallel build and better output..."
-  sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf" >> "$LOGFILE" 2>&1
-  sed -i 's|^#\?\s*BUILDENV=.*|BUILDENV=(!distcc color !ccache !check !sign)|' "$makepkg_conf" >> "$LOGFILE" 2>&1
-  sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf" >> "$LOGFILE" 2>&1
+  # === Makepkg tweaks: optimering til parallel builds osv. ===
+  info_print "Optimizing makepkg.conf for parallel builds..."
+  sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf"
+  sed -i 's|^#\?\s*BUILDENV=.*|BUILDENV=(!distcc color !ccache !check !sign)|' "$makepkg_conf"
+  sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf"
   startup_ok "makepkg.conf optimized."
 
   disable_debug
 
-  info_print "Updating pacman database and installing build dependencies..."
+  # === Opdater pacman database ===
+  info_print "Updating pacman database..."
   arch-chroot /mnt pacman -Sy >> "$LOGFILE" 2>&1
 
-  # Yay installation
-  info_print "Installing yay AUR helper safely..."
+  # === Installér yay AUR helper ===
+  info_print "Installing yay AUR helper..."
   mkdir -p /mnt/root/scripts
-
   cat <<'EOF' > /mnt/root/scripts/yay-install.sh
 #!/bin/bash
 set -euo pipefail
@@ -1817,20 +1818,18 @@ rm -f /etc/sudoers.d/aurbuilder
 EOF
 
   chmod +x /mnt/root/scripts/yay-install.sh
-
   arch-chroot /mnt /root/scripts/yay-install.sh >> "$LOGFILE" 2>&1 || {
-    error_print "Yay installation failed."
+    error_print "yay installation failed."
     rm -f /mnt/root/scripts/yay-install.sh
     return 1
   }
 
   rm -f /mnt/root/scripts/yay-install.sh
-
-if arch-chroot /mnt bash -c 'which yay' &>/dev/null; then
-  startup_ok "yay installed successfully."
+  if arch-chroot /mnt bash -c 'which yay' &>/dev/null; then
+    startup_ok "yay installed successfully."
   else
-  warning_print "yay installation failed or not found in PATH."
-fi
+    warning_print "yay not found in PATH after installation."
+  fi
 }
 
 # ======================= Final Cleanup =======================
