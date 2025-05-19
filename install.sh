@@ -1278,7 +1278,7 @@ install_base_system() {
     base "$KERNEL_PACKAGE" "$MICROCODE_PACKAGE" linux-firmware "$KERNEL_PACKAGE"-headers
     "$NETWORK_PKGS" btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac
     zram-generator sudo bash-completion inotify-tools zsh unzip unrar fzf zoxide colordiff curl
-    btop mc git systemd openssl sbsigntools base-devel go dracut plymouth
+    btop mc git systemd openssl sbsigntools base-devel go mkinitcpio plymouth
   )
 
   enable_debug
@@ -1296,10 +1296,6 @@ install_base_system() {
     error_print "Base system installation failed!"
     exit 1
   fi
-
-  # Remove mkinitcpio and mkinitcpio-busybox if present
-  info_print "Removing mkinitcpio and mkinitcpio-busybox from target system..."
-  arch-chroot /mnt pacman -Rdd --noconfirm mkinitcpio mkinitcpio-busybox >> "$LOGFILE" 2>&1 || true
 }
 
 # ======================= Generate fstab ========================
