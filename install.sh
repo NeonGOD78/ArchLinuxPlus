@@ -1128,9 +1128,9 @@ mount_subvolumes() {
   fi
 
   # Step 2: Create early directories
-  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home
+  mkdir -p /mnt/efi /mnt/var /mnt/srv /mnt/home /mnt/.snapshots
 
-  # Step 3: Mount initial subvolumes
+  # Step 3: Mount EFI
   if mount "$EFI_PARTITION" /mnt/efi; then
     startup_ok "Mounted EFI partition to /efi"
   else
@@ -1138,6 +1138,7 @@ mount_subvolumes() {
     exit 1
   fi
 
+  # Step 4: Mount home
   if [[ "$SEPARATE_HOME" == true ]]; then
     if mount -o noatime,compress=zstd,subvol=@home /dev/mapper/crypthome /mnt/home; then
       startup_ok "Mounted separate home partition to /home"
@@ -1154,15 +1155,15 @@ mount_subvolumes() {
     fi
   fi
 
+  # Step 5: Mount other subvolumes
+  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
+
   if mount -o noatime,compress=zstd,subvol=@var /dev/mapper/cryptroot /mnt/var; then
     startup_ok "Mounted /var subvolume"
   else
     startup_fail "Failed to mount /var"
     exit 1
   fi
-
-  # NOW after /mnt/var exists:
-  mkdir -p /mnt/var/log /mnt/var/cache /mnt/var/tmp /mnt/var/lib/portables /mnt/var/lib/machines
 
   if mount -o noatime,compress=zstd,subvol=@log /dev/mapper/cryptroot /mnt/var/log; then
     startup_ok "Mounted /var/log subvolume"
@@ -1206,7 +1207,13 @@ mount_subvolumes() {
     exit 1
   fi
 
-   startup_ok "All filesystems mounted successfully."
+   if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
+    startup_ok "Mounted .snapshots subvolume"
+  else
+    startup_fail "Failed to mount .snapshots subvolume"
+    exit 1
+  fi
+  startup_ok "All filesystems mounted successfully."
 }
 
 # ================== Setup NoCOW Attributes ==================
