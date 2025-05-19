@@ -1650,23 +1650,20 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
-  # Step 1: Create Snapper config
+  # Step 1: Create Snapper config (subvolume already exists and is mounted)
   info_print "Creating Snapper config for root..."
-  arch-chroot /mnt snapper --no-dbus --config root create-config / >> "$LOGFILE" 2>&1
-  if [[ -f /mnt/etc/snapper/configs/root ]]; then
-    startup_ok "Snapper configuration for root created."
-  else
+  arch-chroot /mnt snapper --no-dbus --config root create-config /
+  if [[ ! -f /mnt/etc/snapper/configs/root ]]; then
     error_print "Snapper config was not created!"
     exit 1
   fi
+  startup_ok "Snapper configuration for root created."
 
   # Step 2: Adjust Snapper config
   info_print "Adjusting snapper config..."
-  if [[ -n "$USERNAME" ]]; then
-    arch-chroot /mnt sed -i 's|^ALLOW_USERS=.*|ALLOW_USERS="'"$USERNAME"'"|' /etc/snapper/configs/root
-  fi
-  arch-chroot /mnt sed -i 's|^TIMELINE_CREATE=.*|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
-  arch-chroot /mnt sed -i 's|^NUMBER_CLEANUP=.*|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
+  arch-chroot /mnt sed -i 's|ALLOW_USERS=""|ALLOW_USERS="'"$USERNAME"'"|' /etc/snapper/configs/root
+  arch-chroot /mnt sed -i 's|TIMELINE_CREATE="no"|TIMELINE_CREATE="yes"|' /etc/snapper/configs/root
+  arch-chroot /mnt sed -i 's|NUMBER_CLEANUP="no"|NUMBER_CLEANUP="yes"|' /etc/snapper/configs/root
   startup_ok "Snapper config adjusted."
 
   # Step 3: Set permissions
@@ -1676,15 +1673,16 @@ setup_snapper() {
 
   # Step 4: Create initial snapshot
   info_print "Creating initial snapshot..."
-  arch-chroot /mnt snapper --no-dbus --config root create --description "Initial install snapshot" >> "$LOGFILE" 2>&1
+  arch-chroot /mnt snapper --no-dbus --config root create --description "Initial install snapshot"
   startup_ok "Initial snapshot created."
 
-  # Step 5: Enable Snapper systemd timers
+  # Step 5: Enable Snapper timers
   info_print "Enabling Snapper systemd timers..."
   arch-chroot /mnt systemctl enable snapper-timeline.timer >> "$LOGFILE" 2>&1
   arch-chroot /mnt systemctl enable snapper-cleanup.timer >> "$LOGFILE" 2>&1
   startup_ok "Snapper timers enabled."
 }
+
 
 # ==================== Select GRUB THEME ====================
 
