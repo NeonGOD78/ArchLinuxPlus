@@ -1650,8 +1650,8 @@ setup_snapper() {
 
   info_print "Creating Snapper config for root..."
 
-  # Let Snapper create config and .snapshots subvolume
-  if arch-chroot /mnt snapper --config root create-config /; then
+  # Let Snapper create config and .snapshots subvolume (without DBus)
+  if arch-chroot /mnt snapper --no-dbus --config root create-config /; then
     startup_ok "Snapper config created successfully"
   else
     startup_fail "Snapper config creation failed"
@@ -1683,13 +1683,12 @@ setup_snapper() {
   fi
 
   # Create initial snapshot
-  if arch-chroot /mnt snapper create --description "Initial system state"; then
+  if arch-chroot /mnt snapper --no-dbus create --description "Initial system state"; then
     startup_ok "Initial snapshot created"
   else
     warning_print "Failed to create initial snapshot"
   fi
 }
-
 
 # ==================== Select GRUB THEME ====================
 
