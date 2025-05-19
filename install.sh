@@ -1075,7 +1075,7 @@ create_btrfs_subvolumes() {
     "@tmp"
     "@portables"
     "@machines"
-    "@snapshots"
+    # "@snapshots"  # Removed – will be created by Snapper
   )
 
   for subvol in "${subvolumes[@]}"; do
