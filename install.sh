@@ -2246,22 +2246,41 @@ setup_crypttab() {
 # ==================== Generate Initramfs ====================
 
 generate_initramfs_with_dracut() {
-  section_header "Generating Initramfs with Dracut"
+  section_header "Generating Initramfs with Dracut and Signing Kernel"
 
-  # Find kernel version from installed system
   local kernel_version
-  kernel_version=$(ls /mnt/lib/modules | sort -V | tail -n1)
+  kernel_version=$(ls /mnt/lib/modules | grep -E '^([0-9]+\.){2}[0-9]+' | head -n1)
 
   if [[ -z "$kernel_version" ]]; then
-    error_print "Could not detect installed kernel version in /mnt/lib/modules"
+    error_print "Could not determine kernel version inside target system (/mnt/lib/modules)."
     exit 1
   fi
 
   info_print "Generating initramfs for kernel: $kernel_version"
   if arch-chroot /mnt dracut --force --kver "$kernel_version" >> "$LOGFILE" 2>&1; then
-    startup_ok "Initramfs successfully generated with dracut for kernel $kernel_version."
+    startup_ok "Initramfs successfully generated with dracut."
   else
-    error_print "dracut failed to generate initramfs for kernel $kernel_version!"
+    error_print "dracut failed to generate initramfs!"
+    exit 1
+  fi
+
+  # Secure Boot signing of vmlinuz
+  local kernel_path="/mnt/boot/vmlinuz-linux"
+  local signed_output="/mnt/boot/vmlinuz-linux.signed"
+  local key="/mnt/etc/secureboot/keys/db.key"
+  local cert="/mnt/etc/secureboot/keys/db.crt"
+
+  if [[ -f "$kernel_path" ]]; then
+    info_print "Signing kernel image for Secure Boot..."
+    if sbsign --key "$key" --cert "$cert" --output "$signed_output" "$kernel_path" >> "$LOGFILE" 2>&1; then
+      mv "$signed_output" "$kernel_path"
+      startup_ok "Kernel image signed successfully."
+    else
+      error_print "Failed to sign kernel image!"
+      exit 1
+    fi
+  else
+    error_print "Kernel image not found at $kernel_path. Cannot sign."
     exit 1
   fi
 }
