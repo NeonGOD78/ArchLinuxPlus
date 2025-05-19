@@ -1642,23 +1642,27 @@ EOF
 setup_snapper() {
   section_header "Snapper Setup for Root Filesystem"
 
-  # Step 1: Create the .snapshots subvolume inside chroot
+  # Step 1: Create .snapshots subvolume inside chroot
   info_print "Creating .snapshots subvolume in chroot..."
   arch-chroot /mnt btrfs subvolume create /.snapshots >> "$LOGFILE" 2>&1
   startup_ok ".snapshots subvolume created."
 
-  # Step 2: Mount .snapshots subvolume properly
-  mkdir -p /mnt/.snapshots
-  if mount -o noatime,compress=zstd,subvol=.snapshots /dev/mapper/cryptroot /mnt/.snapshots; then
-    startup_ok ".snapshots subvolume mounted."
-  else
-    error_print "Failed to mount .snapshots subvolume."
+  # Step 2: Mount it properly inside chroot
+  info_print "Mounting .snapshots inside chroot..."
+  echo "/dev/mapper/cryptroot /.snapshots btrfs rw,noatime,compress=zstd,subvol=.snapshots 0 0" >> /mnt/etc/fstab
+  arch-chroot /mnt mount /.snapshots >> "$LOGFILE" 2>&1 || {
+    error_print "Failed to mount .snapshots subvolume inside chroot."
     exit 1
-  fi
+  }
+  startup_ok ".snapshots mounted inside chroot."
 
   # Step 3: Create Snapper config
   info_print "Creating Snapper config for root..."
   arch-chroot /mnt snapper --no-dbus --config root create-config /
+  if [[ ! -f /mnt/etc/snapper/configs/root ]]; then
+    error_print "Snapper config was not created!"
+    exit 1
+  fi
   startup_ok "Snapper configuration for root created."
 
   # Step 4: Adjust Snapper config
