@@ -2269,39 +2269,33 @@ setup_boot_targets() {
 # ==================== Setup Crypttab ====================
 
 setup_crypttab() {
-  section_header "Creating /etc/crypttab with cryptroot and crypthome mappings"
+  section_header "Creating /etc/crypttab with crypthome mapping only"
 
   local crypttab_path="/mnt/etc/crypttab"
-  local root_uuid home_uuid
+  local home_uuid
 
-  # Hent luks UUIDs
-  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
-  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
+  # Hent luks UUID for separat home (hvis valgt)
+  if [[ "$SEPARATE_HOME" == true ]]; then
+    home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
 
-  # Valider UUIDs
-  if [[ -z "$root_uuid" ]]; then
-    error_print "Unable to retrieve LUKS UUID for root partition."
-    exit 1
-  fi
-
-  if [[ "$SEPARATE_HOME" == true && -z "$home_uuid" ]]; then
-    error_print "Unable to retrieve LUKS UUID for /home partition."
-    exit 1
+    if [[ -z "$home_uuid" ]]; then
+      error_print "Unable to retrieve LUKS UUID for /home partition."
+      exit 1
+    fi
   fi
 
   mkdir -p /mnt/etc
 
-  # Skriv filen
+  # Skriv crypttab (kun crypthome hvis aktiv)
   {
-    echo "cryptroot UUID=$root_uuid none luks,discard"
     if [[ "$SEPARATE_HOME" == true ]]; then
       echo "crypthome UUID=$home_uuid none luks,nofail,x-systemd.device-timeout=0"
     fi
   } > "$crypttab_path"
 
   # Valider at filen blev skrevet
-  if [[ ! -s "$crypttab_path" ]]; then
-    error_print "/etc/crypttab was not created properly."
+  if [[ ! -f "$crypttab_path" ]]; then
+    error_print "/etc/crypttab was not created."
     exit 1
   fi
 
