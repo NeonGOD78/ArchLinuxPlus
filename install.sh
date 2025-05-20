@@ -1498,7 +1498,7 @@ setup_grub_bootloader() {
     warning_print "Failed to download GRUB theme. Skipping theme installation."
   fi
 
-  # Configure grub
+  # Configure /etc/default/grub
   info_print "Configuring /etc/default/grub..."
   sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
   sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
@@ -1513,23 +1513,22 @@ setup_grub_bootloader() {
   grep -q "^GRUB_TERMINAL_OUTPUT=" "$grub_cfg_file" || echo "GRUB_TERMINAL_OUTPUT=gfxterm" >> "$grub_cfg_file"
   grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file" || echo "GRUB_TIMEOUT=5" >> "$grub_cfg_file"
   grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file" || echo "GRUB_TIMEOUT_STYLE=menu" >> "$grub_cfg_file"
-
   echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-  # Get luks UUID and write proper GRUB_CMDLINE_LINUX
+  # Add luks UUID for proper unlock behavior
   local luks_uuid
   luks_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION")
   if [[ -n "$luks_uuid" ]]; then
     sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-    echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$luks_uuid:cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
-    startup_ok "Added GRUB_CMDLINE_LINUX with luks UUID."
+    echo "GRUB_CMDLINE_LINUX=\"rd.luks.name=$luks_uuid=cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
+    startup_ok "Added GRUB_CMDLINE_LINUX with rd.luks.name= to avoid double prompt."
   else
     warning_print "Could not detect luks UUID. GRUB_CMDLINE_LINUX not set!"
   fi
 
-  echo 'GRUB_ENABLE_CRYPTODISK=y' >> "$grub_cfg_file"
+  echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-  # Install GRUB bootloader
+  # Install GRUB bootloader with luks/cryptodisk support
   info_print "Installing GRUB bootloader with luks support..."
   local grub_nvram_flag
   grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
@@ -1541,13 +1540,13 @@ setup_grub_bootloader() {
     $grub_nvram_flag \
     --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
     --recheck >> "$LOGFILE" 2>&1; then
-    startup_ok "GRUB bootloader installed successfully."
+    startup_ok "GRUB bootloader installed successfully with luks support."
   else
     error_print "GRUB install failed!"
     exit 1
   fi
 
-  # Sign grubx64.efi (inside chroot)
+  # Sign grubx64.efi
   if arch-chroot /mnt sbsign \
     --key /etc/secureboot/keys/db.key \
     --cert /etc/secureboot/keys/db.crt \
@@ -1572,7 +1571,7 @@ setup_grub_bootloader() {
     exit 1
   fi
 
-  startup_ok "GRUB setup complete. GRUB will now unlock LUKS and boot normally."
+  startup_ok "GRUB setup complete. luks will be unlocked in GRUB, no double prompt."
 }
 
 # ==================== Setup GRUB pacman hook ====================
