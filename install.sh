@@ -2131,16 +2131,16 @@ verify_boot_integrity() {
     echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
   fi
 
-  # luks parameter i cmdline
-  if grep -qE "cryptdevice=|rd.luks.name=" "$cmdline"; then
-    echo "[OK] luks kernel parameter found in GRUB cmdline." >> "$LOGFILE"
+  # kernel cmdline
+  if grep -q 'root=/dev/mapper/cryptroot' "$cmdline"; then
+    echo "[OK] Kernel cmdline specifies correct root device." >> "$LOGFILE"
   else
-    error_print "GRUB cmdline is missing luks parameter (cryptdevice or rd.luks.name)."
-    echo "[FAIL] luks parameter not found in cmdline." >> "$LOGFILE"
+    error_print "Kernel cmdline missing root=/dev/mapper/cryptroot"
+    echo "[FAIL] root parameter missing in cmdline." >> "$LOGFILE"
     fail=true
   fi
 
-  # initramfs file check
+  # initramfs
   if [[ -f "$initrd" ]]; then
     echo "[OK] Initramfs found: $initrd" >> "$LOGFILE"
   else
@@ -2149,29 +2149,26 @@ verify_boot_integrity() {
     fail=true
   fi
 
-  # mkinitcpio.conf encrypt hook
-  if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
-    echo "[OK] mkinitcpio.conf contains 'encrypt' hook." >> "$LOGFILE"
-  else
-    error_print "encrypt hook not found in mkinitcpio.conf!"
-    echo "[FAIL] Missing 'encrypt' hook." >> "$LOGFILE"
+  # mkinitcpio hook check (no encrypt expected)
+  if grep -q '^HOOKS=.*encrypt' "$mkinitcpio_conf"; then
+    error_print "Unexpected 'encrypt' hook found in mkinitcpio.conf!"
+    echo "[FAIL] encrypt hook present but not needed." >> "$LOGFILE"
     fail=true
+  else
+    echo "[OK] mkinitcpio.conf does not contain 'encrypt' hook." >> "$LOGFILE"
   fi
 
-  # crypttab existence and content
+  # crypttab check (no cryptroot expected)
   if [[ -f "$crypttab" ]]; then
     echo "[OK] /etc/crypttab exists." >> "$LOGFILE"
     if grep -q 'cryptroot' "$crypttab"; then
-      echo "[OK] crypttab contains cryptroot entry." >> "$LOGFILE"
+      warning_print "crypttab contains cryptroot entry, but it should not!"
+      echo "[WARN] cryptroot entry found, may cause double-unlock." >> "$LOGFILE"
     else
-      error_print "crypttab exists but no cryptroot entry found!"
-      echo "[FAIL] cryptroot entry missing in crypttab." >> "$LOGFILE"
-      fail=true
+      echo "[OK] crypttab does not contain cryptroot entry." >> "$LOGFILE"
     fi
   else
-    error_print "/etc/crypttab missing!"
-    echo "[FAIL] crypttab does not exist." >> "$LOGFILE"
-    fail=true
+    echo "[OK] /etc/crypttab missing – acceptable if not using separate /home." >> "$LOGFILE"
   fi
 
   echo "== Boot Verification Complete ==" >> "$LOGFILE"
