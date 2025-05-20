@@ -2091,17 +2091,16 @@ verify_boot_integrity() {
   local grub_cfg="/mnt/boot/grub/grub.cfg"
   local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
-  local cmdline_file="/mnt/etc/kernel/cmdline"
-  local grub_default="/mnt/etc/default/grub"
+  local cmdline="/mnt/etc/default/grub"
   local crypttab="/mnt/etc/crypttab"
   local initrd="/mnt/boot/initramfs-linux.img"
   local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-  echo "==== Boot Integrity Verification ====" >> "$LOGFILE"
+  echo "== Boot Verification Start ==" >> "$LOGFILE"
 
   # grub.cfg
   if [[ -f "$grub_cfg" ]]; then
-    success_print "grub.cfg exists"
+    startup_ok "grub.cfg exists."
     echo "[OK] grub.cfg exists." >> "$LOGFILE"
   else
     error_print "Missing GRUB config: $grub_cfg"
@@ -2111,10 +2110,10 @@ verify_boot_integrity() {
 
   # grubx64.efi
   if [[ -f "$grub_efi" ]]; then
-    success_print "grubx64.efi found"
+    startup_ok "grubx64.efi found."
     echo "[OK] grubx64.efi found." >> "$LOGFILE"
     if arch-chroot /mnt sbverify --cert /etc/secureboot/keys/db.crt /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
-      success_print "grubx64.efi is signed"
+      startup_ok "grubx64.efi is signed and valid."
       echo "[OK] grubx64.efi is signed and valid." >> "$LOGFILE"
     else
       error_print "grubx64.efi is not signed correctly!"
@@ -2122,33 +2121,33 @@ verify_boot_integrity() {
       fail=true
     fi
   else
-    error_print "Missing grubx64.efi"
+    error_print "Missing GRUB EFI binary: $grub_efi"
     echo "[FAIL] grubx64.efi not found." >> "$LOGFILE"
     fail=true
   fi
 
   # fallback EFI
   if [[ -f "$fallback_efi" ]]; then
-    success_print "Fallback BOOTX64.EFI exists"
-    echo "[OK] Fallback BOOTX64.EFI exists." >> "$LOGFILE"
+    startup_ok "Fallback BOOTX64.EFI found."
+    echo "[OK] Fallback BOOTX64.EFI found." >> "$LOGFILE"
   else
-    warning_print "Fallback BOOTX64.EFI missing"
+    warning_print "Fallback BOOTX64.EFI missing. Some UEFI firmwares require this."
     echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
   fi
 
-  # kernel cmdline
-  if grep -q 'root=/dev/mapper/cryptroot' "$cmdline_file" || grep -q 'root=/dev/mapper/cryptroot' "$grub_default"; then
-    success_print "Kernel cmdline specifies root=cryptroot"
-    echo "[OK] Kernel cmdline specifies correct root device." >> "$LOGFILE"
+  # luks parameter i cmdline
+  if grep -qE "cryptdevice=|rd.luks.name=" "$cmdline"; then
+    startup_ok "GRUB cmdline contains luks parameter."
+    echo "[OK] luks kernel parameter found in GRUB cmdline." >> "$LOGFILE"
   else
-    error_print "Kernel cmdline missing root=/dev/mapper/cryptroot"
-    echo "[FAIL] Kernel root= parameter not found." >> "$LOGFILE"
+    error_print "GRUB cmdline is missing luks parameter (cryptdevice or rd.luks.name)."
+    echo "[FAIL] luks parameter not found in cmdline." >> "$LOGFILE"
     fail=true
   fi
 
-  # initramfs
+  # initramfs file check
   if [[ -f "$initrd" ]]; then
-    success_print "Initramfs image exists"
+    startup_ok "Initramfs exists."
     echo "[OK] Initramfs found: $initrd" >> "$LOGFILE"
   else
     error_print "Missing initramfs: $initrd"
@@ -2156,35 +2155,38 @@ verify_boot_integrity() {
     fail=true
   fi
 
-  # mkinitcpio HOOKS check (must NOT include encrypt)
-  if grep -q '^HOOKS=.*encrypt' "$mkinitcpio_conf"; then
-    error_print "'encrypt' hook found – should NOT be present"
-    echo "[FAIL] Unexpected 'encrypt' hook in mkinitcpio.conf." >> "$LOGFILE"
-    fail=true
+  # mkinitcpio.conf encrypt hook
+  if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
+    startup_ok "'encrypt' hook present in mkinitcpio.conf"
+    echo "[OK] mkinitcpio.conf contains 'encrypt' hook." >> "$LOGFILE"
   else
-    success_print "mkinitcpio.conf does not include 'encrypt' hook"
-    echo "[OK] No 'encrypt' hook present in mkinitcpio.conf." >> "$LOGFILE"
+    error_print "encrypt hook not found in mkinitcpio.conf!"
+    echo "[FAIL] Missing 'encrypt' hook." >> "$LOGFILE"
+    fail=true
   fi
 
-  # crypttab
+  # crypttab existence and content
   if [[ -f "$crypttab" ]]; then
+    startup_ok "/etc/crypttab exists."
     echo "[OK] /etc/crypttab exists." >> "$LOGFILE"
     if grep -q 'cryptroot' "$crypttab"; then
-      warning_print "crypttab contains cryptroot – should be removed"
-      echo "[WARN] cryptroot found in crypttab (should not be present)." >> "$LOGFILE"
+      startup_ok "cryptroot mapping found in crypttab."
+      echo "[OK] crypttab contains cryptroot entry." >> "$LOGFILE"
     else
-      success_print "crypttab valid (no cryptroot)"
-      echo "[OK] crypttab does not contain cryptroot." >> "$LOGFILE"
+      error_print "crypttab exists but no cryptroot entry found!"
+      echo "[FAIL] cryptroot entry missing in crypttab." >> "$LOGFILE"
+      fail=true
     fi
   else
-    success_print "crypttab missing – acceptable"
-    echo "[OK] crypttab missing – acceptable if no crypthome." >> "$LOGFILE"
+    error_print "/etc/crypttab missing!"
+    echo "[FAIL] crypttab does not exist." >> "$LOGFILE"
+    fail=true
   fi
 
-  echo "==== Boot Integrity Verification Complete ====" >> "$LOGFILE"
+  echo "== Boot Verification Complete ==" >> "$LOGFILE"
 
   if [[ "$fail" == true ]]; then
-    error_print "Boot integrity check failed. See $LOGFILE for details."
+    error_print "Boot verification failed! Check $LOGFILE for details."
     exit 1
   else
     startup_ok "Boot setup verified successfully. System is ready to boot!"
