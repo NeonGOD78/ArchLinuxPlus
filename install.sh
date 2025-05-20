@@ -1004,7 +1004,7 @@ encrypt_partitions() {
 
   # Encrypt root
   info_print "Encrypting root partition: $ROOT_PARTITION"
-  echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$ROOT_PARTITION" -q --type luks2 &>> "$LOGFILE" || {
+  echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$ROOT_PARTITION" -q --type luks2 --pbkdf pbkdf2 &>> "$LOGFILE" || {
     error_print "Failed to format root partition with LUKS."
     exit 1
   }
@@ -1017,7 +1017,7 @@ encrypt_partitions() {
   # Encrypt home (if separate home selected)
   if [[ "$SEPARATE_HOME" == true ]]; then
     info_print "Encrypting home partition: $HOME_PARTITION"
-    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$HOME_PARTITION" -q --type luks2 &>> "$LOGFILE" || {
+    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat "$HOME_PARTITION" -q --type luks2 --pbkdf pbkdf2 &>> "$LOGFILE" || {
       error_print "Failed to format home partition with LUKS."
       exit 1
     }
