@@ -1426,6 +1426,7 @@ setup_cmdline_file() {
   section_header "Generating Kernel Command Line"
 
   local cmdline_path="/mnt/etc/kernel/cmdline"
+  local grub_file="/mnt/etc/default/grub"
   local crypttab_path="/mnt/etc/crypttab"
   local root_uuid home_uuid
 
@@ -1444,17 +1445,20 @@ setup_cmdline_file() {
     exit 1
   fi
 
-  # Skriv cmdline til mkinitcpio-format
+  # Skriv cmdline til kernel/cmdline (til logging og evt. fremtidig brug)
   {
     echo -n "cryptdevice=UUID=$root_uuid:cryptroot"
     echo -n " root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
   } > "$cmdline_path"
 
-  # Valider at filen blev skrevet
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
   fi
+
+  # Sæt GRUB_CMDLINE_LINUX korrekt i /etc/default/grub
+  sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_file"
+  echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$root_uuid:cryptroot root=/dev/mapper/cryptroot rw quiet splash loglevel=3\"" >> "$grub_file"
 
   # Tjek om UUIDs findes i /etc/crypttab
   if ! grep -q "UUID=$root_uuid" "$crypttab_path"; then
@@ -1471,7 +1475,11 @@ setup_cmdline_file() {
   cat "$cmdline_path" >> "$LOGFILE"
   echo "-----------------------------------" >> "$LOGFILE"
 
-  startup_ok "Kernel command line written to $cmdline_path and validated"
+  echo "--- /etc/default/grub updated with cmdline ---" >> "$LOGFILE"
+  grep GRUB_CMDLINE_LINUX "$grub_file" >> "$LOGFILE"
+  echo "------------------------------------------------" >> "$LOGFILE"
+
+  startup_ok "Kernel command line written and GRUB_CMDLINE_LINUX updated"
 }
 
 # ==================== Setup GRUB Bootloader ====================
