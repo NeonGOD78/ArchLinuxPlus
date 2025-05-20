@@ -1646,10 +1646,11 @@ setup_snapper() {
 
   local config_path="/mnt/etc/snapper/configs/root"
   local snapshot_subvol="/mnt/.snapshots"
+  local grub_btrfs_config="/mnt/etc/default/grub-btrfs/config"
 
   info_print "Creating Snapper config for root..."
 
-  # Let Snapper create config and .snapshots subvolume (without DBus)
+  # Let Snapper create config and .snapshots subvolume
   if arch-chroot /mnt snapper --no-dbus --config root create-config /; then
     startup_ok "Snapper config created successfully"
   else
@@ -1657,13 +1658,10 @@ setup_snapper() {
     exit 1
   fi
 
-  # Verify .snapshots now exists
-  if [[ ! -d "$snapshot_subvol" ]]; then
-    startup_fail "Expected .snapshots subvolume not found after snapper config"
-    exit 1
-  fi
+  # Ensure .snapshots mountpoint exists
+  mkdir -p "$snapshot_subvol"
 
-  # Remount .snapshots subvolume (if needed)
+  # Remount .snapshots subvolume
   if mountpoint -q "$snapshot_subvol"; then
     umount "$snapshot_subvol"
   fi
@@ -1674,11 +1672,11 @@ setup_snapper() {
     warning_print "Failed to remount .snapshots – Snapper may still function"
   fi
 
-  # Enable systemd services (timeline + cleanup only)
+  # Enable systemd timers
   if arch-chroot /mnt systemctl enable snapper-timeline.timer snapper-cleanup.timer &>/dev/null; then
     startup_ok "Enabled snapper-timeline.timer and snapper-cleanup.timer"
   else
-    warning_print "Failed to enable one or more snapper timer services"
+    warning_print "Failed to enable Snapper timer services"
   fi
 
   # Create initial snapshot
@@ -1687,6 +1685,18 @@ setup_snapper() {
   else
     warning_print "Failed to create initial snapshot"
   fi
+
+  # ==================== grub-btrfs Snapshot Menu Support ====================
+
+  mkdir -p "$(dirname "$grub_btrfs_config")"
+
+  if [[ -f "$grub_btrfs_config" ]]; then
+    sed -i 's|^#\?GRUB_BTRFS_GRUB_DIRNAME=.*|GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"|' "$grub_btrfs_config"
+  else
+    echo 'GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"' > "$grub_btrfs_config"
+  fi
+
+  startup_ok "grub-btrfs configured for GRUB snapshot menu support"
 }
 
 # ==================== Select GRUB THEME ====================
