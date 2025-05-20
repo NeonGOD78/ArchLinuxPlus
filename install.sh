@@ -2152,12 +2152,12 @@ verify_boot_integrity() {
     echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
   fi
 
-  # Cmdline check
-  if grep -q "cryptdevice=" "$cmdline"; then
-    echo "[OK] GRUB cmdline contains cryptdevice parameter." >> "$LOGFILE"
+  # Cmdline check (accept both cryptdevice= or rd.luks.name=)
+  if grep -qE "cryptdevice=|rd.luks.name=" "$cmdline"; then
+    echo "[OK] GRUB cmdline contains required luks parameter." >> "$LOGFILE"
   else
-    error_print "GRUB cmdline is missing cryptdevice parameter."
-    echo "[FAIL] cryptdevice parameter not found in cmdline." >> "$LOGFILE"
+    error_print "GRUB cmdline is missing luks parameter (cryptdevice or rd.luks.name)."
+    echo "[FAIL] luks parameter not found in cmdline." >> "$LOGFILE"
     fail=true
   fi
 
