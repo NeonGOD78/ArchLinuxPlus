@@ -1686,8 +1686,7 @@ setup_snapper() {
     warning_print "Failed to create initial snapshot"
   fi
 
-  # ==================== grub-btrfs Snapshot Menu Support ====================
-
+  # grub-btrfs Snapshot Menu Support
   mkdir -p "$(dirname "$grub_btrfs_config")"
 
   if [[ -f "$grub_btrfs_config" ]]; then
@@ -1697,6 +1696,15 @@ setup_snapper() {
   fi
 
   startup_ok "grub-btrfs configured for GRUB snapshot menu support"
+
+  # Update grub.cfg so snapshot menu is available immediately
+  info_print "Updating grub.cfg to include snapshot menu..."
+
+  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+    startup_ok "grub.cfg updated with snapshots"
+  else
+    warning_print "Failed to update grub.cfg with snapshots"
+  fi
 }
 
 # ==================== Select GRUB THEME ====================
