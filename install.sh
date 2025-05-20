@@ -1427,49 +1427,21 @@ setup_cmdline_file() {
 
   local cmdline_path="/mnt/etc/kernel/cmdline"
   local grub_file="/mnt/etc/default/grub"
-  local crypttab_path="/mnt/etc/crypttab"
-  local root_uuid home_uuid
 
-  # Hent luks UUIDs
-  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
-  home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
+  # Kernel cmdline (mkinitcpio expects luks already unlocked by GRUB)
+  local kernel_cmdline="root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
 
-  # Tjek UUIDs
-  if [[ -z "$root_uuid" ]]; then
-    error_print "Unable to determine luksUUID for root partition."
-    exit 1
-  fi
-
-  if [[ "$SEPARATE_HOME" == true && -z "$home_uuid" ]]; then
-    error_print "Unable to determine luksUUID for home partition."
-    exit 1
-  fi
-
-  # Skriv cmdline til kernel/cmdline (til logging og evt. fremtidig brug)
-  {
-    echo -n "cryptdevice=UUID=$root_uuid:cryptroot"
-    echo -n " root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
-  } > "$cmdline_path"
+  # Skriv kernel cmdline til /etc/kernel/cmdline
+  echo "$kernel_cmdline" > "$cmdline_path"
 
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
   fi
 
-  # Sæt GRUB_CMDLINE_LINUX korrekt i /etc/default/grub
+  # Sæt GRUB_CMDLINE_LINUX i /etc/default/grub
   sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_file"
-  echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=$root_uuid:cryptroot root=/dev/mapper/cryptroot rw quiet splash loglevel=3\"" >> "$grub_file"
-
-  # Tjek om UUIDs findes i /etc/crypttab
-  if ! grep -q "UUID=$root_uuid" "$crypttab_path"; then
-    error_print "cryptroot UUID not found in /etc/crypttab"
-    exit 1
-  fi
-
-  if [[ "$SEPARATE_HOME" == true ]] && ! grep -q "UUID=$home_uuid" "$crypttab_path"; then
-    error_print "crypthome UUID not found in /etc/crypttab"
-    exit 1
-  fi
+  echo "GRUB_CMDLINE_LINUX=\"$kernel_cmdline\"" >> "$grub_file"
 
   echo "--- /etc/kernel/cmdline content ---" >> "$LOGFILE"
   cat "$cmdline_path" >> "$LOGFILE"
