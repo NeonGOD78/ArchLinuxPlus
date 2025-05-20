@@ -2305,11 +2305,11 @@ generate_initramfs_with_mkinitcpio() {
 
   local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-  # === Set HOOKS for GRUB-unlocked luks, plymouth, and filesystems ===
-  sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block filesystems keyboard plymouth)/' "$mkinitcpio_conf"
-  startup_ok "mkinitcpio hooks updated for luks via GRUB, plymouth, and btrfs support."
+  # === Set HOOKS: luks needs encrypt, filesystem is Btrfs, and plymouth for splash ===
+  sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block encrypt filesystems keyboard plymouth)/' "$mkinitcpio_conf"
+  startup_ok "mkinitcpio hooks updated for luks1 with GRUB-unlocked boot, encrypted root and Btrfs."
 
-  # === Optional: Set COMPRESSION ===
+  # === Optional: Enable zstd compression ===
   sed -i 's/^#COMPRESSION=.*/COMPRESSION="zstd"/' "$mkinitcpio_conf"
   startup_ok "Initramfs compression set to zstd."
 
