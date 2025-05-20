@@ -2114,10 +2114,13 @@ verify_boot_integrity() {
   local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
   local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
   local cmdline="/mnt/etc/default/grub"
+  local crypttab="/mnt/etc/crypttab"
+  local initrd="/mnt/boot/initramfs-linux.img"
+  local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
   echo "== Boot Verification Start ==" >> "$LOGFILE"
 
-  # GRUB config
+  # grub.cfg
   if [[ -f "$grub_cfg" ]]; then
     echo "[OK] grub.cfg exists." >> "$LOGFILE"
   else
@@ -2129,8 +2132,6 @@ verify_boot_integrity() {
   # grubx64.efi
   if [[ -f "$grub_efi" ]]; then
     echo "[OK] grubx64.efi found." >> "$LOGFILE"
-
-    # Check signature inside chroot
     if arch-chroot /mnt sbverify --cert /etc/secureboot/keys/db.crt /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
       echo "[OK] grubx64.efi is signed and valid." >> "$LOGFILE"
     else
@@ -2144,7 +2145,7 @@ verify_boot_integrity() {
     fail=true
   fi
 
-  # Fallback EFI
+  # fallback EFI
   if [[ -f "$fallback_efi" ]]; then
     echo "[OK] Fallback BOOTX64.EFI found." >> "$LOGFILE"
   else
@@ -2152,12 +2153,46 @@ verify_boot_integrity() {
     echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
   fi
 
-  # Cmdline check (accept both cryptdevice= or rd.luks.name=)
+  # luks parameter i cmdline
   if grep -qE "cryptdevice=|rd.luks.name=" "$cmdline"; then
-    echo "[OK] GRUB cmdline contains required luks parameter." >> "$LOGFILE"
+    echo "[OK] luks kernel parameter found in GRUB cmdline." >> "$LOGFILE"
   else
     error_print "GRUB cmdline is missing luks parameter (cryptdevice or rd.luks.name)."
     echo "[FAIL] luks parameter not found in cmdline." >> "$LOGFILE"
+    fail=true
+  fi
+
+  # initramfs file check
+  if [[ -f "$initrd" ]]; then
+    echo "[OK] Initramfs found: $initrd" >> "$LOGFILE"
+  else
+    error_print "Missing initramfs: $initrd"
+    echo "[FAIL] Missing initramfs file." >> "$LOGFILE"
+    fail=true
+  fi
+
+  # mkinitcpio.conf encrypt hook
+  if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
+    echo "[OK] mkinitcpio.conf contains 'encrypt' hook." >> "$LOGFILE"
+  else
+    error_print "encrypt hook not found in mkinitcpio.conf!"
+    echo "[FAIL] Missing 'encrypt' hook." >> "$LOGFILE"
+    fail=true
+  fi
+
+  # crypttab existence and content
+  if [[ -f "$crypttab" ]]; then
+    echo "[OK] /etc/crypttab exists." >> "$LOGFILE"
+    if grep -q 'cryptroot' "$crypttab"; then
+      echo "[OK] crypttab contains cryptroot entry." >> "$LOGFILE"
+    else
+      error_print "crypttab exists but no cryptroot entry found!"
+      echo "[FAIL] cryptroot entry missing in crypttab." >> "$LOGFILE"
+      fail=true
+    fi
+  else
+    error_print "/etc/crypttab missing!"
+    echo "[FAIL] crypttab does not exist." >> "$LOGFILE"
     fail=true
   fi
 
