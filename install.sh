@@ -1444,15 +1444,13 @@ setup_cmdline_file() {
     exit 1
   fi
 
-  # Skriv cmdline
+  # Skriv cmdline til mkinitcpio-format
   {
-    echo -n "rd.luks.name=$root_uuid=cryptroot"
-    if [[ "$SEPARATE_HOME" == true ]]; then
-      echo -n " rd.luks.name=$home_uuid=crypthome"
-    fi
-    echo " root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
+    echo -n "cryptdevice=UUID=$root_uuid:cryptroot"
+    echo -n " root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
   } > "$cmdline_path"
 
+  # Valider at filen blev skrevet
   if [[ ! -s "$cmdline_path" ]]; then
     error_print "Failed to write kernel command line to $cmdline_path"
     exit 1
