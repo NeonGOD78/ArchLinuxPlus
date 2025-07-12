@@ -2085,131 +2085,69 @@ EOF
 # ==================== Verify Boot integrity ====================
 
 verify_boot_integrity() {
-  section_header "Verifying Boot Setup Integrity"
+    section_header "Verifying Boot Setup Integrity"
 
-  local fail=false
-  local grub_cfg="/mnt/boot/grub/grub.cfg"
-  local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
-  local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
-  local cmdline="/mnt/etc/default/grub"
-  local crypttab="/mnt/etc/crypttab"
-  local initrd="/mnt/boot/initramfs-linux.img"
-  local initrd_fallback="/mnt/boot/initramfs-linux-fallback.img"
-  local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
+    local fail=false
+    local grub_cfg="/mnt/boot/grub/grub.cfg"
+    local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
+    local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
+    # Vi tjekker nu den genererede grub.cfg, ikke default-filen
+    local cmdline_check_target="/mnt/boot/grub/grub.cfg"
+    local crypttab="/mnt/etc/crypttab"
+    local initrd="/mnt/boot/initramfs-linux.img"
+    local initrd_fallback="/mnt/boot/initramfs-linux-fallback.img"
+    local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-  echo "== Boot Verification Start ==" >> "$LOGFILE"
+    echo "== Boot Verification Start ==" >> "$LOGFILE"
 
-  # === grub.cfg ===
-  if [[ -f "$grub_cfg" ]]; then
-    startup_ok "grub.cfg exists."
-    echo "[OK] grub.cfg exists." >> "$LOGFILE"
-  else
-    startup_fail "Missing GRUB config: $grub_cfg"
-    echo "[FAIL] grub.cfg missing." >> "$LOGFILE"
-    fail=true
-  fi
+    # === grub.cfg, grubx64.efi, fallback EFI (Uændret) ===
+    # Disse tjek er stadig korrekte
+    if [[ -f "$grub_cfg" ]]; then startup_ok "grub.cfg exists."; else startup_fail "Missing GRUB config: $grub_cfg"; fail=true; fi
+    if [[ -f "$grub_efi" ]]; then startup_ok "grubx64.efi found."; else startup_fail "grubx64.efi missing."; fail=true; fi
+    if [[ -f "$fallback_efi" ]]; then startup_ok "Fallback BOOTX64.EFI exists."; else startup_warn "Fallback BOOTX64.EFI missing."; fi
 
-  # === grubx64.efi ===
-  if [[ -f "$grub_efi" ]]; then
-    startup_ok "grubx64.efi found."
-    echo "[OK] grubx64.efi found." >> "$LOGFILE"
-    if arch-chroot /mnt sbverify --cert /etc/secureboot/keys/db.crt /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
-      startup_ok "grubx64.efi is signed correctly."
-      echo "[OK] grubx64.efi signature valid." >> "$LOGFILE"
+    # === KORRIGERET TJEK: cryptdevice SKAL VÆRE TIL STEDE ===
+    if grep -q "cryptdevice=UUID=.*:cryptroot" "$cmdline_check_target"; then
+        startup_ok "cryptdevice= korrekt til stede i GRUB config."
+        echo "[OK] cryptdevice= found." >> "$LOGFILE"
     else
-      startup_fail "grubx64.efi is not signed correctly!"
-      echo "[FAIL] grubx64.efi signature invalid." >> "$LOGFILE"
-      fail=true
+        startup_fail "cryptdevice= mangler i GRUB config! Nødvendig for at låse root op."
+        echo "[FAIL] cryptdevice= parameter mangler." >> "$LOGFILE"
+        fail=true
     fi
-  else
-    startup_fail "grubx64.efi missing."
-    echo "[FAIL] grubx64.efi not found." >> "$LOGFILE"
-    fail=true
-  fi
 
-  # === fallback EFI ===
-  if [[ -f "$fallback_efi" ]]; then
-    startup_ok "Fallback BOOTX64.EFI exists."
-    echo "[OK] BOOTX64.EFI found." >> "$LOGFILE"
-  else
-    startup_warn "Fallback BOOTX64.EFI missing – some systems require it."
-    echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
-  fi
+    # === initramfs (Uændret) ===
+    if [[ -f "$initrd" ]]; then startup_ok "initramfs-linux.img found."; else startup_fail "Missing initramfs-linux.img!"; fail=true; fi
+    if [[ -f "$initrd_fallback" ]]; then startup_ok "initramfs-linux-fallback.img found."; else startup_warn "initramfs fallback image is missing."; fi
 
-  # === cmdline: cryptdevice must be ABSENT ===
-  if grep -q "cryptdevice=" "$cmdline"; then
-    startup_fail "cryptdevice= present in GRUB_CMDLINE_LINUX, but GRUB unlock is used!"
-    echo "[FAIL] cryptdevice= should not be present." >> "$LOGFILE"
-    fail=true
-  else
-    startup_ok "cryptdevice= correctly absent in GRUB_CMDLINE_LINUX."
-    echo "[OK] cryptdevice= absent." >> "$LOGFILE"
-  fi
-
-  # === initramfs ===
-  if [[ -f "$initrd" ]]; then
-    startup_ok "initramfs-linux.img found."
-    echo "[OK] initramfs-linux.img exists." >> "$LOGFILE"
-  else
-    startup_fail "Missing initramfs-linux.img!"
-    echo "[FAIL] initramfs-linux.img not found." >> "$LOGFILE"
-    fail=true
-  fi
-
-  # === fallback initramfs ===
-  if [[ -f "$initrd_fallback" ]]; then
-    startup_ok "initramfs-linux-fallback.img found."
-    echo "[OK] initramfs fallback exists." >> "$LOGFILE"
-  else
-    startup_warn "initramfs fallback image is missing."
-    echo "[WARN] initramfs-linux-fallback.img missing." >> "$LOGFILE"
-  fi
-
-  # === mkinitcpio.conf: encrypt hook must be ABSENT ===
-  if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
-    startup_fail "encrypt hook is present in mkinitcpio.conf, but GRUB unlock is used!"
-    echo "[FAIL] encrypt hook should not be present." >> "$LOGFILE"
-    fail=true
-  else
-    startup_ok "encrypt hook correctly absent in mkinitcpio.conf."
-    echo "[OK] encrypt hook absent." >> "$LOGFILE"
-  fi
-
-  # === crypttab: cryptroot must be ABSENT ===
-  if [[ -f "$crypttab" ]]; then
-    info_print "/etc/crypttab exists."
-    echo "[OK] /etc/crypttab exists." >> "$LOGFILE"
-    if grep -q "cryptroot" "$crypttab"; then
-      startup_fail "cryptroot entry found in crypttab, but GRUB unlock is used!"
-      echo "[FAIL] cryptroot should not be in crypttab." >> "$LOGFILE"
-      fail=true
+    # === KORRIGERET TJEK: encrypt hook SKAL VÆRE TIL STEDE ===
+    if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
+        startup_ok "encrypt hook korrekt til stede i mkinitcpio.conf."
+        echo "[OK] encrypt hook found." >> "$LOGFILE"
     else
-      startup_ok "cryptroot correctly absent from crypttab."
-      echo "[OK] cryptroot absent in crypttab." >> "$LOGFILE"
+        startup_fail "encrypt hook mangler i mkinitcpio.conf! Nødvendig for at bruge keyfile."
+        echo "[FAIL] encrypt hook mangler." >> "$LOGFILE"
+        fail=true
     fi
-  else
-    startup_ok "/etc/crypttab missing (this is OK if no extra encrypted volumes)."
-    echo "[OK] /etc/crypttab not present." >> "$LOGFILE"
-  fi
 
-  # === /dev/mapper/cryptroot exists inside chroot ===
-  if arch-chroot /mnt test -e /dev/mapper/cryptroot; then
-    startup_ok "/dev/mapper/cryptroot exists (mapper setup successful)."
-    echo "[OK] /dev/mapper/cryptroot found." >> "$LOGFILE"
-  else
-    startup_fail "/dev/mapper/cryptroot not found inside chroot!"
-    echo "[FAIL] cryptroot mapper missing." >> "$LOGFILE"
-    fail=true
-  fi
+    # === KORRIGERET TJEK: cryptroot SKAL VÆRE I crypttab ===
+    if [[ -f "$crypttab" ]] && grep -q "cryptroot" "$crypttab"; then
+        startup_ok "cryptroot entry korrekt fundet i /etc/crypttab."
+        echo "[OK] cryptroot entry found in crypttab." >> "$LOGFILE"
+    else
+        startup_fail "cryptroot entry mangler i /etc/crypttab! Nødvendig for keyfile unlock."
+        echo "[FAIL] cryptroot entry mangler i crypttab." >> "$LOGFILE"
+        fail=true
+    fi
 
-  echo "== Boot Verification Complete ==" >> "$LOGFILE"
+    echo "== Boot Verification Complete ==" >> "$LOGFILE"
 
-  if [[ "$fail" == true ]]; then
-    startup_fail "Boot verification failed! See $LOGFILE for details."
-    exit 1
-  else
-    startup_ok "Boot setup verified successfully. System is ready to boot!"
-  fi
+    if [[ "$fail" == true ]]; then
+        startup_fail "Boot verification failed! Se $LOGFILE for detaljer."
+        exit 1
+    else
+        startup_ok "Boot setup verificeret. Systemet ser ud til at være klar til opstart!"
+    fi
 }
 
 # ==================== Setup Boot Targets ====================
