@@ -2136,14 +2136,14 @@ verify_boot_integrity() {
     echo "[WARN] BOOTX64.EFI not found." >> "$LOGFILE"
   fi
 
-  # === cmdline ===
+  # === cmdline: cryptdevice must be ABSENT ===
   if grep -q "cryptdevice=" "$cmdline"; then
-    startup_ok "cryptdevice= found in GRUB_CMDLINE_LINUX."
-    echo "[OK] cryptdevice= present." >> "$LOGFILE"
-  else
-    startup_fail "Missing cryptdevice= in GRUB_CMDLINE_LINUX!"
-    echo "[FAIL] cryptdevice= missing." >> "$LOGFILE"
+    startup_fail "cryptdevice= present in GRUB_CMDLINE_LINUX, but GRUB unlock is used!"
+    echo "[FAIL] cryptdevice= should not be present." >> "$LOGFILE"
     fail=true
+  else
+    startup_ok "cryptdevice= correctly absent in GRUB_CMDLINE_LINUX."
+    echo "[OK] cryptdevice= absent." >> "$LOGFILE"
   fi
 
   # === initramfs ===
@@ -2165,32 +2165,31 @@ verify_boot_integrity() {
     echo "[WARN] initramfs-linux-fallback.img missing." >> "$LOGFILE"
   fi
 
-  # === mkinitcpio.conf ===
+  # === mkinitcpio.conf: encrypt hook must be ABSENT ===
   if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
-    startup_ok "encrypt hook present in mkinitcpio.conf."
-    echo "[OK] encrypt hook in mkinitcpio.conf." >> "$LOGFILE"
-  else
-    startup_fail "Missing encrypt hook in mkinitcpio.conf!"
-    echo "[FAIL] encrypt hook missing." >> "$LOGFILE"
+    startup_fail "encrypt hook is present in mkinitcpio.conf, but GRUB unlock is used!"
+    echo "[FAIL] encrypt hook should not be present." >> "$LOGFILE"
     fail=true
+  else
+    startup_ok "encrypt hook correctly absent in mkinitcpio.conf."
+    echo "[OK] encrypt hook absent." >> "$LOGFILE"
   fi
 
-  # === crypttab ===
+  # === crypttab: cryptroot must be ABSENT ===
   if [[ -f "$crypttab" ]]; then
     info_print "/etc/crypttab exists."
     echo "[OK] /etc/crypttab exists." >> "$LOGFILE"
     if grep -q "cryptroot" "$crypttab"; then
-      startup_ok "cryptroot mapping found in crypttab."
-      echo "[OK] cryptroot present." >> "$LOGFILE"
-    else
-      startup_fail "crypttab missing cryptroot entry!"
-      echo "[FAIL] cryptroot entry not in crypttab." >> "$LOGFILE"
+      startup_fail "cryptroot entry found in crypttab, but GRUB unlock is used!"
+      echo "[FAIL] cryptroot should not be in crypttab." >> "$LOGFILE"
       fail=true
+    else
+      startup_ok "cryptroot correctly absent from crypttab."
+      echo "[OK] cryptroot absent in crypttab." >> "$LOGFILE"
     fi
   else
-    startup_fail "Missing /etc/crypttab!"
-    echo "[FAIL] crypttab not found." >> "$LOGFILE"
-    fail=true
+    startup_ok "/etc/crypttab missing (this is OK if no extra encrypted volumes)."
+    echo "[OK] /etc/crypttab not present." >> "$LOGFILE"
   fi
 
   # === /dev/mapper/cryptroot exists inside chroot ===
