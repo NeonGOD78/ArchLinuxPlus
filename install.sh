@@ -1466,7 +1466,7 @@ setup_grub_bootloader() {
 
     info_print "Configuring /etc/default/grub..."
     # ... (alle dine sed-kommandoer for tema, timeout osv. er fine) ...
-    sed -i "s|^GRUB_GFXMODE=.*|$GRUB_GFXMODE|" "$grub_cfg_file"
+    sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=\"$gfx_mode\"|" "$grub_cfg_file"
     sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
     sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$GRUB_THEME_DIR/theme.txt\"|" "$grub_cfg_file"
     sed -i "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|" "$grub_cfg_file"
