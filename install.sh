@@ -2264,19 +2264,29 @@ get_latest_commit_hash() {
 setup_keyfile_for_root_unlock() {
     section_header "Setting up keyfile to unlock root partition"
 
-    # Opret en 4096-byte keyfile med tilfældige data
+    local root_uuid
+    # Hent UUID for rod-partitionen direkte i denne funktion
+    root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
+
+    if [[ -z "$root_uuid" ]]; then
+        error_print "Could not determine UUID for root partition ($ROOT_PARTITION)."
+        error_print "Cannot setup keyfile unlock. Exiting."
+        exit 1
+    fi
+
     info_print "Generating keyfile..."
     arch-chroot /mnt dd if=/dev/random of=/boot/volume.key bs=1 count=4096 >> "$LOGFILE" 2>&1
-
-    # Sæt stramme rettigheder på filen, så kun root kan læse den
     arch-chroot /mnt chmod 600 /boot/volume.key
+    startup_ok "Keyfile generated successfully."
 
-    # Tilføj keyfile som en gyldig nøgle til at låse cryptroot op
-    # Bruger automatisk password fra variablen ENCRYPTION_PASSWORD
     info_print "Adding keyfile to cryptroot LUKS partition automatically..."
-    echo -n "$LUKS_PASSWORD" | arch-chroot /mnt cryptsetup --key-file - luksAddKey /dev/disk/by-uuid/"$ROOT_UUID" /boot/volume.key
-
-    startup_ok "Keyfile successfully created and added to cryptroot."
+    # Brug den fundne UUID og tjek om kommandoen lykkes
+    if echo -n "$LUKS_PASSWORD" | arch-chroot /mnt cryptsetup luksAddKey "/dev/disk/by-uuid/${root_uuid}" /boot/volume.key >> "$LOGFILE" 2>&1; then
+        startup_ok "Keyfile successfully added to cryptroot."
+    else
+        error_print "Failed to add keyfile to LUKS partition! Check log for details."
+        exit 1
+    fi
 }
 
 # ================ PAM Unlock =======================
