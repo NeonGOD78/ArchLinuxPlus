@@ -1463,7 +1463,7 @@ setup_grub_bootloader() {
     local gfx_mode="$GRUB_GFXMODE"
     local theme_url="$GRUB_THEME_URL"
     local grub_cfg_file="/mnt/etc/default/grub"
-    local grub_efi="/efi/EFI/GRUB/grubx64.efi"
+    local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
     local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
     # Download and extract GRUB theme
@@ -1491,10 +1491,7 @@ setup_grub_bootloader() {
     root_partition_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
 
     if [[ -n "$root_partition_uuid" ]]; then
-        # Fjern eventuel eksisterende GRUB_CMDLINE_LINUX linje
         sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-
-        # Tilføj den korrekte linje med cryptdevice=UUID=...
         echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=${root_partition_uuid}:cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
         startup_ok "Added GRUB_CMDLINE_LINUX with cryptdevice= to /etc/default/grub."
     else
@@ -1502,6 +1499,10 @@ setup_grub_bootloader() {
     fi
 
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
+
+    # Geninstaller GRUB for at sikre alle filer er til stede
+    info_print "Ensuring grub package is correctly installed..."
+    arch-chroot /mnt pacman -S --noconfirm grub >> "$LOGFILE" 2>&1
 
     # Install GRUB bootloader med alle nødvendige moduler
     info_print "Installing GRUB bootloader with graphics and luks support..."
