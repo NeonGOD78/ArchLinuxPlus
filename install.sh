@@ -1489,23 +1489,31 @@ setup_grub_bootloader() {
     # Sæt korrekt kernel parameter for kryptering
     local root_partition_uuid
     root_partition_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-
     if [[ -n "$root_partition_uuid" ]]; then
         sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
         echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=${root_partition_uuid}:cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
         startup_ok "Added GRUB_CMDLINE_LINUX with cryptdevice= to /etc/default/grub."
-    else
-        warning_print "Could not detect block UUID for root partition. GRUB_CMDLINE_LINUX not set!"
     fi
-
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Geninstaller GRUB for at sikre alle filer er til stede
-    info_print "Ensuring grub package is correctly installed..."
-    arch-chroot /mnt pacman -S --noconfirm grub >> "$LOGFILE" 2>&1
+    # --- DIAGNOSTIK START ---
+
+    # Trin 1: Geninstaller GRUB og vis output direkte på skærmen
+    info_print "Ensuring grub package is correctly installed (output will be shown)..."
+    arch-chroot /mnt pacman -S --noconfirm grub
+    info_print "Pacman command finished."
+
+    # Trin 2: Verificer om modulet eksisterer EFTER pacman har kørt
+    info_print "Verifying existence of grub module file..."
+    arch-chroot /mnt ls -l /usr/lib/grub/x86_64-efi/jpg.mod
+
+    info_print "Pausing for 5 seconds to allow you to read output..."
+    sleep 5
+
+    # --- DIAGNOSTIK SLUT ---
 
     # Install GRUB bootloader med alle nødvendige moduler
-    info_print "Installing GRUB bootloader with graphics and luks support..."
+    info_print "Attempting to install GRUB bootloader..."
     if ! arch-chroot /mnt grub-install \
         --target=x86_64-efi \
         --efi-directory=/efi \
@@ -1513,6 +1521,8 @@ setup_grub_bootloader() {
         --modules="part_gpt part_msdos fat ext2 normal png jpg jpeg tga efi_gop efi_uga gfxterm gfxmenu all_video videoinfo boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
         --recheck >> "$LOGFILE" 2>&1; then
         error_print "GRUB install failed!"
+        # Efter fejl, vis os de sidste linjer fra loggen
+        tail -n 20 "$LOGFILE"
         exit 1
     fi
     startup_ok "GRUB bootloader installed successfully."
