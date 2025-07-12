@@ -2269,34 +2269,51 @@ setup_boot_targets() {
 # ==================== Setup Crypttab ====================
 
 setup_crypttab() {
-  section_header "Creating /etc/crypttab with optional crypthome"
+    section_header "Creating /etc/crypttab"
 
-  local crypttab_path="/mnt/etc/crypttab"
-  local home_uuid
+    local crypttab_path="/mnt/etc/crypttab"
+    local root_uuid
+    local home_uuid
 
-  mkdir -p /mnt/etc
+    # Sørg for, at /etc-mappen eksisterer
+    mkdir -p /mnt/etc
 
-  if [[ "$SEPARATE_HOME" == true ]]; then
-    home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
-    if [[ -z "$home_uuid" ]]; then
-      error_print "Unable to retrieve LUKS UUID for /home partition."
-      exit 1
+    # 1. Hent UUID for rod-partitionen
+    root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
+    if [[ -z "$root_uuid" ]]; then
+        error_print "Unable to retrieve LUKS UUID for /root partition."
+        exit 1
     fi
 
-    echo "crypthome UUID=$home_uuid none luks,nofail,x-systemd.device-timeout=0" > "$crypttab_path"
-  else
-    # Empty crypttab (no separate home)
-    > "$crypttab_path"
-  fi
+    # 2. Opret ALTID posten for cryptroot med keyfile.
+    #    Dette sikrer, at root låses op automatisk under boot.
+    #    '>' overskriver filen, hvis den eksisterer.
+    echo "cryptroot UUID=$root_uuid /boot/volume.key luks" > "$crypttab_path"
+    startup_ok "Added cryptroot entry with keyfile to crypttab."
 
-  # Log filens indhold
-  echo "--- /etc/crypttab content ---" >> "$LOGFILE"
-  cat "$crypttab_path" >> "$LOGFILE"
-  echo "-----------------------------" >> "$LOGFILE"
+    # 3. Håndter KUN crypthome, hvis en separat home-partition er valgt.
+    if [[ "$SEPARATE_HOME" == true ]]; then
+        home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
+        if [[ -z "$home_uuid" ]]; then
+            error_print "Unable to retrieve LUKS UUID for /home partition."
+            exit 1
+        fi
 
-  startup_ok "/etc/crypttab created and validated successfully"
+        # Tilføj posten for crypthome.
+        # 'none' = ingen keyfile (PAM håndterer password ved login).
+        # 'noauto' = systemet skal IKKE forsøge at mounte den ved boot.
+        # '>>' tilføjer til filen uden at slette cryptroot-posten.
+        echo "crypthome UUID=$home_uuid none luks,noauto" >> "$crypttab_path"
+        startup_ok "Added crypthome entry to crypttab for login-unlock."
+    fi
+
+    # Log filens endelige indhold
+    echo "--- /etc/crypttab content ---" >> "$LOGFILE"
+    cat "$crypttab_path" >> "$LOGFILE"
+    echo "-----------------------------" >> "$LOGFILE"
+
+    startup_ok "/etc/crypttab created successfully."
 }
-
 
 # ==================== Generate Initramfs with mkinitcpio ====================
 
