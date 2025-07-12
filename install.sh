@@ -13,6 +13,7 @@ CYAN='\e[96m'
 
 # ==================== Global Variables ====================
 
+SCRIPT_VERSION="v1.0"
 LOGFILE="/var/log/archinstall.log"
 
 # ======================= Debug Control =======================
