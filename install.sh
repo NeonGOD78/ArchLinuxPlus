@@ -1492,7 +1492,6 @@ setup_grub_bootloader() {
 
     if [[ -n "$luks_uuid" ]]; then
         sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-        # Brug 'rd.luks.uuid=' til at pege initramfs på den korrekte enhed
         echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
         startup_ok "Added GRUB_CMDLINE_LINUX with rd.luks.uuid hint."
     else
@@ -1501,15 +1500,11 @@ setup_grub_bootloader() {
 
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Install GRUB bootloader med alle nødvendige moduler
-    info_print "Installing GRUB bootloader with graphics and luks support..."
-    if ! arch-chroot /mnt grub-install \
-        --target=x86_64-efi \
-        --efi-directory=/efi \
-        --bootloader-id=GRUB \
-        --modules="part_gpt part_msdos fat ext2 normal png jpg jpeg tga efi_gop efi_uga gfxterm gfxmenu all_video videoinfo boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
-        --recheck >> "$LOGFILE" 2>&1; then
+    # Install GRUB bootloader med en simpel standardopsætning
+    info_print "Installing GRUB bootloader (simplified method)..."
+    if ! arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1; then
         error_print "GRUB install failed!"
+        tail -n 20 "$LOGFILE"
         exit 1
     fi
     startup_ok "GRUB bootloader installed successfully."
