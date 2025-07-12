@@ -2065,10 +2065,11 @@ EOF
 # ==================== Verify Boot integrity ====================
 
 verify_boot_integrity() {
-    section_header "Verifying Boot Setup Integrity (Final Version)"
+    section_header "Verifying Boot Setup Integrity (Final, Complete Version)"
 
     local fail=false
     local grub_cfg="/mnt/boot/grub/grub.cfg"
+    local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
     local crypttab="/mnt/etc/crypttab"
     local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
@@ -2077,6 +2078,20 @@ verify_boot_integrity() {
         startup_fail "Missing GRUB config: $grub_cfg" && fail=true
     else
         startup_ok "grub.cfg exists."
+    fi
+
+    if [[ ! -f "$grub_efi" ]]; then
+        startup_fail "Missing GRUB bootloader: $grub_efi" && fail=true
+    else
+        startup_ok "grubx64.efi exists."
+        
+        # NYT TJEK: Verificer Secure Boot signaturen
+        info_print "Verifying Secure Boot signature..."
+        if arch-chroot /mnt sbverify --cert /etc/secureboot/keys/db.crt /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
+            startup_ok "grubx64.efi is signed correctly."
+        else
+            startup_fail "grubx64.efi is NOT signed correctly!" && fail=true
+        fi
     fi
 
     info_print "Verifying kernel command line parameters in grub.cfg..."
