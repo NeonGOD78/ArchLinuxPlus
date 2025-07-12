@@ -1742,28 +1742,38 @@ EOF
 # ======================= Configure Package Management =======================
 
 configure_package_management() {
-  section_header "Package Manager Tweaks and Yay Installation"
+    section_header "Package Manager Tweaks and Yay Installation"
 
-  local pacman_conf="/mnt/etc/pacman.conf"
-  local makepkg_conf="/mnt/etc/makepkg.conf"
+    local pacman_conf="/mnt/etc/pacman.conf"
+    local makepkg_conf="/mnt/etc/makepkg.conf"
 
-  enable_debug
+    # =================================================================
+    # === NYT TRIN: Kopier den optimerede mirrorlist til systemet ===
+    # =================================================================
+    info_print "Copying optimized mirrorlist to new system..."
+    if cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1; then
+        startup_ok "Optimized mirrorlist copied to final installation."
+    else
+        warning_print "Could not copy mirrorlist."
+    fi
 
-  # === Pacman tweaks: farver, parallel downloads osv. ===
-  info_print "Tweaking pacman.conf for color, parallel downloads, and candy..."
-  sed -i 's/^#Color/Color/' "$pacman_conf"
-  grep -q '^ILoveCandy' "$pacman_conf" || sed -i '/^Color/a ILoveCandy' "$pacman_conf"
-  sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 10/' "$pacman_conf"
-  sed -i 's/^#VerbosePkgLists/VerbosePkgLists/' "$pacman_conf"
-  sed -i 's/^#CheckSpace/CheckSpace/' "$pacman_conf"
+    enable_debug
 
-  # === Enable multilib repository ===
-  info_print "Enabling multilib repository..."
-  sed -i '/#\[multilib\]/,/#Include/s/^#//' "$pacman_conf"
+    # === Pacman tweaks: farver, parallel downloads osv. ===
+    info_print "Tweaking pacman.conf for color, parallel downloads, and candy..."
+    sed -i 's/^#Color/Color/' "$pacman_conf"
+    grep -q '^ILoveCandy' "$pacman_conf" || sed -i '/^Color/a ILoveCandy' "$pacman_conf"
+    sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 10/' "$pacman_conf"
+    sed -i 's/^#VerbosePkgLists/VerbosePkgLists/' "$pacman_conf"
+    sed -i 's/^#CheckSpace/CheckSpace/' "$pacman_conf"
 
-  # === Tilføj valgfrie testing-repos (core, extra, multilib) med "Usage = Sync Search" ===
-  if ! grep -q "\[core-testing\]" "$pacman_conf"; then
-    cat <<EOF >> "$pacman_conf"
+    # === Enable multilib repository ===
+    info_print "Enabling multilib repository..."
+    sed -i '/#\[multilib\]/,/#Include/s/^#//' "$pacman_conf"
+
+    # === Tilføj valgfrie testing-repos (core, extra, multilib) med "Usage = Sync Search" ===
+    if ! grep -q "\[core-testing\]" "$pacman_conf"; then
+        cat <<EOF >> "$pacman_conf"
 
 [core-testing]
 Include = /etc/pacman.d/mirrorlist
@@ -1777,28 +1787,28 @@ Usage = Sync Search
 Include = /etc/pacman.d/mirrorlist
 Usage = Sync Search
 EOF
-    startup_ok "Testing repositories (core, extra, multilib) added with 'Usage = Sync Search'."
-  else
-    info_print "Testing repositories already present. Skipping addition."
-  fi
+        startup_ok "Testing repositories (core, extra, multilib) added with 'Usage = Sync Search'."
+    else
+        info_print "Testing repositories already present. Skipping addition."
+    fi
 
-  # === Makepkg tweaks: optimering til parallel builds osv. ===
-  info_print "Optimizing makepkg.conf for parallel builds..."
-  sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf"
-  sed -i 's|^#\?\s*BUILDENV=.*|BUILDENV=(!distcc color !ccache !check !sign)|' "$makepkg_conf"
-  sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf"
-  startup_ok "makepkg.conf optimized."
+    # === Makepkg tweaks: optimering til parallel builds osv. ===
+    info_print "Optimizing makepkg.conf for parallel builds..."
+    sed -i "s/^#MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" "$makepkg_conf"
+    sed -i 's|^#\?\s*BUILDENV=.*|BUILDENV=(!distcc color !ccache !check !sign)|' "$makepkg_conf"
+    sed -i 's/^PKGEXT=.*/PKGEXT=".pkg.tar.zst"/' "$makepkg_conf"
+    startup_ok "makepkg.conf optimized."
 
-  disable_debug
+    disable_debug
 
-  # === Opdater pacman database ===
-  info_print "Updating pacman database..."
-  arch-chroot /mnt pacman -Sy >> "$LOGFILE" 2>&1
+    # === Opdater pacman database ===
+    info_print "Updating pacman database..."
+    arch-chroot /mnt pacman -Sy >> "$LOGFILE" 2>&1
 
-  # === Installér yay AUR helper ===
-  info_print "Installing yay AUR helper..."
-  mkdir -p /mnt/root/scripts
-  cat <<'EOF' > /mnt/root/scripts/yay-install.sh
+    # === Installér yay AUR helper ===
+    info_print "Installing yay AUR helper..."
+    mkdir -p /mnt/root/scripts
+    cat <<'EOF' > /mnt/root/scripts/yay-install.sh
 #!/bin/bash
 set -euo pipefail
 
@@ -1806,29 +1816,29 @@ useradd -m aurbuilder
 echo "aurbuilder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/aurbuilder
 
 sudo -u aurbuilder bash -c '
-  cd /home/aurbuilder
-  git clone https://aur.archlinux.org/yay.git
-  cd yay
-  makepkg -si --noconfirm
+    cd /home/aurbuilder
+    git clone https://aur.archlinux.org/yay.git
+    cd yay
+    makepkg -si --noconfirm
 '
 
 userdel -r aurbuilder || true
 rm -f /etc/sudoers.d/aurbuilder
 EOF
 
-  chmod +x /mnt/root/scripts/yay-install.sh
-  arch-chroot /mnt /root/scripts/yay-install.sh >> "$LOGFILE" 2>&1 || {
-    error_print "yay installation failed."
-    rm -f /mnt/root/scripts/yay-install.sh
-    return 1
-  }
+    chmod +x /mnt/root/scripts/yay-install.sh
+    arch-chroot /mnt /root/scripts/yay-install.sh >> "$LOGFILE" 2>&1 || {
+        error_print "yay installation failed."
+        rm -f /mnt/root/scripts/yay-install.sh
+        return 1
+    }
 
-  rm -f /mnt/root/scripts/yay-install.sh
-  if arch-chroot /mnt bash -c 'which yay' &>/dev/null; then
-    startup_ok "yay installed successfully."
-  else
-    warning_print "yay not found in PATH after installation."
-  fi
+    rm -f /mnt/root/scripts/yay-install.sh
+    if arch-chroot /mnt bash -c 'which yay' &>/dev/null; then
+        startup_ok "yay installed successfully."
+    else
+        warning_print "yay not found in PATH after installation."
+    fi
 }
 
 # ======================= Final Cleanup =======================
