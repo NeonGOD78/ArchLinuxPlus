@@ -2231,36 +2231,6 @@ get_latest_commit_hash() {
   fi
 }
 
-# ==================== setup_keyfile_for_root_unlock ===========================
-
-setup_keyfile_for_root_unlock() {
-    section_header "Setting up keyfile to unlock root partition"
-
-    local root_uuid
-    # Hent UUID for rod-partitionen direkte i denne funktion
-    root_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-
-    if [[ -z "$root_uuid" ]]; then
-        error_print "Could not determine UUID for root partition ($ROOT_PARTITION)."
-        error_print "Cannot setup keyfile unlock. Exiting."
-        exit 1
-    fi
-
-    info_print "Generating keyfile..."
-    arch-chroot /mnt dd if=/dev/random of=/boot/volume.key bs=1 count=4096 >> "$LOGFILE" 2>&1
-    arch-chroot /mnt chmod 600 /boot/volume.key
-    startup_ok "Keyfile generated successfully."
-
-    info_print "Adding keyfile to cryptroot LUKS partition automatically..."
-    # Brug den fundne UUID og tjek om kommandoen lykkes
-    if echo -n "$LUKS_PASSWORD" | arch-chroot /mnt cryptsetup luksAddKey "/dev/disk/by-uuid/${root_uuid}" /boot/volume.key >> "$LOGFILE" 2>&1; then
-        startup_ok "Keyfile successfully added to cryptroot."
-    else
-        error_print "Failed to add keyfile to LUKS partition! Check log for details."
-        exit 1
-    fi
-}
-
 # ================ PAM Unlock =======================
 
 # Funktion til at konfigurere PAM for automatisk oplåsning af /home
