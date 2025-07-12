@@ -2346,6 +2346,26 @@ get_latest_commit_hash() {
   fi
 }
 
+# ==================== setup_keyfile_for_root_unlock ===========================
+
+setup_keyfile_for_root_unlock() {
+    section_header "Setting up keyfile to unlock root partition"
+
+    # Opret en 4096-byte keyfile med tilfældige data
+    info_print "Generating keyfile..."
+    arch-chroot /mnt dd if=/dev/random of=/boot/volume.key bs=1 count=4096 >> "$LOGFILE" 2>&1
+
+    # Sæt stramme rettigheder på filen, så kun root kan læse den
+    arch-chroot /mnt chmod 600 /boot/volume.key
+
+    # Tilføj keyfile som en gyldig nøgle til at låse cryptroot op
+    # Bruger automatisk password fra variablen ENCRYPTION_PASSWORD
+    info_print "Adding keyfile to cryptroot LUKS partition automatically..."
+    echo -n "$ENCRYPTION_PASSWORD" | arch-chroot /mnt cryptsetup --key-file - luksAddKey /dev/disk/by-uuid/"$ROOT_UUID" /boot/volume.key
+
+    startup_ok "Keyfile successfully created and added to cryptroot."
+}
+
 # ==================== Main ====================
 
 main() {
