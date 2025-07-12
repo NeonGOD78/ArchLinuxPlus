@@ -1469,7 +1469,7 @@ setup_grub_bootloader() {
     # Download and extract GRUB theme
     info_print "Downloading and installing GRUB theme: $theme_dir"
     mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-    if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
+    if curl -sSL "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
         bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
         startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
     else
@@ -1503,26 +1503,34 @@ setup_grub_bootloader() {
 
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Install GRUB bootloader
-    info_print "Installing GRUB bootloader with luks support..."
-    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1
+    # Install GRUB bootloader med alle nødvendige moduler
+    info_print "Installing GRUB bootloader with graphics and luks support..."
+    if ! arch-chroot /mnt grub-install \
+        --target=x86_64-efi \
+        --efi-directory=/efi \
+        --bootloader-id=GRUB \
+        --modules="part_gpt part_msdos fat ext2 normal png jpg jpeg tga efi_gop efi_uga gfxterm gfxmenu all_video videoinfo boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
+        --recheck >> "$LOGFILE" 2>&1; then
+        error_print "GRUB install failed!"
+        exit 1
+    fi
+    startup_ok "GRUB bootloader installed successfully."
 
     # Sign grubx64.efi og kopier til fallback
     info_print "Signing GRUB for Secure Boot..."
-    arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output /efi/EFI/GRUB/grubx64.efi /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1
+    arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1
     
     info_print "Creating fallback boot entry..."
     mkdir -p /mnt/efi/EFI/Boot
-    cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
+    cp "$grub_efi" "$fallback_efi"
 
     # Generate grub.cfg
     info_print "Generating grub.cfg..."
-    if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-        startup_ok "grub.cfg generated."
-    else
+    if ! arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
         error_print "Failed to generate grub.cfg!"
         exit 1
     fi
+    startup_ok "grub.cfg generated."
 
     startup_ok "GRUB setup complete."
 }
