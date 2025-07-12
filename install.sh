@@ -2274,13 +2274,25 @@ update_mirrors() {
 section_header "Optimizing Pacman Mirrors"
 info_print "Finding the best and most up-to-date mirrors..."
 
-# Installer reflector
+# Installer reflector, hvis det ikke er der
 if pacman -Sy --noconfirm reflector >> "$LOGFILE" 2>&1; then
-    info_print "Finding the 50 latest synchronized mirrors globally and sorting by speed..."
-    # --latest 50: Vælger de 50 nyest opdaterede servere
-    # --sort rate: Sorterer dem efter download-hastighed
-    reflector --latest 50 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
-    startup_ok "Mirror list updated successfully."
+
+    info_print "Attempting to detect country via IP address..."
+    local country_code
+    # Hent landekoden (med 5 sekunders timeout for at undgå stop)
+    country_code=$(curl -sS --fail --max-time 5 https://ipinfo.io/country)
+
+    if [[ -n "$country_code" ]]; then
+        # SUCCES: Vi fandt landet. Find de 10 nyeste servere og sortér kun dem efter hastighed.
+        info_print "Country detected: $country_code. Finding fastest mirrors in country..."
+        reflector --country "$country_code" --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
+        startup_ok "Mirror list updated for country: $country_code."
+    else
+        # FEJL: Kunne ikke finde landet. Brug et hurtigere globalt alternativ.
+        warning_print "Could not detect country. Using a global list of 50 latest mirrors instead."
+        reflector --latest 50 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
+        startup_ok "Global mirror list updated successfully."
+    fi
 else
     warning_print "Could not install or run reflector. Using default mirrors."
 fi
