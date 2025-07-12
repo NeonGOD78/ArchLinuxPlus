@@ -2437,6 +2437,7 @@ main() {
   move_logfile_to_mnt
   gen_fstab
   setup_crypttab
+  setup_keyfile_for_root_unlock
   setup_zram
   configure_package_management
   save_keymap_config
