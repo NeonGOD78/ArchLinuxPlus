@@ -1466,7 +1466,17 @@ setup_grub_bootloader() {
     local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
     local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
-    # ... (din kode til tema-download og konfiguration af /etc/default/grub er fin) ...
+    # Download and extract GRUB theme
+    info_print "Downloading and installing GRUB theme: $theme_dir"
+    mkdir -p "/mnt/boot/grub/themes/$theme_dir"
+    if curl -sSL "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
+        bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
+        startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
+    else
+        warning_print "Failed to download GRUB theme. Skipping theme installation."
+    fi
+
+    # Configure /etc/default/grub
     info_print "Configuring /etc/default/grub..."
     sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
     sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
@@ -1475,19 +1485,24 @@ setup_grub_bootloader() {
     sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=5|" "$grub_cfg_file"
     sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
+    
+    # --- Final Kernel Parameter Logic ---
+    # 1. Stop GRUB fra selv at tilføje "root=UUID=..." for at undgå konflikt
+    info_print "Disabling GRUB's automatic root UUID detection..."
+    echo 'GRUB_DISABLE_LINUX_UUID=true' >> "$grub_cfg_file"
 
-    # Sæt KUN det nødvendige hint til initramfs.
+    # 2. Definer den fulde, korrekte kernel-linje manuelt
     local luks_uuid
     luks_uuid=$(arch-chroot /mnt cryptsetup luksUUID "$ROOT_PARTITION")
-
     if [[ -n "$luks_uuid" ]]; then
         sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-        echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid\"" >> "$grub_cfg_file"
-        startup_ok "Added GRUB_CMDLINE_LINUX with ONLY the rd.luks.uuid hint."
+        echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
+        startup_ok "Set final, explicit kernel command line."
     else
         warning_print "Could not detect LUKS UUID for root partition!"
     fi
 
+    # 3. Sørg for at GRUB ved, den skal låse en krypteret disk op
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
     # Install GRUB bootloader (simpel, pålidelig metode)
@@ -1502,7 +1517,7 @@ setup_grub_bootloader() {
         exit 1
     fi
     startup_ok "GRUB bootloader installed successfully."
-    
+
     # Tving data til at blive skrevet til disken og vent et øjeblik
     sync
     sleep 1
