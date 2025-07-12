@@ -2061,7 +2061,7 @@ EOF
 # ==================== Verify Boot integrity ====================
 
 verify_boot_integrity() {
-    section_header "Verifying Boot Setup Integrity (Final, Complete Version)"
+    section_header "Verifying Boot Setup Integrity (Final Corrected Version)"
 
     local fail=false
     local grub_cfg="/mnt/boot/grub/grub.cfg"
@@ -2069,25 +2069,17 @@ verify_boot_integrity() {
     local crypttab="/mnt/etc/crypttab"
     local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-    info_print "Verifying essential boot files exist..."
-    if [[ ! -f "$grub_cfg" ]]; then
-        startup_fail "Missing GRUB config: $grub_cfg" && fail=true
-    else
-        startup_ok "grub.cfg exists."
-    fi
-
-    if [[ ! -f "$grub_efi" ]]; then
-        startup_fail "Missing GRUB bootloader: $grub_efi" && fail=true
-    else
+    info_print "Verifying essential boot files..."
+    if [[ -f "$grub_efi" ]]; then
         startup_ok "grubx64.efi exists."
-        
-        # NYT TJEK: Verificer Secure Boot signaturen
         info_print "Verifying Secure Boot signature..."
         if arch-chroot /mnt sbverify --cert /etc/secureboot/keys/db.crt /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
             startup_ok "grubx64.efi is signed correctly."
         else
             startup_fail "grubx64.efi is NOT signed correctly!" && fail=true
         fi
+    else
+        startup_fail "Missing GRUB bootloader: $grub_efi" && fail=true
     fi
 
     info_print "Verifying kernel command line parameters in grub.cfg..."
@@ -2096,17 +2088,17 @@ verify_boot_integrity() {
     else
         startup_fail "Kernel parameter 'rd.luks.uuid=' is MISSING!" && fail=true
     fi
-
-    if grep -q "root=UUID=" "$grub_cfg"; then
-        startup_ok "Kernel parameter 'root=UUID=' is correctly set."
+    
+    if grep -q "root=/dev/mapper/cryptroot" "$grub_cfg"; then
+        startup_ok "Kernel parameter 'root=/dev/mapper/cryptroot' is correctly set."
     else
-        startup_fail "Auto-detected 'root=UUID=' is MISSING!" && fail=true
+        startup_fail "Kernel parameter 'root=/dev/mapper/cryptroot' is MISSING!" && fail=true
     fi
 
-    if grep -q "root=/dev/mapper/cryptroot" "$grub_cfg"; then
-        startup_fail "Conflicting 'root=/dev/mapper/cryptroot' is present and should be removed!" && fail=true
+    if grep -q "root=UUID=" "$grub_cfg"; then
+        startup_fail "Conflicting 'root=UUID=' parameter is present and should be removed!" && fail=true
     else
-        startup_ok "Conflicting 'root=/dev/mapper/cryptroot' is correctly removed."
+        startup_ok "Conflicting 'root=UUID=' parameter is correctly removed."
     fi
 
     info_print "Verifying initramfs and crypttab configuration..."
