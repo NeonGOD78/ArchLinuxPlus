@@ -2276,10 +2276,10 @@ info_print "Finding the best and most up-to-date mirrors..."
 
 # Installer reflector
 if pacman -Sy --noconfirm reflector >> "$LOGFILE" 2>&1; then
-    info_print "Finding the 200 latest synchronized mirrors globally and sorting by speed..."
-    # --latest 200: Vælger de 200 nyest opdaterede servere
+    info_print "Finding the 50 latest synchronized mirrors globally and sorting by speed..."
+    # --latest 50: Vælger de 50 nyest opdaterede servere
     # --sort rate: Sorterer dem efter download-hastighed
-    reflector --latest 200 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
+    reflector --latest 50 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
     startup_ok "Mirror list updated successfully."
 else
     warning_print "Could not install or run reflector. Using default mirrors."
