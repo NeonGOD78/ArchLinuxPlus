@@ -1459,89 +1459,62 @@ setup_cmdline_file() {
 setup_grub_bootloader() {
     section_header "GRUB Bootloader Installation and Theme Setup"
 
-    local theme_dir="$GRUB_THEME_DIR"
-    local gfx_mode="$GRUB_GFXMODE"
-    local theme_url="$GRUB_THEME_URL"
+    # --- Forberedelse uden for chroot ---
     local grub_cfg_file="/mnt/etc/default/grub"
     local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
     local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
-    # Download and extract GRUB theme
-    info_print "Downloading and installing GRUB theme: $theme_dir"
-    mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-    if curl -sSL "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
-        bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
-        startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
-    else
-        warning_print "Failed to download GRUB theme. Skipping theme installation."
-    fi
-
-    # Configure /etc/default/grub
     info_print "Configuring /etc/default/grub..."
-    sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
+    # ... (alle dine sed-kommandoer for tema, timeout osv. er fine) ...
+    sed -i "s|^GRUB_GFXMODE=.*|$GRUB_GFXMODE|" "$grub_cfg_file"
     sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
-    sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"|" "$grub_cfg_file"
+    sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$GRUB_THEME_DIR/theme.txt\"|" "$grub_cfg_file"
     sed -i "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|" "$grub_cfg_file"
     sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=5|" "$grub_cfg_file"
     sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
-    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
-    
-    # --- Final Kernel Parameter Logic ---
-    # 1. Stop GRUB fra selv at tilføje "root=UUID=..." for at undgå konflikt
+
     info_print "Disabling GRUB's automatic root UUID detection..."
     echo 'GRUB_DISABLE_LINUX_UUID=true' >> "$grub_cfg_file"
 
-    # 2. Definer den fulde, korrekte kernel-linje manuelt
     local luks_uuid
     luks_uuid=$(arch-chroot /mnt cryptsetup luksUUID "$ROOT_PARTITION")
     if [[ -n "$luks_uuid" ]]; then
         sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-        echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
+        echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid root=/dev/mapper/cryptroot rw\"" >> "$grub_cfg_file"
         startup_ok "Set final, explicit kernel command line."
-    else
-        warning_print "Could not detect LUKS UUID for root partition!"
     fi
-
-    # 3. Sørg for at GRUB ved, den skal låse en krypteret disk op
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Install GRUB bootloader (simpel, pålidelig metode)
-    info_print "Installing GRUB bootloader..."
-    if ! arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1; then
-        error_print "GRUB install failed! See log for details."
-        tail -n 20 "$LOGFILE"
-        exit 1
-    fi
-    if [ ! -f "$grub_efi" ]; then
-        error_print "GRUB install SILENTLY FAILED! The grubx64.efi file was not created."
-        exit 1
-    fi
-    startup_ok "GRUB bootloader installed successfully."
+    # --- Samlet operation inde i én chroot-session ---
+    info_print "Entering chroot to perform all bootloader tasks..."
+    if ! arch-chroot /mnt /bin/bash -e <<'EOF'
+        echo "--- Inside chroot: Installing GRUB..."
+        grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck
 
-    # Tving data til at blive skrevet til disken og vent et øjeblik
-    sync
-    sleep 1
+        echo "--- Inside chroot: Verifying file existence..."
+        if [ ! -f "/efi/EFI/GRUB/grubx64.efi" ]; then
+            echo "ERROR: grub-install did not create the file!"
+            exit 1
+        fi
+        
+        # Lille pause for filsystemet
+        sync
+        sleep 1
 
-    # Sign grubx64.efi og kopier til fallback, nu med fejlhåndtering
-    info_print "Signing GRUB for Secure Boot..."
-    if ! arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1; then
-        error_print "sbsign command failed! Check log for details."
-        tail -n 20 "$LOGFILE"
+        echo "--- Inside chroot: Signing GRUB..."
+        sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output /efi/EFI/GRUB/grubx64.efi /efi/EFI/GRUB/grubx64.efi
+
+        echo "--- Inside chroot: Generating grub.cfg..."
+        grub-mkconfig -o /boot/grub/grub.cfg
+EOF
+    then
+        error_print "A command inside the chroot session failed! Check output above."
         exit 1
     fi
-    startup_ok "grubx64.efi signed successfully."
     
+    # --- Afsluttende handlinger uden for chroot ---
     info_print "Creating fallback boot entry..."
     cp "$grub_efi" "$fallback_efi"
-
-    # Generate grub.cfg
-    info_print "Generating grub.cfg..."
-    if ! arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-        error_print "Failed to generate grub.cfg!"
-        exit 1
-    fi
-    startup_ok "grub.cfg generated."
-
     startup_ok "GRUB setup complete."
 }
 
