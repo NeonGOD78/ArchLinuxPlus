@@ -1428,17 +1428,8 @@ setup_cmdline_file() {
   local cmdline_path="/mnt/etc/kernel/cmdline"
   local grub_file="/mnt/etc/default/grub"
 
-  # Find luks UUID for root
-  local root_uuid
-  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
-
-  if [[ -z "$root_uuid" ]]; then
-    error_print "Failed to retrieve LUKS UUID for root partition."
-    exit 1
-  fi
-
-  # Kernel cmdline with rd.luks.name
-  local kernel_cmdline="rd.luks.name=$root_uuid=cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
+  # Kernel cmdline WITHOUT luks parameters
+  local kernel_cmdline="root=/dev/mapper/cryptroot rootflags=subvol=@ rw quiet splash loglevel=3"
 
   echo "$kernel_cmdline" > "$cmdline_path"
   if [[ ! -s "$cmdline_path" ]]; then
@@ -1446,7 +1437,10 @@ setup_cmdline_file() {
     exit 1
   fi
 
+  # Remove any existing GRUB_CMDLINE_LINUX
   sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_file"
+
+  # Write new GRUB_CMDLINE_LINUX
   echo "GRUB_CMDLINE_LINUX=\"$kernel_cmdline\"" >> "$grub_file"
 
   echo "--- /etc/kernel/cmdline content ---" >> "$LOGFILE"
