@@ -2325,6 +2325,18 @@ setup_keyfile_for_root_unlock() {
     startup_ok "Keyfile successfully created and added to cryptroot."
 }
 
+# ================ PAM Unlock =======================
+
+# Funktion til at konfigurere PAM for automatisk oplåsning af /home
+configure_pam_for_home_unlock() {
+    section_header "Configuring PAM for auto-unlocking /home"
+
+    # Tilføj pam_cryptsetup.so til PAM's password stack
+    arch-chroot /mnt bash -c 'echo "password optional pam_cryptsetup.so" >> /etc/pam.d/system-login'
+
+    startup_ok "PAM configured to unlock home partition on login."
+}
+
 # ==================== Main ====================
 
 main() {
@@ -2383,6 +2395,7 @@ main() {
   save_hostname_config
   set_timezone
   create_users
+  configure_pam_for_home_unlock
 
   # Secureboot
   setup_secureboot_structure
