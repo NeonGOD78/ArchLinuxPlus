@@ -2248,7 +2248,25 @@ configure_pam_for_home_unlock() {
     startup_ok "PAM configured to unlock home partition on login."
 }
 
- # ==================== Main ====================
+# =================== Mirrors ==================
+
+update_mirrors() {
+section_header "Optimizing Pacman Mirrors"
+info_print "Finding the best and most up-to-date mirrors..."
+
+# Installer reflector
+if pacman -Sy --noconfirm reflector >> "$LOGFILE" 2>&1; then
+    info_print "Finding the 200 latest synchronized mirrors globally and sorting by speed..."
+    # --latest 200: Vælger de 200 nyest opdaterede servere
+    # --sort rate: Sorterer dem efter download-hastighed
+    reflector --latest 200 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
+    startup_ok "Mirror list updated successfully."
+else
+    warning_print "Could not install or run reflector. Using default mirrors."
+fi
+}
+
+# ==================== Main ====================
 
 main() {
   # Help functions
@@ -2271,19 +2289,7 @@ main() {
   get_latest_commit_hash
   banner_archlinuxplus
   log_start
- 
-      # =============================================================
-    section_header "Optimizing Pacman Mirrors"
-    info_print "Finding the best and most up-to-date mirrors..."
-    # Først, synkroniser pacman og installer reflector
-    if pacman -Sy --noconfirm reflector >> "$LOGFILE" 2>&1; then
-        # Kør reflector for at finde de bedste servere og gem dem
-        reflector --country Denmark,Germany --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist >> "$LOGFILE" 2>&1
-        startup_ok "Mirror list updated successfully."
-    else
-        warning_print "Could not install or run reflector. Using default mirrors."
-    fi
-  
+  update_mirrors
   setup_keymap_and_locale
   select_disk
   partition_layout_choice
