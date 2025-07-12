@@ -1466,17 +1466,7 @@ setup_grub_bootloader() {
     local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
     local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
-    # Download and extract GRUB theme
-    info_print "Downloading and installing GRUB theme: $theme_dir"
-    mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-    if curl -sSL "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
-        bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
-        startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
-    else
-        warning_print "Failed to download GRUB theme. Skipping theme installation."
-    fi
-
-    # Configure /etc/default/grub
+    # ... (din kode til tema-download og konfiguration af /etc/default/grub er fin) ...
     info_print "Configuring /etc/default/grub..."
     sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
     sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
@@ -1512,13 +1502,21 @@ setup_grub_bootloader() {
         exit 1
     fi
     startup_ok "GRUB bootloader installed successfully."
+    
+    # Tving data til at blive skrevet til disken og vent et øjeblik
+    sync
+    sleep 1
 
-    # Sign grubx64.efi og kopier til fallback
+    # Sign grubx64.efi og kopier til fallback, nu med fejlhåndtering
     info_print "Signing GRUB for Secure Boot..."
-    arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1
+    if ! arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output "$grub_efi" "$grub_efi" >> "$LOGFILE" 2>&1; then
+        error_print "sbsign command failed! Check log for details."
+        tail -n 20 "$LOGFILE"
+        exit 1
+    fi
+    startup_ok "grubx64.efi signed successfully."
     
     info_print "Creating fallback boot entry..."
-    mkdir -p /mnt/efi/EFI/Boot
     cp "$grub_efi" "$fallback_efi"
 
     # Generate grub.cfg
