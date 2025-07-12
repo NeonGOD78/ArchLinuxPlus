@@ -1466,7 +1466,7 @@ setup_grub_bootloader() {
     local grub_efi="/efi/EFI/GRUB/grubx64.efi"
     local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
-    # Download and extract GRUB theme (Denne del er fin)
+    # Download and extract GRUB theme
     info_print "Downloading and installing GRUB theme: $theme_dir"
     mkdir -p "/mnt/boot/grub/themes/$theme_dir"
     if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
@@ -1476,7 +1476,7 @@ setup_grub_bootloader() {
         warning_print "Failed to download GRUB theme. Skipping theme installation."
     fi
 
-    # Configure /etc/default/grub (Denne del er fin)
+    # Configure /etc/default/grub
     info_print "Configuring /etc/default/grub..."
     sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
     sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
@@ -1486,9 +1486,7 @@ setup_grub_bootloader() {
     sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-    #################################################################
-    # === KORRIGERET BLOK: Sæt korrekt kernel parameter ===
-    #################################################################
+    # Sæt korrekt kernel parameter for kryptering
     local root_partition_uuid
     root_partition_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
 
@@ -1505,16 +1503,19 @@ setup_grub_bootloader() {
 
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Install GRUB bootloader (Denne del er fin)
+    # Install GRUB bootloader
     info_print "Installing GRUB bootloader with luks support..."
     arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1
 
-    # Sign grubx64.efi og kopier til fallback (Denne del er fin)
+    # Sign grubx64.efi og kopier til fallback
+    info_print "Signing GRUB for Secure Boot..."
     arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output /efi/EFI/GRUB/grubx64.efi /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1
+    
+    info_print "Creating fallback boot entry..."
     mkdir -p /mnt/efi/EFI/Boot
     cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
 
-    # Generate grub.cfg (Denne del er fin)
+    # Generate grub.cfg
     info_print "Generating grub.cfg..."
     if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
         startup_ok "grub.cfg generated."
