@@ -1487,15 +1487,13 @@ setup_grub_bootloader() {
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
     # Sæt korrekt kernel parameter for kryptering
-    local root_partition_uuid
-    root_partition_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
-    if [[ -n "$root_partition_uuid" ]]; then
-        sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-        echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=${root_partition_uuid}:cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
-        startup_ok "Added GRUB_CMDLINE_LINUX with cryptdevice= to /etc/default/grub."
-    fi
-    echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
+    # Vi fjerner 'cryptdevice=' helt!
+    sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
+    echo 'GRUB_CMDLINE_LINUX="root=/dev/mapper/cryptroot rw quiet splash"' >> "$grub_cfg_file"
+    startup_ok "Added GRUB_CMDLINE_LINUX with root on mapper device."
 
+# Sørg for at GRUB ved, den skal låse op
+echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
     # Install GRUB bootloader med en simplificeret modul-liste
     info_print "Installing GRUB bootloader with simplified modules..."
     if ! arch-chroot /mnt grub-install \
