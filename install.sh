@@ -2331,7 +2331,7 @@ generate_initramfs_with_mkinitcpio() {
   local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
   # === Set HOOKS: luks needs encrypt, filesystem is Btrfs, and plymouth for splash ===
-  sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block keyboard encrypt filesystems plymouth)/' "$mkinitcpio_conf"
+  sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block keyboard filesystems plymouth)/' "$mkinitcpio_conf"
   startup_ok "mkinitcpio hooks updated for luks1 with GRUB-unlocked boot, encrypted root and Btrfs."
 
   # === Optional: Enable zstd compression ===
