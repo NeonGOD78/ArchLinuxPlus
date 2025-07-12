@@ -1496,32 +1496,15 @@ setup_grub_bootloader() {
     fi
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # --- DIAGNOSTIK START ---
-
-    # Trin 1: Geninstaller GRUB og vis output direkte på skærmen
-    info_print "Ensuring grub package is correctly installed (output will be shown)..."
-    arch-chroot /mnt pacman -S --noconfirm grub
-    info_print "Pacman command finished."
-
-    # Trin 2: Verificer om modulet eksisterer EFTER pacman har kørt
-    info_print "Verifying existence of grub module file..."
-    arch-chroot /mnt ls -l /usr/lib/grub/x86_64-efi/jpg.mod
-
-    info_print "Pausing for 5 seconds to allow you to read output..."
-    sleep 5
-
-    # --- DIAGNOSTIK SLUT ---
-
-    # Install GRUB bootloader med alle nødvendige moduler
-    info_print "Attempting to install GRUB bootloader..."
+    # Install GRUB bootloader med en simplificeret modul-liste
+    info_print "Installing GRUB bootloader with simplified modules..."
     if ! arch-chroot /mnt grub-install \
         --target=x86_64-efi \
         --efi-directory=/efi \
         --bootloader-id=GRUB \
-        --modules="part_gpt part_msdos fat ext2 normal png jpg jpeg tga efi_gop efi_uga gfxterm gfxmenu all_video videoinfo boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
+        --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video videoinfo boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
         --recheck >> "$LOGFILE" 2>&1; then
         error_print "GRUB install failed!"
-        # Efter fejl, vis os de sidste linjer fra loggen
         tail -n 20 "$LOGFILE"
         exit 1
     fi
