@@ -1486,7 +1486,7 @@ setup_grub_bootloader() {
     sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-    # Sæt KUN det nødvendige hint til initramfs. 'grub-mkconfig' klarer selv resten.
+    # Sæt KUN det nødvendige hint til initramfs.
     local luks_uuid
     luks_uuid=$(arch-chroot /mnt cryptsetup luksUUID "$ROOT_PARTITION")
 
@@ -1500,14 +1500,13 @@ setup_grub_bootloader() {
 
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Brug den simple, pålidelige grub-install kommando
-    info_print "Installing GRUB bootloader (simplified, reliable method)..."
+    # Install GRUB bootloader (simpel, pålidelig metode)
+    info_print "Installing GRUB bootloader..."
     if ! arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1; then
         error_print "GRUB install failed! See log for details."
         tail -n 20 "$LOGFILE"
         exit 1
     fi
-    # Tilføjet ekstra tjek for at fange den skjulte fejl
     if [ ! -f "$grub_efi" ]; then
         error_print "GRUB install SILENTLY FAILED! The grubx64.efi file was not created."
         exit 1
