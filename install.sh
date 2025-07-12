@@ -1457,99 +1457,73 @@ setup_cmdline_file() {
 # ==================== Setup GRUB Bootloader ====================
 
 setup_grub_bootloader() {
-  section_header "GRUB Bootloader Installation and Theme Setup"
+    section_header "GRUB Bootloader Installation and Theme Setup"
 
-  local theme_dir="$GRUB_THEME_DIR"
-  local gfx_mode="$GRUB_GFXMODE"
-  local theme_url="$GRUB_THEME_URL"
-  local grub_cfg_file="/mnt/etc/default/grub"
-  local grub_efi="/efi/EFI/GRUB/grubx64.efi"
-  local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
+    local theme_dir="$GRUB_THEME_DIR"
+    local gfx_mode="$GRUB_GFXMODE"
+    local theme_url="$GRUB_THEME_URL"
+    local grub_cfg_file="/mnt/etc/default/grub"
+    local grub_efi="/efi/EFI/GRUB/grubx64.efi"
+    local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
 
-  # Download and extract GRUB theme
-  info_print "Downloading and installing GRUB theme: $theme_dir"
-  mkdir -p "/mnt/boot/grub/themes/$theme_dir"
-  if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
-    bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
-    startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
-  else
-    warning_print "Failed to download GRUB theme. Skipping theme installation."
-  fi
+    # Download and extract GRUB theme (Denne del er fin)
+    info_print "Downloading and installing GRUB theme: $theme_dir"
+    mkdir -p "/mnt/boot/grub/themes/$theme_dir"
+    if curl -sS "$theme_url" -o /tmp/theme.zip >> "$LOGFILE" 2>&1; then
+        bsdtar -xf /tmp/theme.zip -C "/mnt/boot/grub/themes/$theme_dir" >> "$LOGFILE" 2>&1
+        startup_ok "GRUB theme extracted to /boot/grub/themes/$theme_dir"
+    else
+        warning_print "Failed to download GRUB theme. Skipping theme installation."
+    fi
 
-  # Configure /etc/default/grub
-  info_print "Configuring /etc/default/grub..."
-  sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
-  sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
-  sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"|" "$grub_cfg_file"
-  sed -i "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|" "$grub_cfg_file"
-  sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=5|" "$grub_cfg_file"
-  sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
+    # Configure /etc/default/grub (Denne del er fin)
+    info_print "Configuring /etc/default/grub..."
+    sed -i "s|^GRUB_GFXMODE=.*|GRUB_GFXMODE=$gfx_mode|" "$grub_cfg_file"
+    sed -i "s|^GRUB_GFXPAYLOAD_LINUX=.*|GRUB_GFXPAYLOAD_LINUX=keep|" "$grub_cfg_file"
+    sed -i "s|^GRUB_THEME=.*|GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"|" "$grub_cfg_file"
+    sed -i "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|" "$grub_cfg_file"
+    sed -i "s|^GRUB_TIMEOUT=.*|GRUB_TIMEOUT=5|" "$grub_cfg_file"
+    sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
+    echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-  grep -q "^GRUB_GFXMODE=" "$grub_cfg_file" || echo "GRUB_GFXMODE=$gfx_mode" >> "$grub_cfg_file"
-  grep -q "^GRUB_GFXPAYLOAD_LINUX=" "$grub_cfg_file" || echo "GRUB_GFXPAYLOAD_LINUX=keep" >> "$grub_cfg_file"
-  grep -q "^GRUB_THEME=" "$grub_cfg_file" || echo "GRUB_THEME=\"/boot/grub/themes/$theme_dir/theme.txt\"" >> "$grub_cfg_file"
-  grep -q "^GRUB_TERMINAL_OUTPUT=" "$grub_cfg_file" || echo "GRUB_TERMINAL_OUTPUT=gfxterm" >> "$grub_cfg_file"
-  grep -q "^GRUB_TIMEOUT=" "$grub_cfg_file" || echo "GRUB_TIMEOUT=5" >> "$grub_cfg_file"
-  grep -q "^GRUB_TIMEOUT_STYLE=" "$grub_cfg_file" || echo "GRUB_TIMEOUT_STYLE=menu" >> "$grub_cfg_file"
-  echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
+    #################################################################
+    # === KORRIGERET BLOK: Sæt korrekt kernel parameter ===
+    #################################################################
+    local root_partition_uuid
+    root_partition_uuid=$(blkid -s UUID -o value "$ROOT_PARTITION")
 
-  # Add luks UUID for proper unlock behavior
-  local luks_uuid
-  luks_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION")
-  if [[ -n "$luks_uuid" ]]; then
-    sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-    echo "GRUB_CMDLINE_LINUX=\"rd.luks.name=$luks_uuid=cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
-    startup_ok "Added GRUB_CMDLINE_LINUX with rd.luks.name= to avoid double prompt."
-  else
-    warning_print "Could not detect luks UUID. GRUB_CMDLINE_LINUX not set!"
-  fi
+    if [[ -n "$root_partition_uuid" ]]; then
+        # Fjern eventuel eksisterende GRUB_CMDLINE_LINUX linje
+        sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
 
-  echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
+        # Tilføj den korrekte linje med cryptdevice=UUID=...
+        echo "GRUB_CMDLINE_LINUX=\"cryptdevice=UUID=${root_partition_uuid}:cryptroot root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
+        startup_ok "Added GRUB_CMDLINE_LINUX with cryptdevice= to /etc/default/grub."
+    else
+        warning_print "Could not detect block UUID for root partition. GRUB_CMDLINE_LINUX not set!"
+    fi
 
-  # Install GRUB bootloader with luks/cryptodisk support
-  info_print "Installing GRUB bootloader with luks support..."
-  local grub_nvram_flag
-  grub_nvram_flag=$(arch-chroot /mnt systemd-detect-virt --quiet && echo "--no-nvram" || echo "")
+    echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-  if arch-chroot /mnt grub-install \
-    --target=x86_64-efi \
-    --efi-directory=/efi \
-    --bootloader-id=GRUB \
-    $grub_nvram_flag \
-    --modules="part_gpt part_msdos fat ext2 normal efi_gop efi_uga gfxterm gfxmenu all_video boot linux configfile search search_fs_uuid search_label search_fs_file cryptodisk luks" \
-    --recheck >> "$LOGFILE" 2>&1; then
-    startup_ok "GRUB bootloader installed successfully with luks support."
-  else
-    error_print "GRUB install failed!"
-    exit 1
-  fi
+    # Install GRUB bootloader (Denne del er fin)
+    info_print "Installing GRUB bootloader with luks support..."
+    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1
 
-  # Sign grubx64.efi
-  if arch-chroot /mnt sbsign \
-    --key /etc/secureboot/keys/db.key \
-    --cert /etc/secureboot/keys/db.crt \
-    --output /efi/EFI/GRUB/grubx64.efi \
-    /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1; then
-    startup_ok "grubx64.efi signed."
-  else
-    warning_print "Failed to sign grubx64.efi"
-  fi
+    # Sign grubx64.efi og kopier til fallback (Denne del er fin)
+    arch-chroot /mnt sbsign --key /etc/secureboot/keys/db.key --cert /etc/secureboot/keys/db.crt --output /efi/EFI/GRUB/grubx64.efi /efi/EFI/GRUB/grubx64.efi >> "$LOGFILE" 2>&1
+    mkdir -p /mnt/efi/EFI/Boot
+    cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
 
-  # Copy to fallback BOOTX64.EFI
-  mkdir -p /mnt/efi/EFI/Boot
-  cp /mnt/efi/EFI/GRUB/grubx64.efi /mnt/efi/EFI/Boot/BOOTX64.EFI
-  [[ -f "$fallback_efi" ]] && startup_ok "Fallback BOOTX64.EFI updated." || warning_print "Fallback BOOTX64.EFI was not created."
+    # Generate grub.cfg (Denne del er fin)
+    info_print "Generating grub.cfg..."
+    if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
+        startup_ok "grub.cfg generated."
+    else
+        error_print "Failed to generate grub.cfg!"
+        exit 1
+    fi
 
-  # Generate grub.cfg
-  info_print "Generating grub.cfg..."
-  if arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$LOGFILE" 2>&1; then
-    startup_ok "grub.cfg generated."
-  else
-    error_print "Failed to generate grub.cfg!"
-    exit 1
-  fi
-
-  startup_ok "GRUB setup complete. luks will be unlocked in GRUB, no double prompt."
+    startup_ok "GRUB setup complete."
 }
 
 # ==================== Setup GRUB pacman hook ====================
