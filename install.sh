@@ -2184,60 +2184,37 @@ setup_boot_targets() {
 # ==================== Setup Crypttab ====================
 
 setup_crypttab() {
-    section_header "Creating /etc/crypttab"
-
+    section_header "Creating /etc/crypttab for optional crypthome"
     local crypttab_path="/mnt/etc/crypttab"
-    local root_uuid
-    local home_uuid
 
-    mkdir -p /mnt/etc
-
-    # Hent UUID for rod-partitionen
-    root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
-    if [[ -z "$root_uuid" ]]; then
-        error_print "Unable to retrieve LUKS UUID for /root partition."
-        exit 1
-    fi
-
-    # Opret ALTID posten for cryptroot med keyfile.
-    echo "cryptroot UUID=$root_uuid /boot/volume.key luks" > "$crypttab_path"
-    startup_ok "Added cryptroot entry with keyfile to crypttab."
-
-    # Håndter KUN crypthome, hvis en separat home-partition er valgt.
+    # Filen skal kun indeholde noget, hvis du har en separat krypteret /home
     if [[ "$SEPARATE_HOME" == true ]]; then
-        home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
-        if [[ -z "$home_uuid" ]]; then
-            error_print "Unable to retrieve LUKS UUID for /home partition."
-            exit 1
-        fi
-        # Tilføj posten for crypthome med noauto-flag til PAM.
-        echo "crypthome UUID=$home_uuid none luks,noauto" >> "$crypttab_path"
+        local home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
+        # 'noauto' lader PAM håndtere oplåsning ved login
+        echo "crypthome UUID=$home_uuid none luks,noauto" > "$crypttab_path"
         startup_ok "Added crypthome entry to crypttab for login-unlock."
+    else
+        # Hvis ingen separat /home, skal filen være tom.
+        > "$crypttab_path"
+        startup_ok "/etc/crypttab is empty as expected."
     fi
-
-    startup_ok "/etc/crypttab created successfully."
 }
 
 # ==================== Generate Initramfs with mkinitcpio ====================
 
 generate_initramfs_with_mkinitcpio() {
     section_header "Generating Initramfs with mkinitcpio"
-
     local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-    # Tilføj keyfile til FILES-arrayet
-    sed -i 's/^FILES=.*/FILES=(\/boot\/volume.key)/' "$mkinitcpio_conf"
-    startup_ok "Keyfile added to mkinitcpio FILES array."
-
     # Sæt den korrekte HOOKS-linje med 'encrypt'
-    sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block keyboard keymap encrypt plymouth filesystems fsck)/' "$mkinitcpio_conf"
-    startup_ok "mkinitcpio hooks updated for keyfile unlock."
+    sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block keyboard keymap encrypt filesystems fsck)/' "$mkinitcpio_conf"
+    startup_ok "mkinitcpio hooks updated."
 
-    # Sæt kompression (valgfrit)
+    # Fjern en eventuel FILES-linje for keyfile
+    sed -i '/^FILES=/d' "$mkinitcpio_conf"
+
     sed -i 's/^#COMPRESSION=.*/COMPRESSION="zstd"/' "$mkinitcpio_conf"
-    startup_ok "Initramfs compression set to zstd."
 
-    # Generer initramfs
     if arch-chroot /mnt mkinitcpio -P >> "$LOGFILE" 2>&1; then
         startup_ok "Initramfs successfully generated with mkinitcpio."
     else
