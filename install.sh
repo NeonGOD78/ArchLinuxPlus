@@ -1486,25 +1486,30 @@ setup_grub_bootloader() {
     sed -i "s|^GRUB_TIMEOUT_STYLE=.*|GRUB_TIMEOUT_STYLE=menu|" "$grub_cfg_file"
     echo 'GRUB_SPLASH="/boot/plymouth/arch-logo.png"' >> "$grub_cfg_file"
 
-    # Sæt korrekt kernel parameter for kryptering
+    # Sæt KUN det nødvendige hint til initramfs. 'grub-mkconfig' klarer selv resten.
     local luks_uuid
     luks_uuid=$(arch-chroot /mnt cryptsetup luksUUID "$ROOT_PARTITION")
 
     if [[ -n "$luks_uuid" ]]; then
         sed -i '/^GRUB_CMDLINE_LINUX=/d' "$grub_cfg_file"
-        echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid root=/dev/mapper/cryptroot rw quiet splash\"" >> "$grub_cfg_file"
-        startup_ok "Added GRUB_CMDLINE_LINUX with rd.luks.uuid hint."
+        echo "GRUB_CMDLINE_LINUX=\"rd.luks.uuid=$luks_uuid\"" >> "$grub_cfg_file"
+        startup_ok "Added GRUB_CMDLINE_LINUX with ONLY the rd.luks.uuid hint."
     else
-        warning_print "Could not detect LUKS UUID for root partition! Kernel parameters may be incorrect."
+        warning_print "Could not detect LUKS UUID for root partition!"
     fi
 
     echo "GRUB_ENABLE_CRYPTODISK=y" >> "$grub_cfg_file"
 
-    # Install GRUB bootloader med en simpel standardopsætning
-    info_print "Installing GRUB bootloader (simplified method)..."
+    # Brug den simple, pålidelige grub-install kommando
+    info_print "Installing GRUB bootloader (simplified, reliable method)..."
     if ! arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=GRUB --recheck >> "$LOGFILE" 2>&1; then
-        error_print "GRUB install failed!"
+        error_print "GRUB install failed! See log for details."
         tail -n 20 "$LOGFILE"
+        exit 1
+    fi
+    # Tilføjet ekstra tjek for at fange den skjulte fejl
+    if [ ! -f "$grub_efi" ]; then
+        error_print "GRUB install SILENTLY FAILED! The grubx64.efi file was not created."
         exit 1
     fi
     startup_ok "GRUB bootloader installed successfully."
