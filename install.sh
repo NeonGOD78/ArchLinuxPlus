@@ -2065,65 +2065,57 @@ EOF
 # ==================== Verify Boot integrity ====================
 
 verify_boot_integrity() {
-    section_header "Verifying Boot Setup Integrity (GRUB Unlock Method)"
+    section_header "Verifying Boot Setup Integrity (Final Version)"
 
     local fail=false
     local grub_cfg="/mnt/boot/grub/grub.cfg"
     local crypttab="/mnt/etc/crypttab"
     local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-    echo "== Boot Verification Start ==" >> "$LOGFILE"
-
-    # === Tjek 1: Essentielle filer ===
+    info_print "Verifying essential boot files exist..."
     if [[ ! -f "$grub_cfg" ]]; then
         startup_fail "Missing GRUB config: $grub_cfg" && fail=true
     else
         startup_ok "grub.cfg exists."
     fi
 
-    # === Tjek 2: GRUB Kernel Parametre ===
-    # Tjekker at 'root=/dev/mapper/cryptroot' er til stede
-    if grep -q "root=/dev/mapper/cryptroot" "$grub_cfg"; then
-        startup_ok "Kernel parameter 'root=/dev/mapper/cryptroot' is correctly set."
+    info_print "Verifying kernel command line parameters in grub.cfg..."
+    if grep -q "rd.luks.uuid=" "$grub_cfg"; then
+        startup_ok "Kernel parameter 'rd.luks.uuid=' is correctly set."
     else
-        startup_fail "Kernel parameter 'root=/dev/mapper/cryptroot' is MISSING!" && fail=true
-    fi
-    # Tjekker at den gamle 'cryptdevice=' parameter er FJERNET
-    if grep -q "cryptdevice=" "$grub_cfg"; then
-        startup_fail "Old 'cryptdevice=' parameter is still present and should be removed!" && fail=true
-    else
-        startup_ok "Old 'cryptdevice=' parameter is correctly removed."
+        startup_fail "Kernel parameter 'rd.luks.uuid=' is MISSING!" && fail=true
     fi
 
-    # === Tjek 3: Initramfs konfiguration ===
-    # 'encrypt' hook SKAL stadig være der
+    if grep -q "root=UUID=" "$grub_cfg"; then
+        startup_ok "Kernel parameter 'root=UUID=' is correctly set."
+    else
+        startup_fail "Auto-detected 'root=UUID=' is MISSING!" && fail=true
+    fi
+
+    if grep -q "root=/dev/mapper/cryptroot" "$grub_cfg"; then
+        startup_fail "Conflicting 'root=/dev/mapper/cryptroot' is present and should be removed!" && fail=true
+    else
+        startup_ok "Conflicting 'root=/dev/mapper/cryptroot' is correctly removed."
+    fi
+
+    info_print "Verifying initramfs and crypttab configuration..."
     if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
         startup_ok "'encrypt' hook is correctly present in mkinitcpio.conf."
     else
         startup_fail "'encrypt' hook is MISSING in mkinitcpio.conf!" && fail=true
     fi
-    # Keyfile-linjen i FILES SKAL være FJERNET
-    if grep -q "FILES=.*volume.key" "$mkinitcpio_conf"; then
-        startup_fail "Keyfile is still listed in mkinitcpio.conf FILES and should be removed!" && fail=true
-    else
-        startup_ok "Keyfile is correctly removed from mkinitcpio.conf FILES."
-    fi
 
-    # === Tjek 4: Crypttab konfiguration ===
-    # 'cryptroot' SKAL være FJERNET fra /etc/crypttab
     if [[ -f "$crypttab" ]] && grep -q "cryptroot" "$crypttab"; then
         startup_fail "'cryptroot' entry should be REMOVED from /etc/crypttab!" && fail=true
     else
         startup_ok "'cryptroot' entry is correctly absent from /etc/crypttab."
     fi
 
-    echo "== Boot Verification Complete ==" >> "$LOGFILE"
-
     if [[ "$fail" == true ]]; then
-        startup_fail "Boot verification failed! See $LOGFILE for details."
+        startup_fail "Boot verification failed! Please review the errors above."
         exit 1
     else
-        startup_ok "Boot setup verified successfully for GRUB unlock method."
+        startup_ok "Boot setup verified successfully. System should be ready to boot!"
     fi
 }
 
