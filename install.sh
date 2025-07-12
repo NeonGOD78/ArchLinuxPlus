@@ -2361,7 +2361,7 @@ setup_keyfile_for_root_unlock() {
     # Tilføj keyfile som en gyldig nøgle til at låse cryptroot op
     # Bruger automatisk password fra variablen ENCRYPTION_PASSWORD
     info_print "Adding keyfile to cryptroot LUKS partition automatically..."
-    echo -n "$ENCRYPTION_PASSWORD" | arch-chroot /mnt cryptsetup --key-file - luksAddKey /dev/disk/by-uuid/"$ROOT_UUID" /boot/volume.key
+    echo -n "$LUKS_PASSWORD" | arch-chroot /mnt cryptsetup --key-file - luksAddKey /dev/disk/by-uuid/"$ROOT_UUID" /boot/volume.key
 
     startup_ok "Keyfile successfully created and added to cryptroot."
 }
