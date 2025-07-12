@@ -2060,68 +2060,65 @@ EOF
 # ==================== Verify Boot integrity ====================
 
 verify_boot_integrity() {
-    section_header "Verifying Boot Setup Integrity"
+    section_header "Verifying Boot Setup Integrity (GRUB Unlock Method)"
 
     local fail=false
     local grub_cfg="/mnt/boot/grub/grub.cfg"
-    local grub_efi="/mnt/efi/EFI/GRUB/grubx64.efi"
-    local fallback_efi="/mnt/efi/EFI/Boot/BOOTX64.EFI"
-    # Vi tjekker nu den genererede grub.cfg, ikke default-filen
-    local cmdline_check_target="/mnt/boot/grub/grub.cfg"
     local crypttab="/mnt/etc/crypttab"
-    local initrd="/mnt/boot/initramfs-linux.img"
-    local initrd_fallback="/mnt/boot/initramfs-linux-fallback.img"
     local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
     echo "== Boot Verification Start ==" >> "$LOGFILE"
 
-    # === grub.cfg, grubx64.efi, fallback EFI (Uændret) ===
-    # Disse tjek er stadig korrekte
-    if [[ -f "$grub_cfg" ]]; then startup_ok "grub.cfg exists."; else startup_fail "Missing GRUB config: $grub_cfg"; fail=true; fi
-    if [[ -f "$grub_efi" ]]; then startup_ok "grubx64.efi found."; else startup_fail "grubx64.efi missing."; fail=true; fi
-    if [[ -f "$fallback_efi" ]]; then startup_ok "Fallback BOOTX64.EFI exists."; else startup_warn "Fallback BOOTX64.EFI missing."; fi
-
-    # === KORRIGERET TJEK: cryptdevice SKAL VÆRE TIL STEDE ===
-    if grep -q "cryptdevice=UUID=.*:cryptroot" "$cmdline_check_target"; then
-        startup_ok "cryptdevice= korrekt til stede i GRUB config."
-        echo "[OK] cryptdevice= found." >> "$LOGFILE"
+    # === Tjek 1: Essentielle filer ===
+    if [[ ! -f "$grub_cfg" ]]; then
+        startup_fail "Missing GRUB config: $grub_cfg" && fail=true
     else
-        startup_fail "cryptdevice= mangler i GRUB config! Nødvendig for at låse root op."
-        echo "[FAIL] cryptdevice= parameter mangler." >> "$LOGFILE"
-        fail=true
+        startup_ok "grub.cfg exists."
     fi
 
-    # === initramfs (Uændret) ===
-    if [[ -f "$initrd" ]]; then startup_ok "initramfs-linux.img found."; else startup_fail "Missing initramfs-linux.img!"; fail=true; fi
-    if [[ -f "$initrd_fallback" ]]; then startup_ok "initramfs-linux-fallback.img found."; else startup_warn "initramfs fallback image is missing."; fi
+    # === Tjek 2: GRUB Kernel Parametre ===
+    # Tjekker at 'root=/dev/mapper/cryptroot' er til stede
+    if grep -q "root=/dev/mapper/cryptroot" "$grub_cfg"; then
+        startup_ok "Kernel parameter 'root=/dev/mapper/cryptroot' is correctly set."
+    else
+        startup_fail "Kernel parameter 'root=/dev/mapper/cryptroot' is MISSING!" && fail=true
+    fi
+    # Tjekker at den gamle 'cryptdevice=' parameter er FJERNET
+    if grep -q "cryptdevice=" "$grub_cfg"; then
+        startup_fail "Old 'cryptdevice=' parameter is still present and should be removed!" && fail=true
+    else
+        startup_ok "Old 'cryptdevice=' parameter is correctly removed."
+    fi
 
-    # === KORRIGERET TJEK: encrypt hook SKAL VÆRE TIL STEDE ===
+    # === Tjek 3: Initramfs konfiguration ===
+    # 'encrypt' hook SKAL stadig være der
     if grep -q 'HOOKS=.*encrypt' "$mkinitcpio_conf"; then
-        startup_ok "encrypt hook korrekt til stede i mkinitcpio.conf."
-        echo "[OK] encrypt hook found." >> "$LOGFILE"
+        startup_ok "'encrypt' hook is correctly present in mkinitcpio.conf."
     else
-        startup_fail "encrypt hook mangler i mkinitcpio.conf! Nødvendig for at bruge keyfile."
-        echo "[FAIL] encrypt hook mangler." >> "$LOGFILE"
-        fail=true
+        startup_fail "'encrypt' hook is MISSING in mkinitcpio.conf!" && fail=true
+    fi
+    # Keyfile-linjen i FILES SKAL være FJERNET
+    if grep -q "FILES=.*volume.key" "$mkinitcpio_conf"; then
+        startup_fail "Keyfile is still listed in mkinitcpio.conf FILES and should be removed!" && fail=true
+    else
+        startup_ok "Keyfile is correctly removed from mkinitcpio.conf FILES."
     fi
 
-    # === KORRIGERET TJEK: cryptroot SKAL VÆRE I crypttab ===
+    # === Tjek 4: Crypttab konfiguration ===
+    # 'cryptroot' SKAL være FJERNET fra /etc/crypttab
     if [[ -f "$crypttab" ]] && grep -q "cryptroot" "$crypttab"; then
-        startup_ok "cryptroot entry korrekt fundet i /etc/crypttab."
-        echo "[OK] cryptroot entry found in crypttab." >> "$LOGFILE"
+        startup_fail "'cryptroot' entry should be REMOVED from /etc/crypttab!" && fail=true
     else
-        startup_fail "cryptroot entry mangler i /etc/crypttab! Nødvendig for keyfile unlock."
-        echo "[FAIL] cryptroot entry mangler i crypttab." >> "$LOGFILE"
-        fail=true
+        startup_ok "'cryptroot' entry is correctly absent from /etc/crypttab."
     fi
 
     echo "== Boot Verification Complete ==" >> "$LOGFILE"
 
     if [[ "$fail" == true ]]; then
-        startup_fail "Boot verification failed! Se $LOGFILE for detaljer."
+        startup_fail "Boot verification failed! See $LOGFILE for details."
         exit 1
     else
-        startup_ok "Boot setup verificeret. Systemet ser ud til at være klar til opstart!"
+        startup_ok "Boot setup verified successfully for GRUB unlock method."
     fi
 }
 
