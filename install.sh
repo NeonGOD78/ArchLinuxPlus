@@ -2270,16 +2270,12 @@ setup_boot_targets() {
 # ==================== Setup Crypttab ====================
 
 setup_crypttab() {
-  section_header "Creating /etc/crypttab with cryptroot and crypthome"
+  section_header "Creating /etc/crypttab with optional crypthome"
 
   local crypttab_path="/mnt/etc/crypttab"
-  local root_uuid home_uuid
+  local home_uuid
 
-  root_uuid=$(cryptsetup luksUUID "$ROOT_PARTITION" 2>/dev/null)
-  if [[ -z "$root_uuid" ]]; then
-    error_print "Unable to retrieve LUKS UUID for root partition."
-    exit 1
-  fi
+  mkdir -p /mnt/etc
 
   if [[ "$SEPARATE_HOME" == true ]]; then
     home_uuid=$(cryptsetup luksUUID "$HOME_PARTITION" 2>/dev/null)
@@ -2287,16 +2283,12 @@ setup_crypttab() {
       error_print "Unable to retrieve LUKS UUID for /home partition."
       exit 1
     fi
+
+    echo "crypthome UUID=$home_uuid none luks,nofail,x-systemd.device-timeout=0" > "$crypttab_path"
+  else
+    # Empty crypttab (no separate home)
+    > "$crypttab_path"
   fi
-
-  mkdir -p /mnt/etc
-
-  {
-    echo "cryptroot UUID=$root_uuid none luks,nofail,x-systemd.device-timeout=0"
-    if [[ "$SEPARATE_HOME" == true ]]; then
-      echo "crypthome UUID=$home_uuid none luks,nofail,x-systemd.device-timeout=0"
-    fi
-  } > "$crypttab_path"
 
   # Log filens indhold
   echo "--- /etc/crypttab content ---" >> "$LOGFILE"
@@ -2305,6 +2297,7 @@ setup_crypttab() {
 
   startup_ok "/etc/crypttab created and validated successfully"
 }
+
 
 # ==================== Generate Initramfs with mkinitcpio ====================
 
