@@ -2220,32 +2220,21 @@ setup_crypttab() {
 generate_initramfs_with_mkinitcpio() {
     section_header "Generating Initramfs with mkinitcpio"
 
-    local kernel_pkg="$KERNEL_PACKAGE"
-    local kernel_version
-    kernel_version=$(ls /mnt/lib/modules | grep -E '^([0-9]+\.){2}[0-9]+' | head -n1)
-
-    if [[ -z "$kernel_version" ]]; then
-        error_print "Could not determine kernel version inside target system (/mnt/lib/modules)."
-        exit 1
-    fi
-
-    info_print "Detected kernel version: $kernel_version"
-
     local mkinitcpio_conf="/mnt/etc/mkinitcpio.conf"
 
-    # === AFGØRENDE TRIN: Tilføj keyfile til FILES-arrayet ===
+    # Tilføj keyfile til FILES-arrayet
     sed -i 's/^FILES=.*/FILES=(\/boot\/volume.key)/' "$mkinitcpio_conf"
     startup_ok "Keyfile added to mkinitcpio FILES array."
 
-    # === Set HOOKS: luks needs encrypt, filesystem is Btrfs, and plymouth for splash ===
+    # Sæt den korrekte HOOKS-linje med 'encrypt'
     sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf block keyboard keymap encrypt plymouth filesystems fsck)/' "$mkinitcpio_conf"
     startup_ok "mkinitcpio hooks updated for keyfile unlock."
 
-    # === Optional: Enable zstd compression ===
+    # Sæt kompression (valgfrit)
     sed -i 's/^#COMPRESSION=.*/COMPRESSION="zstd"/' "$mkinitcpio_conf"
     startup_ok "Initramfs compression set to zstd."
 
-    # === Generate initramfs ===
+    # Generer initramfs
     if arch-chroot /mnt mkinitcpio -P >> "$LOGFILE" 2>&1; then
         startup_ok "Initramfs successfully generated with mkinitcpio."
     else
